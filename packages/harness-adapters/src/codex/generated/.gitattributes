@@ -1,0 +1,2 @@
+# Preserve official generator bytes and provenance hashes on Windows checkouts.
+* text eol=lf

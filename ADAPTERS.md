@@ -1,6 +1,6 @@
 # Runtime adapters
 
-This stage defines contracts only. Every Harness integration is **unimplemented**; executable discovery is not compatibility certification. Research date: **2026-09-06**. OpenCode baseline: `v1.18.29`, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`.
+The Codex App Server adapter is **conditional**, pinned to native version `0.153.4`, with local protocol tests and no live model-task validation. Other Harness runtime adapters remain **unimplemented**. Executable discovery is not compatibility certification. [Implemented scope](M1A_IMPLEMENTATION.md). Research date: **2026-09-06**. OpenCode baseline: `v1.18.29`, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`.
 
 ## Package boundary
 

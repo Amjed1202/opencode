@@ -1,7 +1,7 @@
 {
   "codename": "Harness",
   "identityStatus": "provisional",
-  "stage": "architecture-and-contracts",
+  "stage": "initial-local-host-and-codex",
   "desktopIntegration": "not-implemented",
   "upstream": {
     "repository": "https://github.com/anomalyco/opencode",

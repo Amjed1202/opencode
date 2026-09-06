@@ -1,6 +1,33 @@
 # Validation and known issues
 
-Executed 2026-09-06 on Windows with Bun **1.3.14** and Node **24.14.1**. This validates architecture scaffolding and selected existing upstream behavior. It does not validate real Claude/Codex execution, subscription billing, the new desktop UI, security enforcement, collaboration or remote nodes; none is implemented in this stage.
+Executed 2026-09-06 on Windows with Bun **1.3.14** and Node **24.14.1**. The continuation adds behavioral checks for the initial host and Codex integration; [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) defines its scope. There is no live model-task, charge, OS isolation, desktop, collaboration or remote-node acceptance claim.
+
+## Initial host continuation
+
+| Final check | Result | Evidence |
+| --- | --- | --- |
+| Host suite | **115 pass, 0 fail**, 238 assertions | [Log](docs/validation/m1a-control-plane-tests.log) |
+| Codex adapter/stdio suite | **43 pass, 0 fail**, 87 assertions | [Log](docs/validation/m1a-adapter-tests.log) |
+| Three Harness package typechecks | **3 pass** | [Protocol](docs/validation/m1a-harness-protocol-typecheck.log), [adapters](docs/validation/m1a-harness-adapters-typecheck.log), [host](docs/validation/m1a-harness-control-plane-typecheck.log) |
+| Frozen filtered dependency install | **Pass**, no version changes | [Log](docs/validation/m1a-install.log) |
+| Authored-source Prettier | **Pass** | [Log](docs/validation/m1a-format.log) |
+| Oxlint, 35 authored TypeScript files | **0 errors, 75 warnings**, exit 0 | [Diagnostics](docs/validation/m1a-oxlint.json) |
+| Official generated protocol files | **50 hashes match**, unmodified | [Provenance](packages/harness-adapters/src/codex/generated/0.153.4/provenance.json) |
+| Final independent host review | **Both findings fixed and rechecked** | [Review summary](docs/validation/m1a-review.md) |
+
+Total: **158 tests, 325 assertions**. Lint warnings are retained, not suppressed; most concern Bun's promise-assertion typings, with additional typed JSON/test assertions and style warnings. This is not a warning-free lint result. Generated native sources are excluded from authored-source formatting/lint and remain included in typechecking and hash verification.
+
+The host tests exercise billing/auth/provider conflicts, stale and changing evidence, scoped consent, command identity, lease ownership, SQLite transactions and forced process termination. Native integration tests spawn a local JSON-RPC peer through the actual stdio transport; the full integration test uses admission, the runtime manager, SQLite and the Codex adapter together. These are not real provider responses or subscription inference tests.
+
+Independent reviews hardened admission invalidation/expiry races, directory identity, token limits, stream closure, active-turn correlation, durable completion, resume and shutdown. Native launch review covers credential/environment overrides and supported process-only configuration controls.
+
+The installed **Codex 0.153.4** completed a read-only handshake and managed account/configuration reads. Existing endpoint, plugin, MCP and notification configuration intentionally blocked subscription preflight because this adapter does not verify those settings. Presence alone does not establish that an endpoint is custom. All 29 final process-only isolation overrides matched native effective configuration. No native thread, turn, login or refresh request was made. No user configuration or authentication file was edited. See [native smoke evidence](docs/validation/m1a-native-smoke.json).
+
+The two Bun implementation packages use `skipLibCheck` for incompatible declarations in the unchanged catalog's `bun-types@1.3.13`; all Harness source/tests and generated `.ts` wire types are checked. Windows sandbox denial of fixture child processes was resolved by running only those local tests with process permission. The unchanged upstream suites below were not repeated because their functional source did not change.
+
+## Foundation baseline (previous delivery)
+
+The checks below were recorded for architecture scaffolding and existing upstream behavior before the host implementation. Their original limitations and failures remain visible.
 
 ## Typechecks and static checks
 

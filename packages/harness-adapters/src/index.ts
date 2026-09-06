@@ -27,7 +27,7 @@ export interface AdapterSessionContext {
   readonly leaseGeneration: number
 }
 
-/** Host-only interface. No implementation, process launch or native SDK dependency is provided. */
+/** Host-only interface. Concrete native implementations are exposed through separate adapter entry points. */
 export interface AgentAdapter {
   readonly id: string
   readonly version: string

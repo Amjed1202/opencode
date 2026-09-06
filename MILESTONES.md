@@ -8,6 +8,8 @@ Acceptance: upstream functional source remains intact; universal types import no
 
 ## M1a — admission and Codex vertical slice
 
+Current progress: the initial local host, admission, SQLite journal and pinned Codex adapter are implemented and exercised with a spawned protocol peer. M1a is **not complete**: interactive approval handling, native history reconciliation, OS boundary verification and a user-authorized live repository task remain acceptance work. See [implementation status](M1A_IMPLEMENTATION.md).
+
 Implement runtime discovery and nonsecret preflight, provider-specific environment construction, session registry/command ledger and one private local transport. Add Codex App Server using managed native ChatGPT login with API fallback disabled. Pin and test actual executable protocol versions. Keep existing native credentials provider managed; account reads must not mutate login.
 
 Acceptance: one real repository session can run a user-authorized task through control-plane APIs, stream text/actions, handle accept/deny/expiry, interrupt, resume after restart and retain raw events safely. Conflicting API configuration blocks before inference. No silent billing-route changes on capacity errors, retries or reconnection. Fixtures cover protocol behavior; a separately authorized live session validates subscription routing evidence. Unknown provider overage remains explicit.
@@ -44,4 +46,4 @@ Add isolated parallel worktrees and explicit reconciliation, usage aggregates, c
 
 ## Recommended immediate next step
 
-Build the M1a admission and Codex slice. Codex is installed in the reconnaissance environment; Claude was not found on PATH. First implement and test **billing-safe preflight**, then event/permission translation; do not start by restyling the whole OpenCode UI. Recheck current provider terms and versioned native contracts at integration time.
+Finish M1a native integration: verify one supported host sandbox and configuration, add interactive permission/input handling and native history reconciliation, then run a user-authorized repository task with explicit subscription/overage settings. The initial admission and journal remain prerequisites for each command. Claude and desktop work follow these acceptance gates.

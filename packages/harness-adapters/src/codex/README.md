@@ -1,13 +1,38 @@
-# Codex App Server adapter — not implemented
+# Codex App Server adapter — conditional integration
 
-Use official App Server with private stdio and Codex-managed ChatGPT authentication. API-key mode requires an explicit different selection. See [ADAPTERS.md](../../../../ADAPTERS.md).
+`CodexAdapter` is a host-only implementation exported from `@harness/adapters/codex`. It supports the unmodified Codex CLI **0.153.4** through a private stdio child process. Importing the package or constructing the adapter does not start a process; discovery/preflight/session methods do. No native agent loop is reimplemented.
 
-TODO before adding `adapter.ts`:
+```ts
+import { CodexAdapter } from "@harness/adapters/codex"
 
-1. Select a supported executable/version and generate its official wire types privately inside this adapter. Research inspected Codex 0.153.4; that is not a compatibility certification.
-2. Implement initialize/account reads and native browser/device login without reading/copying auth files or taking externally supplied subscription tokens.
-3. Verify effective account/provider/configuration before each admission; test API environment/profile conflicts without mutating global login.
-4. Map thread/turn/item events, native approval request IDs, human-input requests, interrupts and resume into the common interface.
-5. Test uncertain dispatch, stream replay, last-versus-total usage and account-scoped rate-limit buckets. Quota reads must never spend reset credits.
+const adapter = new CodexAdapter({
+  executable: selectedAbsoluteExecutable,
+  cwd: selectedAbsoluteWorkspace,
+  environment: compiledEnvironment,
+  target: { id: "local", kind: "local", name: "Local" },
+})
+// Use host admission/runtime-manager services before createSession or send.
+// dispose() terminates the owned native process when its host shuts down.
+```
 
-No App Server is started by this package.
+The host supplies the environment; this package does not import the control plane. The adapter rejects provider keys, URL/profile overrides and all environment names outside its OS allowlist. PATH and home directories must be explicit and fully absolute. Windows HOME and USERPROFILE must agree. Bun on Windows synthesizes some OS variables even for an empty environment object, so home and PATH must be supplied deliberately. Arbitrary parent credentials are not inherited (verified with a nested process fixture). `transportFactory` is a privileged process-supervision injection point, exercised with a real spawned local peer in tests; never expose it to a renderer.
+
+Preflight initializes the pinned protocol with experimental APIs and client attestation disabled, reads `account/read` with `refreshToken:false`, reads effective config for the selected cwd, then reads the account again. It accepts a managed ChatGPT account on a recognized paid plan, an OpenAI provider, and an explicitly acknowledged provider-overage policy. Provider overage remains **unknown**; `require-disabled` cannot pass. API mode, automatic fallback, external auth tokens, native login/logout, purchases and credit resets are not exposed. The user signs in separately using Codex's own flow.
+
+Each native process receives config overrides disabling hooks, plugins, app connectors, host/bundled skill discovery, subagents, shell snapshots, orchestrator MCP/skills, proxy features, login shells, native shell profiles, analytics, feedback and OTEL exporters. All 29 resulting values must be reflected by native `config/read`. Nonempty provider/profile/custom endpoint, MCP server, notify, plugin/hook/app, or shell environment injection settings block execution. These checks do not edit the user's config or credential files. The official config schema and installed-native config smoke validate these switches; this is not OS attestation.
+
+The initial policy requires deny-only approvals, sandboxed shell, denied network, no allowed MCP servers, and read-only or workspace-write filesystem. `requireEnforcedBoundary` must be false. Thread start/resume checks returned provider, model, cwd, approval policy, sandbox/network settings and idle status; workspace-write additionally checks writable roots and temporary-directory exclusions. Every turn repeats sandbox and approval settings. Native account/config evidence is rechecked immediately before creation/resume/dispatch and compared to the host's current admission. Account changes invalidate evidence; routine quota events do not. These observations do not atomically lock native billing or settings against another native client.
+
+The native account schema exposes email and plan, not a stable organization/workspace/account ID. The adapter hashes those fields for correlation and never publishes the email. This detects ordinary account switches but cannot distinguish accounts/workspaces with the same email and plan. Managed native authentication stays entirely inside Codex.
+
+The adapter maps turn started/completed/failed, assistant text deltas and authoritative text completion. Thread, turn, item and request IDs are retained independently. Notifications arriving before acknowledgement are buffered and bound only after the native turn ID is returned. Stale or unrelated events are retained as metadata without command attribution. Unknown event bodies, command/error bodies, authentication messages and native stderr are not persisted; unknown event types and safe IDs remain available. This is deliberately lossy redaction, not a raw transcript archive.
+
+Native command/file/permission requests are denied immediately; unsupported human input, external-auth, attestation and tool requests receive an error or explicit decline. Legacy approvals abort. Interactive permission grants are unsupported. Closing interrupts a known active turn and unsubscribes; it does not delete the native conversation. Native-ID resume requires idle state and does not hydrate history or reconcile uncertain turns.
+
+The transport bounds pending requests (64), line size (1 MiB by default), request time (15 seconds by default), pre-ack notifications (128 / 1 MiB), and event backlog (1024 / 4 MiB). Timeout, malformed output and process loss terminate pending work without repeating it. Lost dispatch acknowledgement returns `uncertain`. Backlog overflow emits a gap and stops the owned process. The host journal owns replay and reconciliation. Cleanup currently targets the direct child; descendant-process supervision is a later integration gate.
+
+Chat, streaming, deny-only permissions and native-ID resume are verified against pinned generated schemas and local process fixtures. Coding/tool semantics, models, usage/quota, human input, enforced filesystem isolation and live model execution are unverified or unsupported. The installed-native smoke performed initialize/account/config reads only: it observed managed ChatGPT auth and blocked endpoint/extension settings that this adapter cannot verify. Field presence alone does not prove an endpoint is custom. A separate final initialize/config-only run verified all 29 process overrides. **No real native thread, turn, login or inference request was sent.**
+
+Generated types under `generated/0.153.4` are unmodified dependency closures from `codex app-server generate-ts`. `provenance.json` retains file hashes; the official Apache-2.0 LICENSE and NOTICE are included. See [OpenAI App Server documentation](https://learn.chatgpt.com/docs/app-server) and the [pinned official config schema](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/config.schema.json).
+
+Run `bun test` and `bun typecheck` from this package. `skipLibCheck` covers the pinned Bun declaration compatibility issue; adapter source and tests remain checked strictly. Fixtures never invoke installed Codex or perform inference.

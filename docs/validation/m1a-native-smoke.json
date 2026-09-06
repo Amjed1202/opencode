@@ -1,0 +1,181 @@
+{
+  "date": "2026-09-06T16:19:13.980Z",
+  "runtimeVersion": "0.153.4",
+  "earlierSubscriptionObservation": {
+    "methods": [
+      "initialize",
+      "account/read",
+      "config/read"
+    ],
+    "accountType": "chatgpt",
+    "requiresOpenaiAuth": true,
+    "preflightStatus": "blocked",
+    "presentConfiguration": {
+      "chatgpt_base_url": true,
+      "plugins": true,
+      "mcp_servers": true,
+      "notify": true
+    },
+    "note": "Presence booleans only; configuration values and account identifiers were not logged. Existing overrides intentionally block dispatch."
+  },
+  "finalLaunchValidation": {
+    "methods": [
+      "initialize",
+      "config/read"
+    ],
+    "initializedNotificationSent": true,
+    "overrides": [
+      {
+        "key": "features.hooks",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.codex_hooks",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.plugin_hooks",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.plugins",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.remote_plugin",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.recommended_plugins",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.apps",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.connectors",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.enable_mcp_apps",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.shell_snapshot",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.shell_snapshot_v2",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.multi_agent",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.multi_agent_v2",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.skill_mcp_dependency_install",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.skip_host_skill_discovery",
+        "expected": true,
+        "matched": true
+      },
+      {
+        "key": "skills.include_instructions",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "skills.bundled.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "agents.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "allow_login_shell",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "shell_environment_policy.experimental_use_profile",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "analytics.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "feedback.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "otel.exporter",
+        "expected": "none",
+        "matched": true
+      },
+      {
+        "key": "otel.trace_exporter",
+        "expected": "none",
+        "matched": true
+      },
+      {
+        "key": "otel.metrics_exporter",
+        "expected": "none",
+        "matched": true
+      },
+      {
+        "key": "orchestrator.mcp.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "orchestrator.skills.enabled",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.respect_system_proxy",
+        "expected": false,
+        "matched": true
+      },
+      {
+        "key": "features.network_proxy",
+        "expected": false,
+        "matched": true
+      }
+    ],
+    "allOverridesMatched": true
+  },
+  "threadRequests": 0,
+  "turnRequests": 0,
+  "loginRequests": 0,
+  "tokenRefreshRequests": 0,
+  "inferenceRequests": 0
+}

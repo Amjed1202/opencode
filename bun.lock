@@ -516,6 +516,7 @@
         "@harness/protocol": "workspace:*",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
         "typescript": "catalog:",
       },
@@ -528,6 +529,7 @@
         "@harness/protocol": "workspace:*",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
         "typescript": "catalog:",
       },

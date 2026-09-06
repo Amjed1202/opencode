@@ -1,0 +1,54 @@
+$ bun test test
+bun test v1.3.14 (0d9b296a)
+
+test\codex\adapter.test.ts:
+(pass) adapter rejects invalid native process environment {"PATH":""} before spawning [1.53ms]
+(pass) adapter rejects invalid native process environment {"PATH":"."} before spawning [0.05ms]
+(pass) adapter rejects invalid native process environment {"HOME":"relative"} before spawning [0.04ms]
+(pass) adapter rejects invalid native process environment {"HOME":"C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-adapters\\test\\codex","USERPROFILE":"C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-adapters\\test"} before spawning [0.12ms]
+(pass) adapter rejects invalid native process environment {"OPENAI_API_KEY":"fixture-not-secret"} before spawning [0.03ms]
+(pass) preflight verifies managed ChatGPT status without claiming overage is disabled [75.24ms]
+(pass) native nullable extension defaults and managed credential-store settings are observationally safe [71.36ms]
+(pass) preflight blocks api without creating a native thread or turn [68.88ms]
+(pass) preflight blocks provider without creating a native thread or turn [67.41ms]
+(pass) preflight blocks helper without creating a native thread or turn [68.91ms]
+(pass) preflight blocks profile without creating a native thread or turn [67.73ms]
+(pass) preflight blocks wrong-version without creating a native thread or turn [70.93ms]
+(pass) preflight blocks mcp without creating a native thread or turn [75.32ms]
+(pass) preflight blocks ignored-overrides without creating a native thread or turn [64.70ms]
+(pass) preflight blocks shell-injection without creating a native thread or turn [67.73ms]
+(pass) missing or non-finite workspace lease expiry cannot create a thread [68.24ms]
+(pass) conflicting native account updates block further admission even if account/read lags [70.73ms]
+(pass) duplicate pending command cannot release another send's reservation [72.26ms]
+(pass) stale native lifecycle/text cannot release or contaminate the active command [69.99ms]
+(pass) an unsupported server request cannot masquerade as a turn completion notification [73.61ms]
+(pass) native error is normalized without retaining potentially sensitive error bodies [69.71ms]
+(pass) routine account quota updates do not invalidate or interrupt an active turn [75.20ms]
+(pass) slow event consumers receive an explicit gap and the owned native process stops [74.36ms]
+(pass) included-only policy blocks unknown provider overage [2.41ms]
+(pass) create revalidates account-switch before allowing turns [72.73ms]
+(pass) create revalidates config-switch before allowing turns [70.70ms]
+(pass) create revalidates thread-provider before allowing turns [71.16ms]
+(pass) create revalidates thread-network before allowing turns [74.43ms]
+(pass) create revalidates active-thread before allowing turns [71.20ms]
+(pass) native text/completion mapping preserves correlation and omits unknown sensitive bodies [67.14ms]
+(pass) approval requests retain native request IDs and are denied without exposing command bodies [73.58ms]
+(pass) lost turn acknowledgement is uncertain and never automatically retried [73.02ms]
+(pass) concurrent sends cannot accidentally steer a running turn [70.98ms]
+(pass) resume uses an existing native thread ID and close only unsubscribes [71.46ms]
+
+test\codex\stdio.test.ts:
+(pass) stdio correlates requests and preserves UTF-8 text [67.20ms]
+(pass) transport never copies arbitrary parent credentials or configuration into its child [121.07ms]
+(pass) a timed out request closes the stream and rejects every pending request [173.68ms]
+(pass) invalid closes pending requests without exposing stderr [63.96ms]
+(pass) oversize closes pending requests without exposing stderr [64.73ms]
+(pass) unknown-response closes pending requests without exposing stderr [63.58ms]
+(pass) crash closes pending requests without exposing stderr [66.99ms]
+(pass) unsupported native server requests are rejected immediately [65.86ms]
+(pass) close rejects in-flight work and terminates its owned subprocess [4.39ms]
+
+ 43 pass
+ 0 fail
+ 87 expect() calls
+Ran 43 tests across 2 files. [2.72s]

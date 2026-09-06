@@ -1,0 +1,9 @@
+/** Privileged Bun host entry point. Renderer code imports protocol types, never this module. */
+export { AdmissionController, AdmissionError } from "./admission"
+export type { AdmissionOptions, AdmissionWorkspaces, ScopedBillingConsent } from "./admission"
+export { buildNativeEnvironment, hashConfiguration } from "./environment"
+export type { NativeEnvironmentInput } from "./environment"
+export { SQLiteJournal } from "./journal"
+export { LocalRuntimeManager } from "./runtime-manager"
+export type { RuntimeManagerOptions } from "./runtime-manager"
+export { LocalWorkspaceRegistry } from "./workspaces"

@@ -5,15 +5,18 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./codex": "./src/codex/adapter.ts"
   },
   "scripts": {
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test test"
   },
   "dependencies": {
     "@harness/protocol": "workspace:*"
   },
   "devDependencies": {
+    "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:"
   }

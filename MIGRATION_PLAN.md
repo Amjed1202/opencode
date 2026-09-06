@@ -14,7 +14,7 @@
 - Do not alter the root package workspace patterns: `packages/*` already includes new flat packages.
 - Never automatically choose paid API fallback by default; no copied browser/native session tokens.
 - Renderer calls the control plane; native harnesses retain their tools, permissions and context engines.
-- This execution stops after structural scaffolding. The later tasks below are separate implementation work.
+- The first delivery stopped after structural scaffolding. The subsequent continuation implements the initial portions of tasks 4–5; [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) records the remaining acceptance work.
 
 ## 1. Reconnaissance and provenance — current stage
 
@@ -57,7 +57,7 @@ Add compile-time checks that invalid event payloads and mismatched API billing s
 
 Use full CI/e2e and native packaging once UI or transport behavior changes. This structural stage must not call a model to claim native integration works.
 
-## 4. Billing-safe admission — next implementation slice
+## 4. Billing-safe admission — initial implementation delivered
 
 Create `packages/harness-control-plane/src/admission.ts`, `runtime-manager.ts`, `environment.ts`, and tests alongside them. Implement `preflight`/admission ports declared in `src/index.ts`.
 
@@ -65,7 +65,7 @@ Fixtures: subscription native status + inherited API key; API profile/helper ove
 
 Then implement local process supervision and the SQLite command/event journal. Verify crash-before-dispatch, crash-after-dispatch and native completion reconciliation; uncertain commands are not automatically repeated. This is required before a coding session can be called resumable.
 
-## 5. Codex vertical slice
+## 5. Codex vertical slice — initial local protocol implementation delivered
 
 Create `packages/harness-adapters/src/codex/adapter.ts` and versioned mapping fixtures. Generate official wire types from a pinned supported executable into an adapter-private generated directory, retaining provenance. Use App Server stdio, initialize, native account read/login UI, thread start/resume, turn start/interrupt and native server approval requests. Bind native request/turn/item IDs and preserve unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
 

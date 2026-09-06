@@ -42,7 +42,7 @@ export interface ControlPlaneClient {
   closeSession(sessionId: string): Promise<void>
 }
 
-/** Privileged host ports below. No concrete registry, policy, storage or executor exists yet. */
+/** Privileged host ports below. Initial Bun implementations are isolated in the ./host entry point. */
 export interface AdapterRegistry {
   register(adapter: AgentAdapter): void
   get(adapterId: string): AgentAdapter | undefined

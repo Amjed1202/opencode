@@ -1,0 +1,134 @@
+$ bun test --root ./test
+bun test v1.3.14 (0d9b296a)
+
+test\admission.test.ts:
+(pass) billing-safe admission > accepts current native subscription evidence with matching provider [4.61ms]
+(pass) billing-safe admission > blocks api-auth evidence before dispatch [3.41ms]
+(pass) billing-safe admission > blocks unknown-route evidence before dispatch [1.60ms]
+(pass) billing-safe admission > blocks different-provider evidence before dispatch [1.78ms]
+(pass) billing-safe admission > blocks stale evidence before dispatch [1.74ms]
+(pass) billing-safe admission > blocks future evidence before dispatch [1.35ms]
+(pass) billing-safe admission > blocks overage evidence before dispatch [1.79ms]
+(pass) billing-safe admission > blocks account-swap evidence before dispatch [1.72ms]
+(pass) billing-safe admission > blocks fingerprint-swap evidence before dispatch [1.34ms]
+(pass) billing-safe admission > blocks capacity evidence before dispatch [1.35ms]
+(pass) billing-safe admission > an API consent id alone is insufficient and never falls back [2.73ms]
+(pass) billing-safe admission > API access requires a current consent bound to workspace, target, runtime and provider [1.73ms]
+(pass) billing-safe admission > unknown overage is blocked unless intent explicitly acknowledges provider settings [1.14ms]
+(pass) billing-safe admission > binds one admission to one session and operation [3.06ms]
+(pass) billing-safe admission > does not trust caller mutation of the admitted intent or returned evidence [1.70ms]
+(pass) billing-safe admission > rejects advisory enforcement when an enforced review boundary is required [1.43ms]
+(pass) billing-safe admission > invalidating a runtime revokes previously issued admissions [1.48ms]
+(pass) admission security regressions > rejects wire input mixing subscription authentication with API billing [0.85ms]
+(pass) admission security regressions > unrecognized mechanisms cannot claim a mandatory enforcement boundary [1.05ms]
+(pass) admission security regressions > native evidence from another runtime version cannot authorize the selected executable [1.09ms]
+(pass) admission security regressions > explicit advisory mode remains available and cannot admit enforced review [2.68ms]
+(pass) admission security regressions > dispatch validation catches invalidate during the final consent await [2.71ms]
+(pass) admission security regressions > dispatch validation catches release during the final consent await [2.54ms]
+(pass) admission security regressions > dispatch validation catches expire during the final consent await [2.44ms]
+(pass) admission security regressions > dispatch validation catches revoke during the final consent await [2.78ms]
+(pass) admission security regressions > invalidating while native preflight is pending prevents a new admission [1.45ms]
+(pass) admission security regressions > blocks missing-account mismatches [1.11ms]
+(pass) admission security regressions > blocks auth-source mismatches [0.83ms]
+(pass) admission security regressions > blocks auth-mode mismatches [1.48ms]
+(pass) admission security regressions > blocks billing-mode mismatches [0.74ms]
+(pass) admission security regressions > blocks provider-method mismatches [0.75ms]
+(pass) admission security regressions > blocks evidence that expires during capacity verification [2.12ms]
+(pass) admission security regressions > rechecks billing consent after native work can revoke it [1.49ms]
+(pass) admission security regressions > rechecks billing consent after native work can expire it [1.24ms]
+(pass) admission security regressions > adapter mutations cannot replace the caller's admitted model or policy [2.11ms]
+(pass) admission security regressions > a runtime executable change cannot reuse account and configuration evidence [1.61ms]
+(pass) admission security regressions > rejects malformed command fingerprints [1.32ms]
+(pass) admission security regressions > rejects non-string command identifiers before binding the token [1.10ms]
+(pass) admission security regressions > caps retained admission tokens and makes expired capacity available again [1.79ms]
+
+test\codex-integration.test.ts:
+(pass) Codex peer flows through admission, durable orchestration, streaming and native resume [166.68ms]
+
+test\environment.test.ts:
+(pass) native launch environment > keeps selected Windows OS values and explicitly selected native home and executable search path [0.34ms]
+(pass) native launch environment > does not forward ambient credential, billing, configuration, shell, proxy, or executable overrides [0.11ms]
+(pass) native launch environment > rejects conflicting Windows key variants without exposing values [0.06ms]
+(pass) native launch environment > coalesces matching Windows key variants and ignores undefined values [0.04ms]
+(pass) native launch environment > uses case-sensitive POSIX OS names without importing Windows controls [0.05ms]
+(pass) native launch environment > rejects cwd-dependent posix search path bin [0.03ms]
+(pass) native launch environment > rejects cwd-dependent posix search path /usr/bin:
+(pass) native launch environment > rejects cwd-dependent posix search path /usr/bin:.:/bin
+(pass) native launch environment > rejects cwd-dependent win32 search path C:bin
+(pass) native launch environment > rejects cwd-dependent win32 search path \bin
+(pass) native launch environment > rejects cwd-dependent win32 search path C:\bin;
+(pass) native launch environment > rejects cwd-dependent win32 search path C:\bin;relative
+(pass) native launch environment > requires an absolute explicit native home:  [0.02ms]
+(pass) native launch environment > requires an absolute explicit native home: relative
+(pass) native launch environment > requires an absolute explicit native home: C:relative
+(pass) native launch environment > requires an absolute explicit native home: \root-relative
+(pass) native launch environment > rejects null bytes in retained runtime variables [0.02ms]
+(pass) native launch environment > rejects cwd-dependent inherited Windows SYSTEMROOT [0.02ms]
+(pass) native launch environment > rejects cwd-dependent inherited Windows WINDIR
+(pass) native launch environment > rejects cwd-dependent inherited Windows TEMP
+(pass) native launch environment > rejects cwd-dependent inherited Windows TMP
+(pass) configuration fingerprint > uses a known SHA-256 JSON digest [0.04ms]
+(pass) configuration fingerprint > ignores object key insertion order throughout the configuration [0.03ms]
+(pass) configuration fingerprint > distinguishes changes to configuration and array order [0.03ms]
+(pass) configuration fingerprint > rejects nonfinite numbers instead of colliding with null [0.05ms]
+(pass) configuration fingerprint > rejects circular and sparse configurations [0.05ms]
+(pass) configuration fingerprint > rejects objects with serialization hooks without invoking them [0.04ms]
+(pass) configuration fingerprint > rejects array getters without invoking them [0.04ms]
+(pass) configuration fingerprint > rejects configuration properties that JSON would silently omit [0.07ms]
+
+test\journal.test.ts:
+(pass) reserves one durable command and returns its recorded receipt on exact retry after restart [29.38ms]
+(pass) rejects conflicting command content or admission bindings without replacing the admitted command [27.78ms]
+(pass) durably deduplicates full source identities before assigning contiguous host sequence numbers [36.53ms]
+(pass) same event ID is independent across source streams and epochs [28.95ms]
+(pass) conflicting source identity rolls back the entire append and its command receipt [30.50ms]
+(pass) rejects foreign, stale-epoch and future cursors instead of silently replaying unrelated history [28.12ms]
+(pass) persists sessions and rejects lost updates from a second SQLite connection [32.18ms]
+(pass) explicit recovery marks commands from both dispatch crash windows uncertain without replaying events [37.70ms]
+(pass) a durably correlated native completion reconciles uncertainty and survives later restart [33.07ms]
+(pass) explicit completion of create or resume commands requires an acknowledged dispatch [28.91ms]
+(pass) retention emits a durable snapshot gap and keeps source deduplication after payload removal [38.34ms]
+(pass) a completion from another native turn cannot settle an uncertain command [32.08ms]
+(pass) a settled native completion cannot regress to uncertain through a late receipt [29.14ms]
+(pass) origin content comparison accepts reordered JSON keys and rejects changed source sequences [27.61ms]
+(pass) recovers a admitted command after forcibly terminating its writer process [85.92ms]
+(pass) recovers a dispatched command after forcibly terminating its writer process [93.96ms]
+
+test\runtime-manager.test.ts:
+(pass) an exact create retry returns the saved native session without a second creation [41.74ms]
+(pass) a lost native create response is durably uncertain and never automatically retried [35.56ms]
+(pass) create idempotency keys reject a different admission [38.66ms]
+(pass) a turn's exact retry returns its journal receipt; changed text cannot reuse its command id [49.20ms]
+(pass) clean native stream closure makes an active turn and its session uncertain [50.41ms]
+(pass) invalid native completion cannot enter or settle the durable journal [77.64ms]
+(pass) a late completion for a previous command cannot idle the current native turn [79.94ms]
+(pass) close preserves uncertainty and resume installs a fresh event pump [61.06ms]
+(pass) a stream-construction failure marks the durable session uncertain [37.42ms]
+(pass) a dispatched but unsettled resume receipt cannot masquerade as a completed operation [40.69ms]
+(pass) dispose waits for a native create already in flight and closes the resulting attachment [38.58ms]
+(pass) live event consumers finish when their attachment closes [37.56ms]
+(pass) a native session reporting changed intent or effective billing is not persisted as admitted [36.12ms]
+(pass) mutating a returned session cannot redirect the native event pump [49.10ms]
+(pass) adapter mutation cannot change the admission used to validate its returned session [39.31ms]
+(pass) admission revocation after the durable dispatch marker prevents the native create [34.32ms]
+(pass) native completion reconciles a lost turn acknowledgement without sending again [54.46ms]
+(pass) restart recovery catches a running session projection even after its completion receipt settled [41.97ms]
+(pass) account changes between preflight and create produce no durable dispatch [28.09ms]
+(pass) adapter close mutation cannot clear a running turn's uncertainty or release its lease [49.47ms]
+(pass) adapter close mutation cannot change the native thread selected for resume [45.49ms]
+(pass) an old pump's queued EOF cannot make a resumed attachment uncertain [76.86ms]
+(pass) an old pump's queued error cannot make a resumed attachment uncertain [80.39ms]
+
+test\workspaces.test.ts:
+(pass) write leases exclude other owners; stale releases cannot release a newer lease [1.89ms]
+(pass) nested roots cannot bypass an existing workspace's ownership locks [2.12ms]
+(pass) directory aliases cannot register a second workspace [2.36ms]
+(pass) replacing a workspace directory invalidates existing leases [2.91ms]
+(pass) expiry blocks the owner without transferring a running writer's lease [1.57ms]
+(pass) registration captures the authorized selection before filesystem awaits [1.12ms]
+(pass) read leases coexist while a writer is excluded [1.22ms]
+
+ 115 pass
+ 0 fail
+ 238 expect() calls
+Ran 115 tests across 6 files. [2.05s]

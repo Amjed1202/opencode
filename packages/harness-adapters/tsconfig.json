@@ -1,4 +1,5 @@
 {
   "extends": "../harness-protocol/tsconfig.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": { "types": ["bun"], "skipLibCheck": true },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

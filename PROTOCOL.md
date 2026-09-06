@@ -1,6 +1,6 @@
 # Universal agent protocol
 
-Status: proposed protocol `0.1`, with TypeScript contracts only. No wire decoder, transport, event journal or policy enforcement exists yet. Authoritative scaffold: `packages/harness-protocol/src`. It has no runtime dependency on OpenCode, Electron, a vendor SDK or Node.
+Status: protocol `0.1` contracts with initial native stdio decoding, a local command/event journal and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
 
 ## Domain and versioning
 

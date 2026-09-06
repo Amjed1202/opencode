@@ -1,6 +1,6 @@
 # Harness architecture
 
-Status: architectural baseline and type-only scaffolding, 2026-09-06. **Harness is a working codename, not a finalized brand. No universal runtime or new desktop session flow is implemented at this stage.**
+Status: architectural baseline with an initial privileged host and Codex adapter, 2026-09-06. **Harness is a working codename. The desktop session flow remains unimplemented.** [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) distinguishes implemented behavior from the broader architecture below.
 
 ## Foundation and decision
 
@@ -72,4 +72,4 @@ Accounts/Runtimes settings will distinguish installed, authenticated, preflight-
 
 ## Deliberate limits
 
-This stage adds contracts, documentation and provider integration TODOs only. Runtime discovery, security enforcement, storage migrations, UI changes, inference, collaboration scheduling and a listening node are not implemented. [MIGRATION_PLAN.md](MIGRATION_PLAN.md) sequences the next work; [MILESTONES.md](MILESTONES.md) separates this stage from a working Milestone 1.
+The initial implementation adds local Codex discovery, billing admission, workspace leases, command/event persistence, private stdio and session orchestration. OS isolation attestation, interactive permissions, full recovery, UI, collaboration scheduling and a listening node remain unimplemented. [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) records the exact limits; [MILESTONES.md](MILESTONES.md) retains the full acceptance gates.

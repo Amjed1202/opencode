@@ -1,6 +1,6 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: reconnaissance, architecture and type-only scaffolding. A new working desktop application is not implemented yet.** Harness is a provisional codename.
+**Delivered: architecture plus the initial billing-safe host and Codex App Server implementation. A new working desktop application is not implemented yet.** Harness is a provisional codename. See [implementation and running instructions](M1A_IMPLEMENTATION.md) for the exact supported scope.
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 
@@ -46,16 +46,20 @@ OpenCode fork/                       original monorepo retained
     │   └── type-tests/contracts.ts
     ├── harness-adapters/
     │   └── src/
-    │       ├── index.ts             adapter interface, no concrete adapters
-    │       └── claude/, codex/, opencode/, generic/, remote/  integration TODOs
+    │       ├── index.ts             adapter interface
+    │       ├── codex/               pinned stdio adapter, mapping and generated wire types
+    │       └── claude/, opencode/, generic/, remote/  integration TODOs
     └── harness-control-plane/
         ├── src/index.ts            client and privileged service ports
+        ├── src/host.ts             admission, leases, journal and session orchestration
+        ├── src/codex-probe.ts       diagnostic command; no inference
+        ├── test/                   behavioral and local process integration tests
         └── type-tests/public-contracts.ts
 ```
 
 Each added package has its own manifest and strict tsconfig. Existing `packages/*` discovery includes them, so root workspace configuration is unchanged. No native SDK dependency was added. Only `bun.lock` workspace records and an additive `SECURITY.md` section modify preexisting tracked files; all functional upstream source remains intact.
 
-## Check the scaffolding
+## Check the packages
 
 Use the repository's Bun **1.3.14**. From the repository root:
 
