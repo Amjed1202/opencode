@@ -1,6 +1,6 @@
 # Harness architecture
 
-Status: architectural baseline with an initial privileged host and Codex adapter, 2026-09-06. **Harness is a working codename. The desktop session flow remains unimplemented.** [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) distinguishes implemented behavior from the broader architecture below.
+Status: architectural baseline with a privileged host, Codex adapter and initial Electron/Solid desktop, 2026-09-06. **Harness is a working codename.** [DESKTOP.md](DESKTOP.md) and [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) distinguish implemented behavior from the broader architecture below. The new desktop is an additive `packages/harness-desktop` application; upstream desktop/app source stays intact.
 
 ## Foundation and decision
 
@@ -26,7 +26,7 @@ Three approaches were considered. Reusing OpenCode agents as the universal domai
 
 ## Reconnaissance findings that change the plan
 
-The pinned desktop is **Electron**, not Tauri: `packages/desktop/package.json`, `src/main/windows.ts`, `src/preload/index.ts`. Its renderer already has context isolation, sandboxing and Node integration disabled. Preserve these controls. Its server runs in an Electron utility process (`src/main/server.ts`); use that lifecycle pattern for a future separate control-plane worker.
+The pinned desktop is **Electron**, not Tauri: `packages/desktop/package.json`, `src/main/windows.ts`, `src/preload/index.ts`. Its renderer already has context isolation, sandboxing and Node integration disabled. Preserve these controls. Its server runs in an Electron utility process (`src/main/server.ts`); the Harness desktop instead launches its Bun-specific host in a separate child through inherited private pipes, keeping Bun SQLite out of Electron and the renderer.
 
 OpenCode already splits `schema`, `core`, `protocol`, `server`, `client`, `sdk-next`, `llm`, and `session-ui`. Follow the upstream dependency rules in `AGENTS.md`. Our `packages/harness-protocol` deliberately does not reuse the existing `packages/protocol` name or import its runtime-specific schema.
 
@@ -36,14 +36,14 @@ Some current `SessionV2` operations explicitly return unavailable errors; see `p
 
 ## Ownership and trust boundaries
 
-| Layer | Owns | Must not own |
-| --- | --- | --- |
-| Renderer | Conversation projections, composer, inspector, capability-driven controls, safe account labels | Credentials, processes, direct provider/server calls, permission enforcement |
-| Electron main/preload | Narrow authenticated IPC, window lifecycle, trusted pickers, control-plane process lifecycle | Model orchestration in components; generic arbitrary IPC forwarding |
-| Control plane | Admission, auth/billing preflight, session registry, write leases, permissions, process supervision, journal, workspace services, collaboration | Reimplementation of each native agent loop |
-| Adapter | Native version negotiation, events, native permissions, session identity, capability evidence, sanitized status | Choosing another billing route silently; application UI state |
-| Native harness | Its own tools, hooks, MCP clients, skills, context management, native subagents and history | Authority to escape the application's mandatory policy |
-| Node | Same admission and execution policy on its machine; locally held credentials | Trusting a desktop-supplied path, identity or permission claim without validation |
+| Layer                 | Owns                                                                                                                                            | Must not own                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Renderer              | Conversation projections, composer, inspector, capability-driven controls, safe account labels                                                  | Credentials, processes, direct provider/server calls, permission enforcement      |
+| Electron main/preload | Narrow authenticated IPC, window lifecycle, trusted pickers, control-plane process lifecycle                                                    | Model orchestration in components; generic arbitrary IPC forwarding               |
+| Control plane         | Admission, auth/billing preflight, session registry, write leases, permissions, process supervision, journal, workspace services, collaboration | Reimplementation of each native agent loop                                        |
+| Adapter               | Native version negotiation, events, native permissions, session identity, capability evidence, sanitized status                                 | Choosing another billing route silently; application UI state                     |
+| Native harness        | Its own tools, hooks, MCP clients, skills, context management, native subagents and history                                                     | Authority to escape the application's mandatory policy                            |
+| Node                  | Same admission and execution policy on its machine; locally held credentials                                                                    | Trusting a desktop-supplied path, identity or permission claim without validation |
 
 Use a provider-specific environment allowlist and sanctioned effective-config metadata. Upstream's `createSidecarEnv()` copies parent variables; it cannot be reused unchanged for subscription sessions. Resolve executable/profile identity before launch; an executable present on PATH is not authenticated or ready. API fallback defaults off and requires scoped consent. Auth, billing route and provider extra usage are separate observations. Unknown facts remain unknown. See [ADAPTERS.md](ADAPTERS.md).
 

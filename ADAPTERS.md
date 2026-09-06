@@ -14,21 +14,22 @@ Adapters depend on the protocol; the control plane selects adapters. Renderer co
 
 ## Contract
 
-| Operation | Meaning |
-| --- | --- |
-| `discover(context)` | Find runtime metadata on the selected target without inference or credential extraction. |
-| `preflight(request)` | Compare create/resume/turn intent with native evidence; resume/turn include the host-resolved existing session so persisted native configuration is checked. |
-| `createSession(admission)` | Accept validated control-plane admission and associate application/native session IDs. |
-| `send(session, input)` | Admit a command and return a receipt; receipt does not mean execution completed. |
-| `events(session)` | Continuous asynchronous event stream covering execution, approvals and lifecycle beyond individual sends. |
-| `interrupt(session)` | Request cancellation; terminal state arrives through events. |
-| `resume(...)` | Optional, advertised only after native resume behavior is verified. |
-| `resolvePermission(...)` | Resolve the correlated native request using its supported decisions and scopes. |
-| `reviewPermission(...)`, `reviewInput(...)` | Host-only access to a cloned pending patch or question display, bound to the current session and operation. The host protects it before presentation. |
-| `resolveInput(...)` | Resolve a bound native question using offered option IDs or cancellation. Answer delivery requires the final host authorization callback. |
-| `inspect(session)` | Optional bounded read-only history evidence; does not resume or replay native work. |
-| `models(...)`, `usage(...)` | Optional native discovery/observations; unavailable is distinct from empty or zero. |
-| `close(session)` | Release the attachment and owned resources without deleting native history. |
+| Operation                                   | Meaning                                                                                                                                                                                                               |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `discover(context)`                         | Find runtime metadata on the selected target without inference or credential extraction.                                                                                                                              |
+| `status(runtime)`                           | Optional bounded native account/config observation before choosing a model or starting a session. Codex uses existing official account/config reads with token refresh disabled; no login, thread or turn is created. |
+| `preflight(request)`                        | Compare create/resume/turn intent with native evidence; resume/turn include the host-resolved existing session so persisted native configuration is checked.                                                          |
+| `createSession(admission)`                  | Accept validated control-plane admission and associate application/native session IDs.                                                                                                                                |
+| `send(session, input)`                      | Admit a command and return a receipt; receipt does not mean execution completed.                                                                                                                                      |
+| `events(session)`                           | Continuous asynchronous event stream covering execution, approvals and lifecycle beyond individual sends.                                                                                                             |
+| `interrupt(session)`                        | Request cancellation; terminal state arrives through events.                                                                                                                                                          |
+| `resume(...)`                               | Optional, advertised only after native resume behavior is verified.                                                                                                                                                   |
+| `resolvePermission(...)`                    | Resolve the correlated native request using its supported decisions and scopes.                                                                                                                                       |
+| `reviewPermission(...)`, `reviewInput(...)` | Host-only access to a cloned pending patch or question display, bound to the current session and operation. The host protects it before presentation.                                                                 |
+| `resolveInput(...)`                         | Resolve a bound native question using offered option IDs or cancellation. Answer delivery requires the final host authorization callback.                                                                             |
+| `inspect(session)`                          | Optional bounded read-only history evidence; does not resume or replay native work.                                                                                                                                   |
+| `models(...)`, `usage(...)`                 | Optional native discovery/observations; unavailable is distinct from empty or zero.                                                                                                                                   |
+| `close(session)`                            | Release the attachment and owned resources without deleting native history.                                                                                                                                           |
 
 Discovery records executable, runtime/adapter versions, protocol variant, target and support evidence. Capabilities distinguish requested, declared and verified support, with limitations. Unsupported operations fail explicitly. Cross-runtime builder/reviewer workflows belong to our collaboration engine.
 
@@ -64,14 +65,14 @@ Remote is an orthogonal execution target: `harness-node` hosts the same native a
 
 ## Native event mapping
 
-| Native source | Normalized meaning |
-| --- | --- |
-| Claude text deltas; Codex `item/agentMessage/delta`; OpenCode text-part deltas | `assistant.text.delta` |
-| Claude tool-use/result; Codex tool item lifecycle; OpenCode tool parts | Tool requested/started/output/completed, according to actual lifecycle evidence |
-| Claude permission host; Codex server approval request; OpenCode permission event | `permission.requested` with native correlation and scope |
-| Codex `item/tool/requestUserInput` | `input.requested` with bound choice IDs and protected display; unsupported forms are cancelled |
-| Claude result/model usage; Codex thread token snapshots; OpenCode message usage | `usage.updated`, retaining source and cumulative/delta semantics |
-| Native session status, compaction and subagent events | Corresponding lifecycle/context events; unknown variants retained |
+| Native source                                                                    | Normalized meaning                                                                             |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Claude text deltas; Codex `item/agentMessage/delta`; OpenCode text-part deltas   | `assistant.text.delta`                                                                         |
+| Claude tool-use/result; Codex tool item lifecycle; OpenCode tool parts           | Tool requested/started/output/completed, according to actual lifecycle evidence                |
+| Claude permission host; Codex server approval request; OpenCode permission event | `permission.requested` with native correlation and scope                                       |
+| Codex `item/tool/requestUserInput`                                               | `input.requested` with bound choice IDs and protected display; unsupported forms are cancelled |
+| Claude result/model usage; Codex thread token snapshots; OpenCode message usage  | `usage.updated`, retaining source and cumulative/delta semantics                               |
+| Native session status, compaction and subagent events                            | Corresponding lifecycle/context events; unknown variants retained                              |
 
 Retain supported sensitive display payloads through protected artifact references; the current implementation covers bounded patches and fixed-choice questions. Unknown native bodies remain omitted. Never persist authentication exchanges, tokens or complete process environments. Deduplicate partial/final messages and cumulative usage; missing fields stay unknown.
 

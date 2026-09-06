@@ -1,6 +1,6 @@
 # Universal agent protocol
 
-Status: protocol `0.3` contracts with native stdio decoding, local command/event/permission/input journals, protected review and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
+Status: protocol `0.3` contracts with native stdio decoding, local command/event/permission/input journals, protected review and host admission. The desktop has an operation-specific bounded IPC decoder and private parent/child framing; a general public/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
 
 ## Domain and versioning
 
@@ -30,19 +30,19 @@ Scope includes target and runtime, with session/turn/command/task/collaboration/
 
 Before assigning host IDs, deduplicate drafts by `EventOrigin` `(streamId, epoch, eventId)`. Adapters preserve native identity where available; otherwise they must assign and durably retain ingestion identity before offering replay. If native history cannot supply stable identity or missing output, report `stream.gap` rather than promise lossless resume. Role assignment, workflow step and attempt IDs enable collaboration attribution without parsing opaque accounting keys.
 
-| Event family | Payload semantics |
-| --- | --- |
-| `assistant.text.delta`, `.completed`, `assistant.thinking` | Stable message/part IDs; delta appends, completion replaces/reconciles authoritative content; thinking is exposed native content only |
-| `agent.started`, `.completed`, `.error` | Native turn lifecycle; completion includes succeeded/failed/interrupted, independent of command acknowledgement |
-| `tool.started`, `.output`, `.completed` | Call ID, sanitized name/arguments, artifact/text output and result status; argument generation is not execution |
-| `terminal.started`, `.output`, `.completed` | Actual terminal/process identity only; ordinary shell tool output need not be a PTY |
-| `file.read`, `.changed`, `.created`, `.deleted`, `diff.created`, `git.changed` | Workspace-relative resources, change source and artifact/snapshot identity; a proposed patch is distinct from an applied change |
-| `permission.requested`, `.resolved`, `input.requested`, `.resolved` | Security approvals are distinct from questions or MCP elicitation |
-| `interaction.reviewed` | Host-assigned actor/time and artifact digest establish authorized content delivery, not human comprehension |
-| `task.started`, `.updated`, `.completed`, `session.updated` | State projections and native bindings; changes carry explicit versions |
-| `usage.updated`, `context.updated`, `context.compacted` | Provenanced observations with cumulative/delta scope and epoch; unknown counts stay unknown |
-| `subagent.started`, `.completed`, `collaboration.review.created` | Native child relationships versus application collaboration roles remain distinct |
-| `runtime.updated`, `native.event` | Sanitized runtime/auth changes and unsupported native extensions |
+| Event family                                                                   | Payload semantics                                                                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `assistant.text.delta`, `.completed`, `assistant.thinking`                     | Stable message/part IDs; delta appends, completion replaces/reconciles authoritative content; thinking is exposed native content only |
+| `agent.started`, `.completed`, `.error`                                        | Native turn lifecycle; completion includes succeeded/failed/interrupted, independent of command acknowledgement                       |
+| `tool.started`, `.output`, `.completed`                                        | Call ID, sanitized name/arguments, artifact/text output and result status; argument generation is not execution                       |
+| `terminal.started`, `.output`, `.completed`                                    | Actual terminal/process identity only; ordinary shell tool output need not be a PTY                                                   |
+| `file.read`, `.changed`, `.created`, `.deleted`, `diff.created`, `git.changed` | Workspace-relative resources, change source and artifact/snapshot identity; a proposed patch is distinct from an applied change       |
+| `permission.requested`, `.resolved`, `input.requested`, `.resolved`            | Security approvals are distinct from questions or MCP elicitation                                                                     |
+| `interaction.reviewed`                                                         | Host-assigned actor/time and artifact digest establish authorized content delivery, not human comprehension                           |
+| `task.started`, `.updated`, `.completed`, `session.updated`                    | State projections and native bindings; changes carry explicit versions                                                                |
+| `usage.updated`, `context.updated`, `context.compacted`                        | Provenanced observations with cumulative/delta scope and epoch; unknown counts stay unknown                                           |
+| `subagent.started`, `.completed`, `collaboration.review.created`               | Native child relationships versus application collaboration roles remain distinct                                                     |
+| `runtime.updated`, `native.event`                                              | Sanitized runtime/auth changes and unsupported native extensions                                                                      |
 
 ## Delivery, failures and replay
 
@@ -68,4 +68,4 @@ Extensions use an adapter namespace, version and JSON-schema identifier. Native 
 
 ## Required future protocol checks
 
-Public IPC/node frame decoding, cross-node replay rejection, interrupted/error usage and cumulative usage reset remain future checks. Local native framing, durable command/interaction claims, expiry, binding mismatches, review capabilities, account/config invalidation and exact-turn reconciliation have behavioral fixture coverage; see [validation](VALIDATION.md) for the precise evidence. Compile-time shape checks do not establish live provider execution or OS isolation.
+General public/node frame decoding, cross-node replay rejection, interrupted/error usage and cumulative usage reset remain future checks. Local native framing, durable command/interaction claims, expiry, binding mismatches, review capabilities, account/config invalidation and exact-turn reconciliation have behavioral fixture coverage; see [validation](VALIDATION.md) for the precise evidence. Compile-time shape checks do not establish live provider execution or OS isolation.

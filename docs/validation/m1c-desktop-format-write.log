@@ -1,0 +1,103 @@
+packages/harness-adapters/tsconfig.json 15ms (unchanged)
+packages/harness-desktop/vite.preview.config.ts 17ms
+packages/harness-desktop/tsconfig.json 1ms
+packages/harness-control-plane/type-tests/public-contracts.ts 5ms (unchanged)
+packages/harness-control-plane/tsconfig.json 1ms (unchanged)
+packages/harness-protocol/type-tests/contracts.ts 3ms (unchanged)
+packages/harness-protocol/tsconfig.json 1ms (unchanged)
+packages/harness-control-plane/test/workspaces.test.ts 24ms (unchanged)
+packages/harness-control-plane/test/support.ts 11ms (unchanged)
+packages/harness-control-plane/test/skills.test.ts 21ms (unchanged)
+packages/harness-control-plane/test/runtime-manager.test.ts 74ms (unchanged)
+packages/harness-control-plane/test/runtime-manager-review.test.ts 12ms (unchanged)
+packages/harness-control-plane/test/review-content.test.ts 14ms (unchanged)
+packages/harness-control-plane/test/permission-journal.test.ts 34ms (unchanged)
+packages/harness-control-plane/test/journal.test.ts 18ms (unchanged)
+packages/harness-control-plane/test/input-journal.test.ts 30ms (unchanged)
+packages/harness-control-plane/test/environment.test.ts 7ms (unchanged)
+packages/harness-control-plane/test/codex-permissions-integration.test.ts 26ms (unchanged)
+packages/harness-control-plane/test/codex-integration.test.ts 6ms (unchanged)
+packages/harness-control-plane/test/codex-input-integration.test.ts 14ms (unchanged)
+packages/harness-control-plane/test/artifacts.test.ts 24ms (unchanged)
+packages/harness-control-plane/test/admission.test.ts 16ms (unchanged)
+packages/harness-desktop/test/unit/worker.test.ts 11ms (unchanged)
+packages/harness-desktop/test/unit/vault.test.ts 5ms (unchanged)
+packages/harness-desktop/test/unit/security.test.ts 2ms (unchanged)
+packages/harness-desktop/test/unit/requests.test.ts 6ms (unchanged)
+packages/harness-desktop/test/unit/preload.test.ts 5ms (unchanged)
+packages/harness-desktop/test/unit/host-client.test.ts 4ms (unchanged)
+packages/harness-desktop/test/unit/backend.test.ts 19ms
+packages/harness-protocol/src/usage.ts 2ms (unchanged)
+packages/harness-adapters/test/codex/stdio.test.ts 7ms (unchanged)
+packages/harness-adapters/test/codex/permissions.test.ts 2ms (unchanged)
+packages/harness-adapters/test/codex/peer.ts 2ms (unchanged)
+packages/harness-adapters/test/codex/human-input.test.ts 3ms (unchanged)
+packages/harness-adapters/test/codex/history.test.ts 14ms (unchanged)
+packages/harness-adapters/test/codex/environment-parent.ts 1ms (unchanged)
+packages/harness-adapters/test/codex/app-server-peer.ts 8ms (unchanged)
+packages/harness-adapters/test/codex/adapter.test.ts 45ms (unchanged)
+packages/harness-protocol/src/skills.ts 2ms (unchanged)
+packages/harness-protocol/src/session.ts 3ms (unchanged)
+packages/harness-protocol/src/runtime.ts 3ms (unchanged)
+packages/harness-protocol/src/remote.ts 2ms (unchanged)
+packages/harness-protocol/src/permissions.ts 3ms (unchanged)
+packages/harness-protocol/src/index.ts 1ms
+packages/harness-protocol/src/events.ts 4ms (unchanged)
+packages/harness-protocol/src/common.ts 2ms (unchanged)
+packages/harness-protocol/src/collaboration.ts 2ms (unchanged)
+packages/harness-protocol/src/capabilities.ts 1ms (unchanged)
+packages/harness-protocol/package.json 1ms (unchanged)
+packages/harness-desktop/test/ui/renderer.spec.ts 13ms (unchanged)
+packages/harness-desktop/test/ui/playwright.config.ts 1ms (unchanged)
+packages/harness-control-plane/src/workspaces.ts 7ms (unchanged)
+packages/harness-control-plane/src/skills.ts 15ms (unchanged)
+packages/harness-control-plane/src/runtime-manager.ts 61ms (unchanged)
+packages/harness-control-plane/src/review-content.ts 7ms (unchanged)
+packages/harness-control-plane/src/journal.ts 36ms (unchanged)
+packages/harness-control-plane/src/index.ts 4ms (unchanged)
+packages/harness-control-plane/src/host.ts 1ms (unchanged)
+packages/harness-control-plane/src/environment.ts 5ms (unchanged)
+packages/harness-control-plane/src/codex-probe.ts 3ms (unchanged)
+packages/harness-control-plane/src/artifacts.ts 12ms (unchanged)
+packages/harness-control-plane/src/admission.ts 15ms (unchanged)
+packages/harness-control-plane/package.json 1ms (unchanged)
+packages/harness-adapters/package.json 0ms (unchanged)
+packages/harness-desktop/electron.vite.config.ts 1ms
+packages/harness-desktop/package.json 0ms (unchanged)
+packages/harness-desktop/test/fixtures/host-peer.ts 3ms (unchanged)
+packages/harness-desktop/test/electron/smoke.spec.ts 5ms (unchanged)
+packages/harness-desktop/test/electron/playwright.config.ts 1ms (unchanged)
+packages/harness-desktop/src/shared/requests.ts 4ms
+packages/harness-desktop/src/shared/contracts.ts 3ms
+packages/harness-desktop/src/renderer/styles.css 36ms (unchanged)
+packages/harness-desktop/src/renderer/index.tsx 2ms (unchanged)
+packages/harness-desktop/src/renderer/index.html 9ms (unchanged)
+packages/harness-desktop/src/renderer/icons.tsx 3ms (unchanged)
+packages/harness-desktop/src/renderer/copy.ts 2ms (unchanged)
+packages/harness-desktop/src/renderer/app.tsx 34ms (unchanged)
+packages/harness-adapters/src/codex/stdio.ts 9ms (unchanged)
+packages/harness-adapters/src/codex/permissions.ts 7ms (unchanged)
+packages/harness-adapters/src/codex/human-input.ts 3ms (unchanged)
+packages/harness-adapters/src/codex/history.ts 6ms (unchanged)
+packages/harness-desktop/src/preload/index.ts 1ms (unchanged)
+packages/harness-desktop/src/preload/bridge.ts 2ms (unchanged)
+packages/harness-adapters/src/index.ts 1ms (unchanged)
+packages/harness-desktop/src/main/vault.ts 6ms (unchanged)
+packages/harness-desktop/src/main/security.ts 2ms (unchanged)
+packages/harness-desktop/src/main/ipc.ts 3ms
+packages/harness-desktop/src/main/index.ts 5ms
+packages/harness-desktop/src/main/host-client.ts 5ms
+packages/harness-desktop/src/main/copy.ts 1ms
+packages/harness-adapters/src/codex/adapter.ts 42ms (unchanged)
+packages/harness-desktop/src/host/worker.ts 4ms
+packages/harness-desktop/src/host/backend.ts 15ms (unchanged)
+ADAPTERS.md 22ms
+ARCHITECTURE.md 9ms
+HARNESS.md 5ms
+M1A_IMPLEMENTATION.md 12ms
+MIGRATION_PLAN.md 9ms
+MILESTONES.md 6ms (unchanged)
+PROTOCOL.md 9ms
+SECURITY.md 9ms
+DESKTOP.md 6ms (unchanged)
+CLAUDE_SKILLS.md 5ms (unchanged)

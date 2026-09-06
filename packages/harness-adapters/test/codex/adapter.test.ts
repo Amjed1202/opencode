@@ -838,6 +838,70 @@ test.each([
   ).toThrow()
 })
 
+test("read-only native status observes account/configuration without model intent or native work", async () => {
+  const peer = fixture()
+  const runtime = (
+    await peer.adapter.discover({
+      target: { id: "local", kind: "local", name: "Local" },
+      allowedExecutablePaths: [process.execPath],
+    })
+  )[0]!
+  const status = await peer.adapter.status(runtime)
+  expect(status.auth).toMatchObject({
+    runtimeId: "codex-local",
+    targetId: "local",
+    status: "authenticated",
+    mode: "subscription",
+  })
+  expect(status.billing).toMatchObject({ route: "subscription", providerOverage: "unknown" })
+  expect(status.configurationFingerprint).toMatch(/^[a-f0-9]{64}$/)
+  expect(status.enforcement.filesystem).toBe(false)
+  const snapshot = await peer.state()
+  expect(snapshot.turns).toBe(0)
+  expect(
+    snapshot.requests.filter(
+      (method) => !["fixture/state", "initialize", "initialized", "account/read", "config/read"].includes(method),
+    ),
+  ).toEqual([])
+  expect(JSON.stringify(status)).not.toContain("first@example.invalid")
+})
+
+test("read-only status rejects a foreign runtime binding before observing it", async () => {
+  const peer = fixture()
+  const runtime = (
+    await peer.adapter.discover({
+      target: { id: "local", kind: "local", name: "Local" },
+      allowedExecutablePaths: [process.execPath],
+    })
+  )[0]!
+  for (const changed of [
+    { ...runtime, id: "other" },
+    { ...runtime, adapterId: "other" },
+    { ...runtime, target: { ...runtime.target, id: "other" } },
+    { ...runtime, target: { ...runtime.target, kind: "remote-node" as const, nodeId: "other" } },
+  ])
+    await expect(peer.adapter.status(changed)).rejects.toThrow("Invalid native status binding")
+  expect((await peer.state()).requests).not.toContain("account/read")
+})
+
+test.each(["api", "provider", "helper", "profile", "mcp", "ignored-overrides", "shell-injection"])(
+  "read-only status blocks conflicting native %s configuration without running a task",
+  async (scenario) => {
+    const peer = fixture(scenario)
+    const runtime = (
+      await peer.adapter.discover({
+        target: { id: "local", kind: "local", name: "Local" },
+        allowedExecutablePaths: [process.execPath],
+      })
+    )[0]!
+    const error: unknown = await peer.adapter.status(runtime).catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(Error)
+    const snapshot = await peer.state()
+    expect(snapshot.turns).toBe(0)
+    expect(snapshot.requests).not.toContain("thread/start")
+  },
+)
+
 test("preflight verifies managed ChatGPT status without claiming overage is disabled", async () => {
   const peer = fixture()
   const result = await peer.adapter.preflight({ operation: "create", intent })

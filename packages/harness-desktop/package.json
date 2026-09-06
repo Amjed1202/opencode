@@ -1,0 +1,34 @@
+{
+  "name": "@harness/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test test/unit",
+    "test:ui": "playwright test --config test/ui/playwright.config.ts",
+    "test:electron": "playwright test --config test/electron/playwright.config.ts",
+    "build": "electron-vite build && bun build src/host/worker.ts --target bun --outfile out/host/index.js",
+    "dev": "bun run build && electron .",
+    "preview:web": "vite --config vite.preview.config.ts"
+  },
+  "dependencies": {
+    "@harness/protocol": "workspace:*",
+    "@harness/control-plane": "workspace:*",
+    "@harness/adapters": "workspace:*",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "@playwright/test": "catalog:",
+    "electron": "42.3.3",
+    "electron-vite": "^5",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -8,7 +8,7 @@ Acceptance: upstream functional source remains intact; universal types import no
 
 ## M1a — admission and Codex vertical slice
 
-Current progress: the local host, admission, SQLite command/permission/input journals and pinned Codex adapter are implemented and exercised with spawned protocol peers. Bounded once-only file decisions, blocking fixed-choice input, encrypted patch/question review, expiry, native history inspection and exact-turn reconciliation are available through host APIs. Grants and answers require a current actor-bound review token and final authorization at the native write boundary. M1a is **not complete**: desktop presentation, host key/vault provisioning, broader action/raw-artifact handling, OS boundary verification and a user-authorized live repository task remain acceptance work. See [implementation status](M1A_IMPLEMENTATION.md).
+Current progress: the local host, admission, SQLite command/permission/input journals and pinned Codex adapter are implemented and exercised with spawned protocol peers. Bounded once-only file decisions, blocking fixed-choice input, encrypted patch/question review, expiry, native history inspection and exact-turn reconciliation are available through host APIs. Grants and answers require a current actor-bound review token and final authorization at the native write boundary. M1a is **not complete**: broader action/raw-artifact handling, OS boundary verification and a user-authorized live repository task remain acceptance work. The new [desktop](DESKTOP.md) now supplies protected review presentation and OS-protected review keys. See [implementation status](M1A_IMPLEMENTATION.md).
 
 Implement runtime discovery and nonsecret preflight, provider-specific environment construction, session registry/command ledger and one private local transport. Add Codex App Server using managed native ChatGPT login with API fallback disabled. Pin and test actual executable protocol versions. Keep existing native credentials provider managed; account reads must not mutate login.
 
@@ -22,7 +22,9 @@ Acceptance: the same application session commands and event projections operate 
 
 ## M1c — desktop foundation proof
 
-Wire a restricted preload/control-plane client into a new session route in the existing Electron/Solid desktop. Introduce the new identity, account/runtime settings, repository picker, conversation activity, normalized approvals, billing labels and basic token/context information. Reuse upstream markdown, diff/file viewer and terminal presentation through domain-specific view models. Ship Files/Diff and minimum tool visibility before the full inspector set.
+Current progress: the additive `packages/harness-desktop` application implements restricted preload IPC, a private Bun host, native pickers, one Codex conversation, protected review and a read-only Claude Skills catalog. Its dependencies reuse the pinned Electron/Solid toolchain, while upstream desktop/app code stays untouched.
+
+Continue the restricted preload/control-plane client and session presentation in this separate Electron/Solid application. Introduce the new identity, account/runtime settings, repository picker, conversation activity, normalized approvals, billing labels and basic token/context information. Reuse upstream markdown, diff/file viewer and terminal presentation through domain-specific view models. Ship Files/Diff and minimum tool visibility before the full inspector set.
 
 Before packaging, isolate data/config, app IDs and deep links; disable upstream updater/share/telemetry destinations in the Harness distribution and configure owned signing/update channels. Keep upstream development behavior available and clearly separate.
 
@@ -46,4 +48,4 @@ Add isolated parallel worktrees and explicit reconciliation, usage aggregates, c
 
 ## Recommended immediate next step
 
-Finish M1a native integration: verify one supported host sandbox and configuration, provision protected storage keys and present the implemented patch/choice review APIs, extend recovery where native evidence permits, then run a user-authorized repository task with explicit subscription/overage settings. Fixed-choice input is implemented; free-form/secret/nonblocking input remains unsupported. Admission, protected review and durable claims remain prerequisites for authorized native actions. Claude and desktop work follow these acceptance gates.
+Finish supported-model discovery, native recovery presentation and one supported host sandbox/configuration, then run a user-authorized repository task with explicit subscription/overage settings. OS-protected review keys and the initial patch/choice desktop UI are implemented. Fixed-choice input is implemented; free-form/secret/nonblocking input remains unsupported. Admission, protected review and durable claims remain prerequisites for authorized native actions. The Claude native adapter must validate skill activation against the catalog hash, native invocation rules and current session policy; discovery alone never grants tools or executes skills.

@@ -534,6 +534,27 @@
         "typescript": "catalog:",
       },
     },
+    "packages/harness-desktop": {
+      "name": "@harness/desktop",
+      "version": "0.1.0",
+      "dependencies": {
+        "@harness/adapters": "workspace:*",
+        "@harness/control-plane": "workspace:*",
+        "@harness/protocol": "workspace:*",
+        "solid-js": "catalog:",
+      },
+      "devDependencies": {
+        "@playwright/test": "catalog:",
+        "@types/bun": "catalog:",
+        "@types/node": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "electron": "42.3.3",
+        "electron-vite": "^5",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vite-plugin-solid": "catalog:",
+      },
+    },
     "packages/harness-protocol": {
       "name": "@harness/protocol",
       "version": "0.1.0",
@@ -1699,6 +1720,8 @@
     "@harness/adapters": ["@harness/adapters@workspace:packages/harness-adapters"],
 
     "@harness/control-plane": ["@harness/control-plane@workspace:packages/harness-control-plane"],
+
+    "@harness/desktop": ["@harness/desktop@workspace:packages/harness-desktop"],
 
     "@harness/protocol": ["@harness/protocol@workspace:packages/harness-protocol"],
 

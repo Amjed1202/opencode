@@ -2,7 +2,7 @@
 
 **Goal:** add a universal control plane around native harnesses while retaining a maintainable OpenCode fork.
 
-**Architecture:** three additive packages now contain protocol contracts, privileged host libraries and the pinned Codex adapter; a narrow new desktop route follows the remaining native acceptance gates. Upstream paths and agent engines remain intact.
+**Architecture:** four additive packages contain protocol contracts, privileged host libraries, the pinned Codex adapter and a separate Electron/Solid desktop. Upstream paths and agent engines remain intact.
 
 **Tech stack:** pinned Bun 1.3.14, existing TypeScript/catalog toolchain, Electron/Solid upstream, Bun SQLite for host journals and encrypted review artifacts. Upstream persistence stays separate.
 
@@ -30,18 +30,18 @@ No production source edits are needed for this task. Before later merges, fetch 
 
 Create these units in order after the design documents:
 
-| File/unit | Responsibility and public types |
-| --- | --- |
-| `packages/harness-protocol/src/common.ts` | JSON values, identifiers, artifact/native-event references, observation evidence |
-| `src/capabilities.ts`, `src/runtime.ts` | Capability states, model/runtime/target selection, auth and billing evidence, explicit fallback preferences |
-| `src/session.ts`, `src/permissions.ts` | Session intent/bindings, admission, commands, input, permissions and human questions |
-| `src/usage.ts`, `src/events.ts` | Scoped measurements/context/quota, discriminated event drafts and persisted envelopes |
-| `src/collaboration.ts`, `src/remote.ts` | Roles/findings/decisions/budgets and node/lease/transport contracts |
-| `packages/harness-adapters/src/index.ts` | Native adapter interface and optional capability ports; no concrete adapters |
-| `packages/harness-adapters/src/{claude,codex,opencode,generic,remote}/README.md` | Native integration route, evidence required and exact next TODOs |
-| `packages/harness-control-plane/src/index.ts` | Public application client plus privileged registry/admission/storage/workspace/process/secret service ports |
-| Package manifests/tsconfigs and protocol contract checks | Private ESM packages, existing catalog compiler, strict non-emitting checks |
-| `harness.product.json`, `HARNESS.md` | Provisional identity, provenance, explicit safe defaults and entry point to these documents |
+| File/unit                                                                        | Responsibility and public types                                                                             |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `packages/harness-protocol/src/common.ts`                                        | JSON values, identifiers, artifact/native-event references, observation evidence                            |
+| `src/capabilities.ts`, `src/runtime.ts`                                          | Capability states, model/runtime/target selection, auth and billing evidence, explicit fallback preferences |
+| `src/session.ts`, `src/permissions.ts`                                           | Session intent/bindings, admission, commands, input, permissions and human questions                        |
+| `src/usage.ts`, `src/events.ts`                                                  | Scoped measurements/context/quota, discriminated event drafts and persisted envelopes                       |
+| `src/collaboration.ts`, `src/remote.ts`                                          | Roles/findings/decisions/budgets and node/lease/transport contracts                                         |
+| `packages/harness-adapters/src/index.ts`                                         | Native adapter interface and optional capability ports; no concrete adapters                                |
+| `packages/harness-adapters/src/{claude,codex,opencode,generic,remote}/README.md` | Native integration route, evidence required and exact next TODOs                                            |
+| `packages/harness-control-plane/src/index.ts`                                    | Public application client plus privileged registry/admission/storage/workspace/process/secret service ports |
+| Package manifests/tsconfigs and protocol contract checks                         | Private ESM packages, existing catalog compiler, strict non-emitting checks                                 |
+| `harness.product.json`, `HARNESS.md`                                             | Provisional identity, provenance, explicit safe defaults and entry point to these documents                 |
 
 Package import direction: adapters → protocol; control-plane → protocol and adapter **types**; protocol → nothing. The renderer may later consume client DTOs from protocol/control-plane but may not import adapters. Avoid extra empty packages for telemetry, permissions, workspace or nodes; split implementations only when needed.
 
@@ -67,19 +67,21 @@ Then implement local process supervision and the SQLite command/event journal. V
 
 ## 5. Codex vertical slice — initial local protocol implementation delivered
 
-Implemented continuation: native deferred permission/input replies, host claim/audit journaling, encrypted patch/question artifacts and short-lived actor-bound review tokens, bounded once-only file grants and blocking fixed-choice input with a final host write guard, deny-only command/network expansions, read-only paginated history and exact-known-turn reconciliation. Wire protocol 0.3 explicitly gates older event journals behind migration or a separate database. Native billing/OS/live-task gates, key/vault provisioning, desktop presentation and full transcript/artifact retention remain open. [Current scope](M1A_IMPLEMENTATION.md).
+Implemented continuation: native deferred permission/input replies, host claim/audit journaling, encrypted patch/question artifacts and short-lived actor-bound review tokens, bounded once-only file grants and blocking fixed-choice input with a final host write guard, deny-only command/network expansions, read-only paginated history and exact-known-turn reconciliation. Wire protocol 0.3 explicitly gates older event journals behind migration or a separate database. Native billing/OS/live-task gates and full transcript/artifact retention remain open. The initial desktop now presents protected reviews and provisions an OS-protected review key. [Current scope](M1A_IMPLEMENTATION.md).
 
 Continue `packages/harness-adapters/src/codex/adapter.ts` and its versioned mapping fixtures. Keep official wire types in the adapter-private generated directory with provenance. The implemented route uses App Server stdio, initialize, native account/config reads, thread start/resume, turn start/interrupt and deferred approval/question callbacks; native login UI remains future work. `experimentalApi` stays false because the pinned source forwards fixed-choice input without opting in. Bind native request/turn/item IDs and retain only sanitized metadata for unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
 
 ## 6. Claude and OpenCode vertical slices
 
+Claude Skills cataloging is implemented with explicit roots, bounded metadata and disabled activation; [CLAUDE_SKILLS.md](CLAUDE_SKILLS.md) specifies native activation admission.
+
 Claude: install/select an unmodified supported binary, verify official integration conditions, collect documented auth-status/stream/permission-host schemas, then implement `claude/adapter.ts` without touching provider-owned tokens. Preserve native login choices; add explicitly selected API/approved SDK routes separately. Prove interruption, native subagents/usage attribution and required permissions before advertising support.
 
 OpenCode: implement `opencode/adapter.ts` using pinned SDK/server APIs. Keep version/capability probing inside this folder. Use separate state/config/database roots; do not import core into the universal domain. Test one session generation end-to-end before considering current `/api` migration. Cover tool/permission and SSE disconnect behavior with real upstream server fixtures isolated from user data.
 
-## 7. Desktop integration and identity
+## 7. Desktop integration and identity — initial application delivered
 
-Add a dedicated control-plane channel in `packages/desktop/src/preload/{index,types}.ts` and validated handlers in `src/main/ipc.ts`; launch a separate supervised worker from main. Add a Harness session route/context in `packages/app/src` that depends on application DTOs. Reuse UI and session presentation through view models. Add runtime/account/billing/target selector, approvals and diff inspection; no provider SDK imports in components.
+`packages/harness-desktop` provides a separate Electron main, sandboxed preload, Solid conversation renderer and private Bun worker. This additive entry point preserves upstream desktop/app behavior and avoids loading its native engine into the universal control plane. Native pickers, subscription status, explicit admission acknowledgements, patch/question review and read-only Claude Skills discovery are implemented. See [DESKTOP.md](DESKTOP.md) for exact setup and limits. Model discovery, session recovery/history UI, full Files/Diff/tool views and additional runtime selection remain work.
 
 Before packaging, wire `harness.product.json` into a distinct build profile affecting `electron-builder.config.ts`, main app/data IDs, scheme, assets, updater, telemetry and i18n. Keep upstream development as a separate profile. Verify two installations coexist and a Harness update can never install upstream OpenCode. Use existing performance baseline and accessibility/e2e workflows when timeline/UI code changes.
 

@@ -92,3 +92,11 @@ export type {
   AgentEvent,
   EventDelivery,
 } from "./events"
+export type {
+  SkillScope,
+  SkillFeature,
+  SkillDescriptor,
+  SkillCatalog,
+  NativeSkillSupport,
+  SkillActivationIntent,
+} from "./skills"

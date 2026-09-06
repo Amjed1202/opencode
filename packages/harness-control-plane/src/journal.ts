@@ -165,6 +165,18 @@ export class SQLiteJournal implements EventStore, SessionStore {
       .filter((record) => record.sessionId === sessionId)
   }
 
+  /** Unknown native creates have no saved session and therefore cannot safely be scoped to a workspace. */
+  async hasUnsettledWork(workspaceId: string): Promise<boolean> {
+    return Boolean(
+      this.query<{ pending: number }, [string]>(
+        `SELECT 1 AS pending FROM journal_commands AS commands
+         LEFT JOIN journal_sessions AS sessions ON sessions.id = json_extract(commands.record, '$.sessionId')
+         WHERE commands.settled = 0 AND (sessions.id IS NULL OR sessions.workspace_id = ?)
+         LIMIT 1`,
+      ).get(workspaceId),
+    )
+  }
+
   async permission(id: string): Promise<PermissionRecord | undefined> {
     return this.lookupPermission(id)
   }

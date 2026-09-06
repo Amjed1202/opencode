@@ -1,0 +1,18 @@
+[WebServer] $ vite --config vite.preview.config.ts
+[WebServer] (node:46996) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:107568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:107568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 test\ui\renderer.spec.ts:152:1 › startup requires explicit native settings and never sends a prompt automatically (357ms)
+  ok 2 test\ui\renderer.spec.ts:185:1 › patch approval requires opening protected text and never renders it as HTML (297ms)
+  ok 3 test\ui\renderer.spec.ts:223:1 › fixed-choice questions send offered IDs after review (277ms)
+  ok 4 test\ui\renderer.spec.ts:260:1 › expired protected content is removed and approval becomes unavailable (511ms)
+  ok 5 test\ui\renderer.spec.ts:294:1 › older snapshots cannot replace current state and mobile context remains accessible (198ms)
+  ok 6 test\ui\renderer.spec.ts:322:1 › browser preview reports a missing desktop bridge and keeps execution disabled (127ms)
+
+  6 passed (4.1s)

@@ -16,6 +16,7 @@ import type {
   PermissionDecision,
   QuotaSnapshot,
   RuntimeDescriptor,
+  RuntimePreflight,
   UsageSnapshot,
 } from "@harness/protocol"
 
@@ -41,6 +42,8 @@ export interface AgentAdapter {
   readonly version: string
   discover(context: DiscoveryContext): Promise<readonly RuntimeDescriptor[]>
   capabilities(runtime: RuntimeDescriptor): AgentCapabilities
+  /** Read-only native account/configuration evidence; never opens a session or infers a model selection. */
+  readonly status?: (runtime: RuntimeDescriptor) => Promise<RuntimePreflight>
   preflight(request: AdapterPreflightRequest): Promise<AdapterPreflight>
   createSession(request: AdmittedSessionRequest): Promise<AgentSession>
   send(context: AdapterSessionContext, input: AgentInput): Promise<CommandReceipt>

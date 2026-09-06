@@ -214,6 +214,17 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 
+  async status(runtime: RuntimeDescriptor): Promise<RuntimePreflight> {
+    if (
+      runtime.id !== this.runtimeId ||
+      runtime.adapterId !== this.id ||
+      runtime.target.id !== this.options.target.id ||
+      runtime.target.kind !== "local"
+    )
+      throw new Error("Invalid native status binding")
+    return structuredClone(await this.observe())
+  }
+
   async preflight(request: AdapterPreflightRequest): Promise<AdapterPreflight> {
     try {
       this.requireIntent(request.intent)
