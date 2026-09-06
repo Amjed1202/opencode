@@ -1,0 +1,87 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [534]
+
+<workspace>\outputs\harness\node_modules\.bun\tree-sitter-powershell@0.25.10\node_modules\tree-sitter-powershell>if not defined npm_config_node_gyp (bun x --silent node-gyp rebuild )  else (node "" rebuild )
+
+
+(node:76840) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+gyp info it worked if it ends with ok
+gyp info using node-gyp@13.0.2
+gyp info using node@24.14.1 | win32 | x64
+gyp info find Python using Python version 3.12.10 found at "C:\Users\Amjed\AppData\Local\Programs\Python\Python312\python.exe"
+gyp http GET https://nodejs.org/download/release/v24.14.1/node-v24.14.1-headers.tar.gz
+gyp http 200 https://nodejs.org/download/release/v24.14.1/node-v24.14.1-headers.tar.gz
+gyp http GET https://nodejs.org/download/release/v24.14.1/SHASUMS256.txt
+gyp http GET https://nodejs.org/download/release/v24.14.1/win-x64/node.lib
+gyp http 200 https://nodejs.org/download/release/v24.14.1/SHASUMS256.txt
+gyp http 200 https://nodejs.org/download/release/v24.14.1/win-x64/node.lib
+gyp info find VS using VS2026 (18.8.12021.73) found at:
+gyp info find VS "C:\Program Files\Microsoft Visual Studio\18\Community"
+gyp info find VS run with --verbose for detailed information
+gyp info spawn C:\Users\Amjed\AppData\Local\Programs\Python\Python312\python.exe
+gyp info spawn args [
+gyp info spawn args 'C:\\Users\\Amjed\\AppData\\Local\\Temp\\bunx-1920194648-node-gyp@latest\\node_modules\\node-gyp\\gyp\\gyp_main.py',
+gyp info spawn args 'binding.gyp',
+gyp info spawn args '-f',
+gyp info spawn args 'msvs',
+gyp info spawn args '-I',
+gyp info spawn args 'C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\node_modules\\.bun\\tree-sitter-powershell@0.25.10\\node_modules\\tree-sitter-powershell\\build\\config.gypi',
+gyp info spawn args '-I',
+gyp info spawn args 'C:\\Users\\Amjed\\AppData\\Local\\Temp\\bunx-1920194648-node-gyp@latest\\node_modules\\node-gyp\\addon.gypi',
+gyp info spawn args '-I',
+gyp info spawn args 'C:\\Users\\Amjed\\AppData\\Local\\node-gyp\\Cache\\24.14.1\\include\\node\\common.gypi',
+gyp info spawn args '-Dlibrary=shared_library',
+gyp info spawn args '-Dvisibility=default',
+gyp info spawn args '-Dnode_root_dir=C:\\Users\\Amjed\\AppData\\Local\\node-gyp\\Cache\\24.14.1',
+gyp info spawn args '-Dnode_gyp_dir=C:\\Users\\Amjed\\AppData\\Local\\Temp\\bunx-1920194648-node-gyp@latest\\node_modules\\node-gyp',
+gyp info spawn args '-Dnode_lib_file=C:\\\\Users\\\\Amjed\\\\AppData\\\\Local\\\\node-gyp\\\\Cache\\\\24.14.1\\\\<(target_arch)\\\\node.lib',
+gyp info spawn args '-Dmodule_root_dir=C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\node_modules\\.bun\\tree-sitter-powershell@0.25.10\\node_modules\\tree-sitter-powershell',
+gyp info spawn args '-Dnode_engine=v8',
+gyp info spawn args '--depth=.',
+gyp info spawn args '--no-parallel',
+gyp info spawn args '--generator-output',
+gyp info spawn args 'C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\node_modules\\.bun\\tree-sitter-powershell@0.25.10\\node_modules\\tree-sitter-powershell\\build',
+gyp info spawn args '-Goutput_dir=.'
+gyp info spawn args ]
+Traceback (most recent call last):
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\gyp_main.py", line 45, in <module>
+    sys.exit(gyp.script_main())
+             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\__init__.py", line 702, in script_main
+    return main(sys.argv[1:])
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\__init__.py", line 694, in main
+    return gyp_main(args)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\__init__.py", line 679, in gyp_main
+    generator.GenerateOutput(flat_list, targets, data, params)
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\generator\msvs.py", line 2130, in GenerateOutput
+    _GenerateProject(project, options, msvs_version, generator_flags, spec)
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\generator\msvs.py", line 1025, in _GenerateProject
+    return _GenerateMSBuildProject(project, options, version, generator_flags, spec)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\generator\msvs.py", line 3724, in _GenerateMSBuildProject
+    _GenerateMSBuildFiltersFile(
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\generator\msvs.py", line 2209, in _GenerateMSBuildFiltersFile
+    easy_xml.WriteXmlIfChanged(content, filters_path, pretty=True, win32=True)
+  File "C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\gyp\pylib\gyp\easy_xml.py", line 142, in WriteXmlIfChanged
+    with open(path, "wb") as file:
+         ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\node_modules\\.bun\\tree-sitter-powershell@0.25.10\\node_modules\\tree-sitter-powershell\\build\\..\\..\\..\\node-addon-api@7.1.1\\node_modules\\node-addon-api\\node_addon_api_maybe.vcxproj.filters'
+gyp ERR! configure error
+gyp ERR! stack Error: `gyp` failed with exit code: 1
+gyp ERR! stack at ChildProcess.<anonymous> (C:\Users\Amjed\AppData\Local\Temp\bunx-1920194648-node-gyp@latest\node_modules\node-gyp\lib\configure.js:317:18)
+gyp ERR! stack at ChildProcess.emit (node:events:508:28)
+gyp ERR! stack at ChildProcess._handle.onexit (node:internal/child_process:294:12)
+gyp ERR! System Windows_NT 10.0.26200
+gyp ERR! command "C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\Amjed\\AppData\\Local\\Temp\\bunx-1920194648-node-gyp@latest\\node_modules\\node-gyp\\bin\\node-gyp.js" "rebuild"
+gyp ERR! cwd <workspace>\outputs\harness\node_modules\.bun\tree-sitter-powershell@0.25.10\node_modules\tree-sitter-powershell
+gyp ERR! node -v v24.14.1
+gyp ERR! node-gyp -v v13.0.2
+gyp ERR! $npm_package_name opencode
+gyp ERR! $npm_package_version 0.25.10
+gyp ERR! not ok
+
+error: install script from "tree-sitter-powershell" exited with 1

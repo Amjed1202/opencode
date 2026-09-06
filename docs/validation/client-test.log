@@ -1,0 +1,48 @@
+$ bun test --timeout 5000
+bun test v1.3.14 (0d9b296a)
+
+test\contract-identity.test.ts:
+(pass) Core and Server reuse the authoritative Schema and Protocol values [7.01ms]
+(pass) client and Server contracts generate identically [753.70ms]
+(pass) shared DTO schemas construct and decode plain objects [1.23ms]
+error: Cannot read file "C:\Users\Amjed\": EPERM
+
+test\effect.test.ts:
+(pass) sessions.get returns the decoded Effect projection [17.36ms]
+(pass) events.subscribe exposes and decodes the native Effect event stream [12.57ms]
+(pass) events.subscribe terminates on Effect protocol decode failures [6.06ms]
+(pass) session methods retain decoded Effect inputs and outputs [20.16ms]
+(pass) sessions.history retains the typed SessionNotFoundError [4.93ms]
+
+test\import-boundaries.test.ts:
+34 |   const temporary = await mkdtemp(join(import.meta.dir, ".import-boundary-"))
+35 |   const entrypoint = join(temporary, "index.ts")
+36 |   const metafile = join(temporary, "meta.json")
+37 |   try {
+38 |     await Bun.write(entrypoint, `export * from ${JSON.stringify(specifier)}`)
+39 |     const child = Bun.spawn(
+                           ^
+EPERM: operation not permitted, uv_spawn '<workspace>\work\tools\bun-windows-x64\bun.exe'
+    path: "<workspace>\\work\\tools\\bun-windows-x64\\bun.exe",
+ syscall: "uv_spawn",
+   errno: -1,
+    code: "EPERM"
+
+      at bundleInputs (<workspace>\outputs\harness\packages\client\test\import-boundaries.test.ts:39:23)
+      at async <anonymous> (<workspace>\outputs\harness\packages\client\test\import-boundaries.test.ts:15:24)
+(fail) public import boundaries > isolates each public entrypoint [7.76ms]
+
+test\promise.test.ts:
+(pass) exposes every standard HTTP API group [0.45ms]
+(pass) sessions.get returns the wire projection [1.05ms]
+(pass) events.subscribe exposes the Promise event stream wire projection [1.50ms]
+(pass) events.subscribe terminates on malformed Promise SSE data [0.60ms]
+(pass) session methods use the public HTTP contract [2.34ms]
+(pass) middleware errors remain declared client errors [0.44ms]
+(pass) sessions.history decodes SessionNotFoundError [0.24ms]
+
+ 15 pass
+ 1 fail
+ 65 expect() calls
+Ran 16 tests across 4 files. [2.63s]
+error: script "test" exited with code 1

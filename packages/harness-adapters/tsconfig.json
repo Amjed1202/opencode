@@ -1,0 +1,4 @@
+{
+  "extends": "../harness-protocol/tsconfig.json",
+  "include": ["src/**/*.ts"]
+}

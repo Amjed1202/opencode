@@ -1,0 +1,9 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [37]
+error: Fail extracting tarball for "electron-winstaller"
+error: failed to download electron-winstaller@5.4.0: Fail
+  https://registry.npmjs.org/electron-winstaller/-/electron-winstaller-5.4.0.tgz
+
+16 packages installed [91.65s]
+Failed to install 1 package

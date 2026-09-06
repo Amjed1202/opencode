@@ -1,0 +1,77 @@
+$ bun test --conditions=browser --preload ./happydom.ts ./test-browser
+bun test v1.3.14 (0d9b296a)
+
+test-browser\command-palette.test.ts:
+(pass) command palette sessions > uses the home project avatar and cancels superseded searches [113.25ms]
+error: Cannot read file "C:\Users\Amjed\": EPERM
+
+test-browser\motion-spring.test.ts:
+(pass) snaps spring progress when the session changes [1.61ms]
+
+test-browser\prompt-attachments.test.ts:
+(pass) prompt attachment session ownership > adds an asynchronously read image to the session where the read started [4.90ms]
+(pass) prompt attachment session ownership > finishes the captured attachment after the active editor is removed [1.77ms]
+(pass) prompt attachment session ownership > keeps every file in a batch on the session where the batch started [6.38ms]
+(pass) prompt attachment session ownership > keeps a delayed native clipboard image on the session where paste started [2.14ms]
+(pass) rejects a duplicate native clipboard attachment in the V2 prompt store [1.29ms]
+(pass) rejects desktop duplicates and keeps changed files in the V2 prompt store [0.80ms]
+
+test-browser\prompt-persistence.test.ts:
+(pass) prompt persistence > waits for an async draft to hydrate before reporting ready [2.27ms]
+(pass) moves legacy image data URLs into blobs and hydrates object URLs [2.03ms]
+(pass) does not let delayed blob migration overwrite a newer draft [11.46ms]
+
+test-browser\prompt-scope.test.ts:
+(pass) selects the explicitly scoped session tab instead of the active tab [0.11ms]
+
+test-browser\prompt-submission-state.test.ts:
+(pass) prompt submission state > keeps failed submission restoration with the prompt where it started [2.01ms]
+(pass) prompt submission state > moves first-submit restoration and context to the promoted session [0.28ms]
+(pass) prompt submission state > clears the original first-submit prompt after retargeting [0.17ms]
+(pass) prompt submission state > does not restore over a prompt edited after submission [0.09ms]
+
+test-browser\prompt-transient-state.test.ts:
+(pass) resets transient prompt input state when the prompt session changes [3.32ms]
+
+test-browser\review-panel-v2-state.test.ts:
+(pass) enables sidebar motion only after custom width hydration [1.30ms]
+
+test-browser\session-lineage.test.ts:
+(pass) resolves an uncached session and exposes its lineage [2.52ms]
+(pass) re-resolves when navigating to an uncached session without a remount [0.43ms]
+(pass) ignores a stale resolution failure after the target changes [0.45ms]
+(pass) returning to a pruned session re-resolves instead of throwing not found [0.43ms]
+(pass) revisiting a session whose resolution failed while unfocused retries cleanly [0.28ms]
+(pass) re-resolves against a replaced lineage store [0.32ms]
+(pass) throws not found when the settled session is deleted [0.52ms]
+
+test-browser\session-ownership.test.ts:
+(pass) createSessionOwnership > invalidates captured work when its Solid owner is disposed [3.88ms]
+(pass) createSessionOwnership > does not run a continuation after navigation [0.22ms]
+(pass) createSessionOwnership > does not revive a continuation after A to B to A navigation [0.11ms]
+
+test-browser\settings-keybinds.test.ts:
+(pass) keybind settings controller > derives the catalog, effective bindings, and filtered groups [5.56ms]
+(pass) keybind settings controller > captures bindings, rejects conflicts, and restores command handling [1.15ms]
+(pass) keybind settings controller > resets persisted overrides and reports success [0.22ms]
+
+test-browser\solid-router-cleanup.test.ts:
+(pass) route cleanup cannot invalidate an owner list being disposed [13.52ms]
+
+test-browser\solid-virtual.test.ts:
+(pass) end anchoring survives consecutive resizes when the first scroll write is clamped [1.83ms]
+(pass) reactive count updates preserve measured row sizes [1.81ms]
+(pass) initial rect projects rows before a scroll element connects [0.48ms]
+(pass) clamps oversized offsets with scroll margin and padding changes [0.22ms]
+(pass) stale pinned indexes do not produce missing virtual items after count shrinks [0.72ms]
+
+test-browser\toast-owner.test.ts:
+(pass) showToastV2 > coalesces exact active content [2.39ms]
+(pass) showToastV2 > allows dismissed content to appear again [0.18ms]
+(pass) showToastV2 > recreates matching content when it is not the topmost toast [0.08ms]
+(pass) showToastV2 > creates no reactive computations at call time [0.08ms]
+
+ 41 pass
+ 0 fail
+ 100 expect() calls
+Ran 41 tests across 14 files. [1020.00ms]

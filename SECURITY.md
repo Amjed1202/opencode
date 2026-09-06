@@ -1,3 +1,42 @@
+# Harness security architecture
+
+Status: proposed design, 2026-09-06. Harness is a provisional codename. This stage adds contracts only; none of the enforcement described below is implemented. The original OpenCode policy is preserved after this section and applies to upstream OpenCode, not to new Harness security guarantees or reporting ownership.
+
+## Boundaries and authority
+
+Treat repository content, prompts, tool output, MCP servers, hooks, skills, local clients, and remote nodes as distinct trust boundaries. The renderer receives safe projections and submits typed intents through authenticated, validated IPC. It cannot execute commands, open arbitrary paths, read secrets, or call native transports directly. The control plane checks session ownership, target, workspace, and policy before dispatch; the execution node repeats authorization. Host administrator compromise is outside application-only isolation guarantees.
+
+Advertised capabilities describe support, not authority. Record enforcement strength separately: OS isolation, native enforcement, adapter interception, advisory, or unavailable. Effective permission is the intersection of application policy, target restrictions, and native enforcement. Unsupported mandatory policies block admission. Observing a tool event after execution is not an approval mechanism; a user approval cannot widen an enforced workspace boundary.
+
+Permission decisions bind to session, node identity, native request ID, immutable operation digest, policy revision, expiry, and allowed decision scope. Reject stale, conflicting, replayed, or changed requests. Pending requests remain denied/blocked on timeout or disconnection. Audit actor, decision, scope, and outcome.
+
+Resolve filesystem paths on the execution host, including symlinks, Windows reparse points, case rules, UNC paths, and race conditions. Cwd and path-prefix checks alone are insufficient isolation. Shell scripts, package managers, Git hooks, and MCP can mutate files or access networks even when edit tools are hidden. Read-only review requires the enforceable boundaries in [COLLABORATION.md](COLLABORATION.md). Claude SDK permission callbacks are not a universal intercept; the documented permission ordering must inform its adapter. [Claude SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions)
+
+## Authentication, billing, and secrets
+
+Subscription is the preferred intent; automatic paid API fallback defaults to disabled. Authentication evidence, effective provider configuration, billing route, and provider overage state are separate, timestamped facts. Recheck on account/configuration changes. Unknown billing cannot become “API billing: OFF.” Claude subscription usage credits can incur additional charges independently of our API fallback setting. [Claude usage credits](https://support.claude.com/en/articles/12429409-manage-usage-credits-for-paid-claude-plans)
+
+Compile provider-specific minimum launch environments. Do not inherit unrelated API keys, bearer tokens, endpoint overrides, cloud-provider flags, or profile/home overrides. Inspect supported effective configuration because helpers/settings can supersede environment choices; block conflicts without modifying user-global authentication. Do not use inference as a billing probe. Native login remains native-owned; no browser cookies, token copying, private endpoint reproduction, or application-owned subscription OAuth. Claude's unmodified-binary route and restricted SDK route remain distinct implementation gates. [Claude authentication](https://code.claude.com/docs/en/authentication), [Claude legal conditions](https://code.claude.com/docs/en/legal-and-compliance)
+
+Our own secrets use OS secure storage where available; persistence holds opaque references. Native credentials remain with the runtime and execution host. An unavailable secure store does not justify plaintext fallback. Auth exchanges never enter ordinary events. Apply field redaction before persistence/export; raw native diagnostics require explicit retention policy and protected artifacts. Local audit provides traceability, not tamper-proof evidence against the host owner. Retention/deletion covers SQLite, artifacts, indexes, exports, and backups.
+
+## Verified upstream integration hazards
+
+The pinned source requires these safeguards before runtime integration:
+
+- [Desktop sidecar environment](packages/desktop/src/main/server.ts): `createSidecarEnv` copies `process.env`; replace this behavior at the future adapter launch boundary.
+- [Credential schema](packages/core/src/credential/sql.ts): credential values are JSON text in SQLite; this schema is not evidence of OS secure storage.
+- [Core globals](packages/core/src/global.ts): the `opencode` data/config identity is hardcoded and directories are created during import. Provision separate Harness data/config/cache/state roots before loading native services; do not import Core into the renderer or universal protocol.
+- [V2 reset migration](packages/core/src/database/migration/20260622170816_reset_v2_session_state.ts): deletes session/event/workspace state. Never point exploratory migrations at the user's existing OpenCode database. Separate schema ownership, migration review, backups, and explicit import are required.
+
+Native adapters are privileged trusted code until separately isolated. Local HTTP, if introduced, needs per-launch authentication, origin checks and authenticated WebSocket upgrades; loopback alone is insufficient. Remote authentication and command recovery are specified in [REMOTE_NODES.md](REMOTE_NODES.md). These are future acceptance gates, not changes made to upstream behavior now.
+
+---
+
+## Preserved upstream security policy
+
+The following text is retained unchanged from the pinned OpenCode release. Its upstream reporting contacts are not a Harness support service. Harness needs its own disclosure process before distribution.
+
 # Security
 
 ## IMPORTANT

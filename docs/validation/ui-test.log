@@ -1,0 +1,8 @@
+$ bun test src --only-failures
+bun test v1.3.14 (0d9b296a)
+error: Cannot read file "C:\Users\Amjed\": EPERM
+
+ 27 pass
+ 0 fail
+ 38 expect() calls
+Ran 27 tests across 4 files. [171.00ms]

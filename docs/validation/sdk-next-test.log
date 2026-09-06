@@ -1,0 +1,103 @@
+$ bun test --timeout 5000
+bun test v1.3.14 (0d9b296a)
+
+test\embedded.test.ts:
+[14:05:15.321] INFO (#217): project copy refresh started {
+  projectID: "global",
+}
+[14:05:15.323] INFO (#217): project copy refresh done {
+  projectID: "global",
+  updated: [],
+  removed: [],
+}
+[14:05:15.390] INFO (#102): booting location services {
+  directory: "<workspace>\\work\\validation-state\\sdk-next-test\\tmp\\opencode-embedded-dNrTQB",
+  workspaceID: undefined,
+}
+[14:05:15.481] ERROR (#400): Failed to drain Session SessionRunnerModel.ModelUnavailableError: Model unavailable: test/embedded
+    at <anonymous> (<workspace>\outputs\harness\packages\core\src\session\runner\model.ts:199:29)
+    at SessionRunnerModel.resolve (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:199:35)
+    at SessionRunnerModel.resolve (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\model.ts:188:23)
+    at SessionRunner.runTurn (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:377:21)
+    at SessionRunner.runTurn (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:173:35)
+    at SessionRunner.run (<workspace>\outputs\harness\node_modules\.bun\effect@4.0.0-beta.83\node_modules\effect\dist\internal\effect.js:444:98)
+    at SessionRunner.run (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:390:24) {
+  sessionID: "ses_embedded_d7a1deed-5a45-4e23-b94a-560127cf7f3f",
+}
+ 98 |       expect(missingMessage._tag).toBe("MessageNotFoundError")
+ 99 |     })
+100 |     await Effect.runPromise(Effect.scoped(program))
+101 |   } finally {
+102 |     Flag.OPENCODE_DB = database
+103 |     await rm(directory, { recursive: true, force: true })
+                ^
+EBUSY: resource busy or locked, rm '<workspace>\work\validation-state\sdk-next-test\tmp\opencode-embedded-dNrTQB'
+    path: "<workspace>\\work\\validation-state\\sdk-next-test\\tmp\\opencode-embedded-dNrTQB",
+ syscall: "rm",
+   errno: -16,
+    code: "EBUSY"
+
+      at async <anonymous> (<workspace>\outputs\harness\packages\sdk-next\test\embedded.test.ts:103:11)
+(fail) embedded client uses the real router and handlers [1572.69ms]
+[14:05:15.729] INFO (#1406): project copy refresh started {
+  projectID: "global",
+}
+[14:05:15.729] INFO (#1406): project copy refresh done {
+  projectID: "global",
+  updated: [],
+  removed: [],
+}
+[14:05:15.772] INFO (#1291): booting location services {
+  directory: "<workspace>\\work\\validation-state\\sdk-next-test\\tmp\\opencode-embedded-events-SQMMPy",
+  workspaceID: undefined,
+}
+[14:05:15.801] ERROR (#1570): Failed to drain Session SessionRunnerModel.ModelNotSelectedError: No model is available for session ses_embedded_bc1b10f0-2dce-4379-94f4-ef418db5d189
+    at <anonymous> (<workspace>\outputs\harness\packages\core\src\session\runner\model.ts:203:42)
+    at SessionRunnerModel.resolve (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:199:35)
+    at SessionRunnerModel.resolve (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\model.ts:188:23)
+    at SessionRunner.runTurn (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:377:21)
+    at SessionRunner.runTurn (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:173:35)
+    at SessionRunner.run (<workspace>\outputs\harness\node_modules\.bun\effect@4.0.0-beta.83\node_modules\effect\dist\internal\effect.js:444:98)
+    at SessionRunner.run (definition) (<workspace>\outputs\harness\packages\core\src\session\runner\llm.ts:390:24) {
+  sessionID: "ses_embedded_bc1b10f0-2dce-4379-94f4-ef418db5d189",
+}
+(pass) Location-owned runner events reach the ready global client [276.82ms]
+[14:05:16.002] INFO (#2650): project copy refresh started {
+  projectID: "global",
+}
+[14:05:16.003] INFO (#2650): project copy refresh done {
+  projectID: "global",
+  updated: [],
+  removed: [],
+}
+[14:05:16.045] INFO (#2535): booting location services {
+  directory: "<workspace>\\work\\validation-state\\sdk-next-test\\tmp\\opencode-embedded-hosts-6O0IGz",
+  workspaceID: undefined,
+}
+(pass) independent embedded hosts do not share live notifications [374.79ms]
+(pass) embedded client is available as a Layer service [52.78ms]
+error: Cannot read file "C:\Users\Amjed\": EPERM
+
+test\import-boundaries.test.ts:
+19 |   const temporary = await mkdtemp(join(import.meta.dir, ".import-boundary-"))
+20 |   const entrypoint = join(temporary, "index.ts")
+21 |   const metafile = join(temporary, "meta.json")
+22 |   try {
+23 |     await Bun.write(entrypoint, 'export * from "@opencode-ai/sdk-next"')
+24 |     const child = Bun.spawn(
+                           ^
+EPERM: operation not permitted, uv_spawn '<workspace>\work\tools\bun-windows-x64\bun.exe'
+    path: "<workspace>\\work\\tools\\bun-windows-x64\\bun.exe",
+ syscall: "uv_spawn",
+   errno: -1,
+    code: "EPERM"
+
+      at bundleInputs (<workspace>\outputs\harness\packages\sdk-next\test\import-boundaries.test.ts:24:23)
+      at async <anonymous> (<workspace>\outputs\harness\packages\sdk-next\test\import-boundaries.test.ts:11:24)
+(fail) bundles the client and in-memory host [3.18ms]
+
+ 3 pass
+ 2 fail
+ 16 expect() calls
+Ran 5 tests across 2 files. [2.47s]
+error: script "test" exited with code 1

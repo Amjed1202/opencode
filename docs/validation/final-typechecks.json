@@ -1,0 +1,42 @@
+[
+  {
+    "package": "harness-protocol",
+    "command": "bun typecheck",
+    "cwd": "packages/harness-protocol",
+    "exitCode": 0,
+    "output": "$ tsgo --noEmit\r\n",
+    "log": "harness-protocol-final-typecheck.log"
+  },
+  {
+    "package": "harness-adapters",
+    "command": "bun typecheck",
+    "cwd": "packages/harness-adapters",
+    "exitCode": 0,
+    "output": "$ tsgo --noEmit\r\n",
+    "log": "harness-adapters-final-typecheck.log"
+  },
+  {
+    "package": "harness-control-plane",
+    "command": "bun typecheck",
+    "cwd": "packages/harness-control-plane",
+    "exitCode": 0,
+    "output": "$ tsgo --noEmit\r\n",
+    "log": "harness-control-plane-final-typecheck.log"
+  },
+  {
+    "package": "app",
+    "command": "bun typecheck",
+    "cwd": "packages/app",
+    "exitCode": 0,
+    "output": "$ tsgo -b\r\n",
+    "log": "app-final-typecheck.log"
+  },
+  {
+    "package": "desktop",
+    "command": "bun typecheck",
+    "cwd": "packages/desktop",
+    "exitCode": 0,
+    "output": "$ tsgo -b\r\n",
+    "log": "desktop-final-typecheck.log"
+  }
+]

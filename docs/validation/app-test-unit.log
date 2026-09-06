@@ -1,0 +1,8 @@
+$ bun test --conditions=solid --only-failures --preload ./happydom.ts ./src
+bun test v1.3.14 (0d9b296a)
+error: Cannot read file "C:\Users\Amjed\": EPERM
+
+ 724 pass
+ 0 fail
+ 3022 expect() calls
+Ran 724 tests across 103 files. [4.07s]

@@ -1,0 +1,21 @@
+{
+  "name": "@harness/control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@harness/protocol": "workspace:*",
+    "@harness/adapters": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
+  }
+}

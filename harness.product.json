@@ -1,0 +1,22 @@
+{
+  "codename": "Harness",
+  "identityStatus": "provisional",
+  "stage": "architecture-and-contracts",
+  "desktopIntegration": "not-implemented",
+  "upstream": {
+    "repository": "https://github.com/anomalyco/opencode",
+    "release": "v1.18.29",
+    "commit": "16747470f976aca3d362ad730bcd3fe82ecc2c9a",
+    "verifiedAt": "2026-09-06"
+  },
+  "defaults": {
+    "preferSubscriptionRuntimes": true,
+    "allowAutomaticApiFallback": false,
+    "unknownBilling": "block",
+    "unknownHardBudget": "pause",
+    "maxReviewCycles": 2,
+    "externalTelemetry": false,
+    "productUpdater": "disabled-until-configured"
+  },
+  "note": "Intended product configuration only. These defaults are not wired into the existing OpenCode executable or desktop."
+}

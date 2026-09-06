@@ -1,0 +1,4 @@
+$ tsgo -b
+../app/src/custom-elements.d.ts(1,1): error TS1128: Declaration or statement expected.
+../app/src/custom-elements.d.ts(1,2): error TS1128: Declaration or statement expected.
+error: script "typecheck" exited with code 1
