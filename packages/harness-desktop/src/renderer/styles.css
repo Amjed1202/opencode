@@ -980,9 +980,18 @@ select {
   .sidebar .sidebar-heading,
   .sidebar .sidebar-description,
   .sidebar-footer,
-  .sidebar-spacer,
-  .sidebar-runtime {
+  .sidebar-spacer {
     display: none;
+  }
+  .sidebar-runtime {
+    grid-column: 1 / -1;
+    grid-template-columns: 70px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar .sidebar-runtime .sidebar-heading {
+    display: block;
+    padding: 0;
   }
   .workspace-picker {
     padding: 9px;

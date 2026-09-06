@@ -1,8 +1,33 @@
 # Validation and known issues
 
-Executed 2026-09-06 on Windows with Bun **1.3.14**, Node **24.14.1** and Electron **42.3.3**. The newest continuation adds a development desktop and Claude Skills discovery. [Desktop scope](DESKTOP.md) and [host scope](M1A_IMPLEMENTATION.md) distinguish implementation from live-provider, OS execution boundary and distribution acceptance.
+Executed 2026-09-07 (Europe/Rome) on Windows with Bun **1.3.14**, Node **24.14.1** and Electron **42.3.3**. This continuation adds **Claude 2.1.251 native connection checks** and desktop runtime selection. Claude execution and native Skills activation remain unsupported. [Claude scope](M1B_CLAUDE.md) and [desktop scope](DESKTOP.md) distinguish this delivery from native execution and billing acceptance.
 
-## Desktop and Claude Skills continuation
+## Claude native status continuation
+
+| Final check                                           | Result                                                                                   | Evidence                                                                                                   |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Complete host suite                                   | **281 pass, 1 platform skip, 0 fail**, 1078 assertions                                   | [Log](docs/validation/m1b-claude-control-plane-tests.log)                                                  |
+| Complete adapter suite                                | **277 pass, 0 fail**, 776 assertions                                                     | [Log](docs/validation/m1b-claude-adapters-tests.log)                                                       |
+| Complete desktop unit/process suite                   | **51 pass, 1 platform skip, 0 fail**, 328 assertions                                     | [Log](docs/validation/m1b-claude-unit-tests.log)                                                           |
+| Chromium renderer tests                               | **8 pass**                                                                               | [Log](docs/validation/m1b-claude-ui-tests.log)                                                             |
+| Built Electron startup, runtime selection and restart | **1 pass**                                                                               | [Log](docs/validation/m1b-claude-electron-tests.log), [screenshot](docs/validation/m1b-claude-desktop.png) |
+| Four package typechecks and desktop build             | **Pass**                                                                                 | [Commands/logs](docs/validation/m1b-claude-results.json), [build](docs/validation/m1b-claude-build.log)    |
+| Native Claude version/sign-in diagnostics             | **Pass with isolated signed-out profile**                                                | [Sanitized smoke](docs/validation/m1b-claude-native-smoke.json)                                            |
+| Authored-source format and lint                       | **Format pass; 0 lint errors, 342 warnings** across 89 TypeScript files                  | [Format](docs/validation/m1b-claude-format.log), [lint](docs/validation/m1b-claude-oxlint.json)            |
+| Native generated protocol and upstream preservation   | **72 hashes match; functional upstream and MIT unchanged**                               | [Results](docs/validation/m1b-claude-results.json)                                                         |
+| Independent process and integration reviews           | **Cleanup defect fixed and regression checked; no remaining material findings in scope** | [Review](docs/validation/m1b-claude-review.md)                                                             |
+
+Total: **609 passing unit/process tests, 2 platform skips, 2182 assertions**, plus **9 browser/Electron tests**. The Windows skips remain the host's open-database directory-rename test and desktop's POSIX permission-mode test. Lint warnings remain visible, primarily typed assertions and Bun test typings; this is not a warning-free result.
+
+The Claude inspector's 45 process tests include inherited-output-handle timeout/disposal regressions. Nine adapter tests cover runtime identity, unknown billing, unsupported operations and disposal races. Desktop tests prove a signed-in Claude fixture cannot inherit Codex readiness, start a session or leak extra native status fields. Switching clears native roots and evidence and is rejected for an attached session. The real Electron smoke checks the new preload operation and blocked start against the private Bun worker, along with the existing sandbox, custom-origin, asset/CSP and OS key-wrapping checks.
+
+The installed unmodified Claude binary was checked using fixed version/status commands in an isolated signed-out profile. This does not inspect the user's existing account, prove subscription entitlement or establish the absence of provider charges. No Claude login, inference, provider thread or turn was sent. All signed-in and conversation regression scenarios use local fixtures. Native Skills remain catalog metadata; no installed personal skill was executed.
+
+No dependencies or lockfile changed in this increment, so the prior frozen install remains applicable; all four package typechecks and the desktop build were rerun. Process fixtures, compiler and browser subprocesses required permission outside the default process sandbox. All 72 generated Codex file hashes, the MIT notice and original upstream security-policy suffix match the pinned release. Only SECURITY.md and bun.lock differ among preexisting upstream files across the cumulative fork.
+
+Execution remains blocked for Claude because no complete supported native proof of effective billing, managed startup policy and permission enforcement was established before dispatch. [Checked sources](docs/validation/m1b-claude-native-evidence.md). The native inspector bounds direct-child cleanup but does not attest descendant termination. OS execution boundary attestation, live provider billing/task acceptance, OpenCode execution, cross-process fencing and signed distribution remain open. Earlier records below describe their own historical delivery state and are preserved unchanged.
+
+## Desktop and Claude Skills continuation (historical, 2026-09-06)
 
 | Final check                                         | Result                                                                  | Evidence                                                                                                  |
 | --------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |

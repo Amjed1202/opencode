@@ -1,0 +1,21 @@
+$ playwright test --config test/ui/playwright.config.ts
+[WebServer] $ vite --config vite.preview.config.ts
+[WebServer] (node:151544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 8 tests using 1 worker
+
+(node:32972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:32972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 test\ui\renderer.spec.ts:173:1 › startup requires explicit native settings and never sends a prompt automatically (343ms)
+  ok 2 test\ui\renderer.spec.ts:207:1 › patch approval requires opening protected text and never renders it as HTML (295ms)
+  ok 3 test\ui\renderer.spec.ts:245:1 › fixed-choice questions send offered IDs after review (279ms)
+  ok 4 test\ui\renderer.spec.ts:282:1 › expired protected content is removed and approval becomes unavailable (526ms)
+  ok 5 test\ui\renderer.spec.ts:316:1 › older snapshots cannot replace current state and mobile context remains accessible (199ms)
+  ok 6 test\ui\renderer.spec.ts:344:1 › browser preview reports a missing desktop bridge and keeps execution disabled (127ms)
+  ok 7 test\ui\renderer.spec.ts:351:1 › switching runtime invalidates Codex readiness and clears execution acknowledgments (291ms)
+  ok 8 test\ui\renderer.spec.ts:389:1 › Claude sign-in status never enables execution or native Skills when billing remains unknown (163ms)
+
+  8 passed (4.5s)

@@ -5,6 +5,9 @@ import { link, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { CodexAdapter } from "@harness/adapters/codex"
+import { ClaudeAdapter } from "@harness/adapters/claude"
+import { NativeClaudeInspector } from "../../../harness-adapters/src/claude/inspect"
+import { spawn } from "node:child_process"
 import type { InteractionReview } from "@harness/protocol"
 import { StdioJsonRpc } from "../../../harness-adapters/src/codex/stdio"
 import { removeFixtureDirectory } from "../../../harness-control-plane/test/support"
@@ -28,6 +31,7 @@ async function fixture(scenario = "normal") {
   await mkdir(home)
   const published: DesktopState[] = []
   const transports: StdioJsonRpc[] = []
+  const inspections: { command: readonly string[]; cwd: string }[] = []
   let disposals = 0
   class TrackedCodexAdapter extends CodexAdapter {
     override async dispose() {
@@ -43,6 +47,22 @@ async function fixture(scenario = "normal") {
     changed(state: DesktopState) {
       published.push(state)
     },
+    claudeAdapterFactory: (options: ConstructorParameters<typeof ClaudeAdapter>[0]) =>
+      new ClaudeAdapter({
+        ...options,
+        inspectorFactory: (options) =>
+          new NativeClaudeInspector({
+            ...options,
+            launch: (command, launch) => {
+              inspections.push({ command: command.slice(1), cwd: launch.cwd })
+              return spawn(
+                process.execPath,
+                [resolve(import.meta.dir, "../fixtures/claude-status-peer.ts"), ...command.slice(1)],
+                { ...launch, stdio: ["ignore", "pipe", "pipe"], shell: false, windowsHide: true },
+              )
+            },
+          }),
+      }),
     adapterFactory: (options: ConstructorParameters<typeof CodexAdapter>[0]) =>
       new TrackedCodexAdapter({
         ...options,
@@ -76,6 +96,7 @@ async function fixture(scenario = "normal") {
     configuration,
     published,
     transports,
+    inspections,
     disposals: () => disposals,
     backend: () => backend,
     async configure() {
@@ -122,6 +143,57 @@ async function rejection(promise: Promise<unknown>) {
 }
 
 describe("desktop backend through the pinned local stdio fixture", () => {
+  test("runtime switching clears native roots and Claude sign-in never enables execution or exposes native status fields", async () => {
+    const state = await fixture()
+    try {
+      await state.configure()
+      await state.backend().dispatch("refresh")
+      expect((await state.state()).connection.status).toBe("ready")
+      const switched = (await state.backend().dispatch("selectRuntime", { runtime: "claude" })) as DesktopState
+      expect(switched.configuration.runtime).toBe("claude")
+      expect(switched.configuration.executable).toBeUndefined()
+      expect(switched.configuration.nativeHome).toBeUndefined()
+      expect(switched.connection).toEqual({
+        runtimeName: "Claude Code",
+        status: "not-checked",
+        authentication: "unknown",
+        billing: "unknown",
+        providerOverage: "unknown",
+      })
+      expect(state.inspections).toHaveLength(0)
+      await state
+        .backend()
+        .dispatch("configure", { ...switched.configuration, executable: process.execPath, nativeHome: state.home })
+      const checked = (await state.backend().dispatch("refresh")) as DesktopState
+      expect(checked.connection).toMatchObject({
+        runtimeName: "Claude Code",
+        runtimeVersion: "2.1.251",
+        status: "blocked",
+        authentication: "authenticated",
+        billing: "unknown",
+        providerOverage: "unknown",
+      })
+      expect(JSON.stringify(checked)).not.toContain("private-fixture")
+      expect(JSON.stringify(checked)).not.toContain("claimed-plan")
+      expect(state.inspections.map((value) => value.command)).toEqual([
+        ["--version"],
+        ["--version"],
+        ["auth", "status"],
+      ])
+      expect(state.inspections.every((value) => value.cwd === state.storage)).toBe(true)
+      await rejection(state.backend().dispatch("start", start))
+      await rejection(state.backend().dispatch("send", { text: "Must never reach Claude" }))
+      expect(state.inspections).toHaveLength(3)
+      expect((await state.state()).session).toBeUndefined()
+      const back = (await state.backend().dispatch("selectRuntime", { runtime: "codex" })) as DesktopState
+      expect(back.configuration.executable).toBeUndefined()
+      expect(back.configuration.nativeHome).toBeUndefined()
+      expect(back.connection.status).toBe("not-checked")
+      expect(back.connection.runtimeName).toBe("Codex")
+    } finally {
+      await state.close()
+    }
+  })
   test("recovery failure closes both storage databases before rejecting startup", async () => {
     const state = await fixture()
     try {
@@ -275,6 +347,9 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       expect(JSON.stringify(completed)).not.toContain("unknown-sensitive-body")
       expect(JSON.stringify(completed)).not.toContain("never-retain-this")
       await rejection(state.backend().dispatch("configure", state.configuration))
+      await rejection(state.backend().dispatch("selectRuntime", { runtime: "claude" }))
+      expect((await state.state()).connection.runtimeName).toBe("Codex")
+      expect(state.inspections).toHaveLength(0)
     } finally {
       await state.close()
     }

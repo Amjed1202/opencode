@@ -44,6 +44,27 @@ async function install(page: Page, state = initial) {
       getState: returnState,
       chooseWorkspace: returnState,
       chooseRuntime: returnState,
+      async selectRuntime(input) {
+        calls.push({ method: "selectRuntime", input })
+        if (current.session) throw new Error("A runtime is attached to this conversation")
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          configuration: {
+            runtime: input.runtime,
+            ...(current.configuration.workspace ? { workspace: current.configuration.workspace } : {}),
+            ...(current.configuration.userSkillsRoot ? { userSkillsRoot: current.configuration.userSkillsRoot } : {}),
+          },
+          connection: {
+            status: "not-configured",
+            runtimeName: input.runtime === "claude" ? "Claude Code" : "Codex",
+            authentication: "unknown",
+            billing: "unknown",
+            providerOverage: "unknown",
+          },
+        }
+        return current
+      },
       chooseNativeHome: returnState,
       chooseSkillsRoot: returnState,
       refresh: returnState,
@@ -161,6 +182,7 @@ test("startup requires explicit native settings and never sends a prompt automat
   await page.getByLabel("I understand the operating-system execution boundary").check()
   await start.click()
   await expect(page.getByText("Conversation connected: fixture-model")).toBeVisible()
+  await expect(page.getByRole("combobox", { name: "Choose runtime" })).toBeDisabled()
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
   await page.getByRole("textbox", { name: "Message to Codex", exact: true }).fill("Inspect the fixture repository")
   await expect
@@ -310,7 +332,7 @@ test("older snapshots cannot replace current state and mobile context remains ac
   await expect(page.getByRole("tab", { name: "Skills", exact: true })).toBeFocused()
   await expect(
     page.getByText(
-      "Native activation will be available with the Claude Code adapter. These skills are not active in Codex.",
+      "Skills are cataloged only. Native activation is disabled until runtime execution and policy checks are supported.",
     ),
   ).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
@@ -324,4 +346,82 @@ test("browser preview reports a missing desktop bridge and keeps execution disab
   await expect(page.getByRole("alert")).toContainText("The desktop connection is unavailable")
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
   await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
+})
+
+test("switching runtime invalidates Codex readiness and clears execution acknowledgments", async ({ page }) => {
+  await install(page)
+  await page.goto("/")
+  await page.getByLabel("Native model ID", { exact: true }).fill("fixture-model")
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  await page.getByLabel("Allow file changes in this repository").check()
+  await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeEnabled()
+  await page.getByRole("combobox", { name: "Choose runtime" }).selectOption("claude")
+  await expect(page.getByRole("button", { name: "Choose Claude Code executable" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Connect your Claude Code account." })).toBeVisible()
+  await expect(page.getByText("Subscription observed", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Connection ready", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Executable: C:/fixture/codex.exe", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Native account home: C:/fixture/native", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "Check connection", exact: true })).toBeDisabled()
+  await expect(page.getByRole("textbox", { name: "Message to Claude Code", exact: true })).toBeDisabled()
+  await expect(page.getByRole("checkbox")).toHaveCount(0)
+  await page.getByRole("combobox", { name: "Choose runtime" }).selectOption("codex")
+  await page.evaluate(
+    (serialized) =>
+      (window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+        JSON.parse(serialized) as DesktopState,
+      ),
+    JSON.stringify({ ...initial, revision: 4 }),
+  )
+  await expect(page.getByLabel("Native model ID", { exact: true })).toHaveValue("")
+  await expect(page.getByLabel("I have checked my provider’s spending settings")).not.toBeChecked()
+  await expect(page.getByLabel("I understand the operating-system execution boundary")).not.toBeChecked()
+  await expect(page.getByLabel("Allow file changes in this repository")).not.toBeChecked()
+  await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    { method: "selectRuntime", input: { runtime: "claude" } },
+    { method: "selectRuntime", input: { runtime: "codex" } },
+  ])
+})
+
+test("Claude sign-in status never enables execution or native Skills when billing remains unknown", async ({
+  page,
+}) => {
+  await install(page, {
+    ...initial,
+    configuration: { ...initial.configuration, runtime: "claude", executable: "C:/fixture/claude.exe" },
+    connection: {
+      status: "blocked",
+      runtimeName: "Claude Code",
+      runtimeVersion: "2.1.251",
+      authentication: "authenticated",
+      billing: "unknown",
+      providerOverage: "unknown",
+      reason: "Native billing and managed policy evidence is unavailable. Execution is disabled.",
+    },
+  })
+  await page.goto("/")
+  await expect(page.getByRole("combobox", { name: "Choose runtime" })).toHaveValue("claude")
+  await expect(page.getByText("Signed in", { exact: true })).toBeVisible()
+  await expect(
+    page.getByText("Native billing and managed policy evidence is unavailable. Execution is disabled.", {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(page.getByText("Subscription observed", { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/home folder containing \.claude/)).toBeVisible()
+  await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
+  await expect(page.getByRole("textbox", { name: "Message to Claude Code", exact: true })).toBeDisabled()
+  await page.getByRole("tab", { name: "Skills", exact: true }).click()
+  await expect(
+    page.getByText(
+      "Skills are cataloged only. Native activation is disabled until runtime execution and policy checks are supported.",
+      { exact: true },
+    ),
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: /activate|enable/i })).toHaveCount(0)
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
 })

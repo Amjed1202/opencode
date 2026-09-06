@@ -21,14 +21,22 @@ export function App() {
   const [selections, setSelections] = createSignal<Record<string, Record<string, string>>>({})
   const [now, setNow] = createSignal(Date.now())
   const configuration = () => state()?.configuration
+  const runtime = () => configuration()?.runtime ?? "codex"
+  const runtimeName = () => (runtime() === "claude" ? copy.claude : copy.codex)
+  const executionAvailable = () => runtime() === "codex"
   const session = () => state()?.session
   const running = () => ["running", "awaiting-permission", "awaiting-input"].includes(session()?.status ?? "")
   const canSend = () =>
-    !busy() && !!session() && ["idle", "interrupted"].includes(session()!.status) && !!draft().trim()
+    executionAvailable() &&
+    !busy() &&
+    !!session() &&
+    ["idle", "interrupted"].includes(session()!.status) &&
+    !!draft().trim()
   const pending = () => (state()?.permissions.length ?? 0) + (state()?.inputs.length ?? 0)
   const ready = () => state()?.connection.status === "ready"
   const canStart = () =>
     !busy() &&
+    executionAvailable() &&
     !session() &&
     ready() &&
     !!configuration()?.workspace &&
@@ -50,7 +58,18 @@ export function App() {
   let followConversation = true
 
   function receive(next: DesktopState) {
-    setState((current) => (!current || next.revision >= current.revision ? next : current))
+    const current = state()
+    if (current && next.revision < current.revision) return
+    if ((current?.configuration.runtime ?? "codex") !== (next.configuration.runtime ?? "codex")) {
+      setModelId("")
+      setAcknowledgeOverage(false)
+      setAllowFileChanges(false)
+      setAcknowledgeBoundary(false)
+      setDraft("")
+      setReviews({})
+      setSelections({})
+    }
+    setState(next)
   }
 
   onMount(() => {
@@ -108,6 +127,14 @@ export function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function selectRuntime(select: HTMLSelectElement) {
+    const selected = select.value
+    if (!busy() && !session() && (selected === "codex" || selected === "claude") && selected !== runtime()) {
+      await perform(() => window.harness.selectRuntime({ runtime: selected }))
+    }
+    select.value = runtime()
   }
 
   function openContext(next?: ContextTab) {
@@ -255,12 +282,19 @@ export function App() {
           <label class="sidebar-heading" for="runtime-choice">
             {copy.runtime}
           </label>
-          <select class="runtime-select" id="runtime-choice" value="codex" aria-label={copy.runtimeSelect}>
+          <select
+            class="runtime-select"
+            id="runtime-choice"
+            value={runtime()}
+            aria-label={copy.runtimeSelect}
+            disabled={busy() || !!session() || !state()}
+            onChange={(event) => void selectRuntime(event.currentTarget)}
+          >
             <option value="codex">{copy.codex}</option>
-            <option disabled>{copy.claudePending}</option>
+            <option value="claude">{copy.claude}</option>
             <option disabled>{copy.openCodePending}</option>
           </select>
-          <p class="sidebar-description">{copy.nativeSubscription}</p>
+          <p class="sidebar-description">{executionAvailable() ? copy.nativeSubscription : copy.connectionChecks}</p>
         </section>
         <footer class="sidebar-footer">
           <Icon name="shield" size={14} />
@@ -336,18 +370,22 @@ export function App() {
                   <Icon name="code" size={27} />
                 </span>
                 <h2>
-                  {session()
-                    ? copy.emptySessionTitle
-                    : configuration()?.workspace
-                      ? copy.emptyConfiguredTitle
-                      : copy.emptyTitle}
+                  {!executionAvailable()
+                    ? copy.claudeEmptyTitle
+                    : session()
+                      ? copy.emptySessionTitle
+                      : configuration()?.workspace
+                        ? copy.emptyConfiguredTitle
+                        : copy.emptyTitle}
                 </h2>
                 <p>
-                  {session()
-                    ? copy.emptySessionDescription
-                    : configuration()?.workspace
-                      ? copy.emptyConfiguredDescription
-                      : copy.emptyDescription}
+                  {!executionAvailable()
+                    ? copy.claudeEmptyDescription
+                    : session()
+                      ? copy.emptySessionDescription
+                      : configuration()?.workspace
+                        ? copy.emptyConfiguredDescription
+                        : copy.emptyDescription}
                 </p>
                 <Show when={!session()}>
                   <button
@@ -373,7 +411,7 @@ export function App() {
                       <span class="message-avatar" aria-hidden="true">
                         {message.role === "user" ? copy.userInitial : <Icon name="code" size={14} />}
                       </span>
-                      {message.role === "user" ? copy.you : copy.codex}
+                      {message.role === "user" ? copy.you : runtimeName()}
                     </div>
                     <div class="message-body">{message.text}</div>
                   </li>
@@ -382,7 +420,7 @@ export function App() {
             </ol>
           </Show>
         </div>
-        <section class="composer-region" aria-label={copy.promptLabel}>
+        <section class="composer-region" aria-label={copy.promptLabel[runtime()]}>
           <form
             class="composer"
             onSubmit={(event) => {
@@ -391,7 +429,7 @@ export function App() {
             }}
           >
             <label class="sr-only" for="message-composer">
-              {copy.promptLabel}
+              {copy.promptLabel[runtime()]}
             </label>
             <textarea
               id="message-composer"
@@ -403,13 +441,25 @@ export function App() {
                   void send()
                 }
               }}
-              placeholder={session() ? copy.promptPlaceholder : copy.promptUnavailable}
-              disabled={!session()}
+              placeholder={
+                !executionAvailable()
+                  ? copy.connectionChecks
+                  : session()
+                    ? copy.promptPlaceholder
+                    : copy.promptUnavailable
+              }
+              disabled={!session() || !executionAvailable()}
               maxLength={100000}
             />
             <div class="composer-actions">
               <span class="composer-hint">
-                {running() ? (pending() ? copy.awaiting : copy.running) : copy.composerHint}
+                {!executionAvailable()
+                  ? copy.connectionChecks
+                  : running()
+                    ? pending()
+                      ? copy.awaiting
+                      : copy.running[runtime()]
+                    : copy.composerHint}
               </span>
               <div class="composer-buttons">
                 <Show when={running()}>
@@ -436,8 +486,10 @@ export function App() {
             </div>
           </form>
           <div class="composer-note">
-            <span>{copy.composerNote}</span>
-            <span>{allowFileChanges() ? copy.workspaceWrite : copy.workspaceReadOnly}</span>
+            <span>{executionAvailable() ? copy.composerNote : copy.claudeUnavailable}</span>
+            <Show when={executionAvailable()}>
+              <span>{allowFileChanges() ? copy.workspaceWrite : copy.workspaceReadOnly}</span>
+            </Show>
           </div>
         </section>
       </main>
@@ -482,13 +534,11 @@ export function App() {
               <span class="runtime-logo">
                 <Icon name="code" size={18} />
               </span>
-              {state()?.connection.runtimeName ?? copy.codex}
+              {runtimeName()}
             </div>
             <dl class="metadata">
               <dt>{copy.authentication}</dt>
-              <dd>
-                {state()?.connection.authentication === "subscription" ? copy.observedSubscription : copy.unknown}
-              </dd>
+              <dd>{copy.authenticationStatus[state()?.connection.authentication ?? "unknown"]}</dd>
               <dt>{copy.billing}</dt>
               <dd>{state()?.connection.billing === "subscription" ? copy.subscription : copy.unknown}</dd>
               <dt>{copy.overage}</dt>
@@ -509,7 +559,7 @@ export function App() {
                   onClick={() => void perform(() => window.harness.chooseRuntime())}
                 >
                   <Icon name="code" size={14} />
-                  {copy.chooseExecutable}
+                  {copy.chooseExecutable[runtime()]}
                 </button>
                 <Show when={configuration()?.executable}>
                   <span class="setup-path" title={configuration()?.executable}>
@@ -529,7 +579,7 @@ export function App() {
                     {copy.selectedNativeHome}: {configuration()?.nativeHome}
                   </span>
                 </Show>
-                <p class="model-hint">{copy.setupHint}</p>
+                <p class="model-hint">{copy.setupHint[runtime()]}</p>
                 <button
                   class="secondary-button"
                   disabled={busy() || !configuration()?.executable || !configuration()?.nativeHome}
@@ -539,46 +589,51 @@ export function App() {
                   {copy.checkConnection}
                 </button>
               </div>
-              <label class="model-label" for="model-id">
-                {copy.modelLabel}
-              </label>
-              <input
-                id="model-id"
-                class="model-input"
-                type="text"
-                value={modelId()}
-                maxLength={128}
-                autocomplete="off"
-                spellcheck={false}
-                placeholder={copy.modelPlaceholder}
-                onInput={(event) => setModelId(event.currentTarget.value)}
-              />
-              <p class="model-hint">{copy.modelHint}</p>
-              <p class="attention">{copy.overageNotice}</p>
-              <label class="checkbox-label">
+              <Show when={!executionAvailable()}>
+                <p class="attention">{copy.claudeUnavailable}</p>
+              </Show>
+              <Show when={executionAvailable()}>
+                <label class="model-label" for="model-id">
+                  {copy.modelLabel}
+                </label>
                 <input
-                  type="checkbox"
-                  checked={acknowledgeOverage()}
-                  onChange={(event) => setAcknowledgeOverage(event.currentTarget.checked)}
+                  id="model-id"
+                  class="model-input"
+                  type="text"
+                  value={modelId()}
+                  maxLength={128}
+                  autocomplete="off"
+                  spellcheck={false}
+                  placeholder={copy.modelPlaceholder}
+                  onInput={(event) => setModelId(event.currentTarget.value)}
                 />
-                <span>{copy.acknowledgeOverage}</span>
-              </label>
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={allowFileChanges()}
-                  onChange={(event) => setAllowFileChanges(event.currentTarget.checked)}
-                />
-                <span>{copy.allowFileChanges}</span>
-              </label>
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={acknowledgeBoundary()}
-                  onChange={(event) => setAcknowledgeBoundary(event.currentTarget.checked)}
-                />
-                <span>{copy.acknowledgeBoundary}</span>
-              </label>
+                <p class="model-hint">{copy.modelHint}</p>
+                <p class="attention">{copy.overageNotice}</p>
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={acknowledgeOverage()}
+                    onChange={(event) => setAcknowledgeOverage(event.currentTarget.checked)}
+                  />
+                  <span>{copy.acknowledgeOverage}</span>
+                </label>
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={allowFileChanges()}
+                    onChange={(event) => setAllowFileChanges(event.currentTarget.checked)}
+                  />
+                  <span>{copy.allowFileChanges}</span>
+                </label>
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={acknowledgeBoundary()}
+                    onChange={(event) => setAcknowledgeBoundary(event.currentTarget.checked)}
+                  />
+                  <span>{copy.acknowledgeBoundary}</span>
+                </label>
+              </Show>
               <button
                 class="primary-button full-width"
                 disabled={!canStart()}

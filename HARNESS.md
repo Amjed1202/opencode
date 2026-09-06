@@ -1,6 +1,6 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: a development desktop with a Codex conversation screen, protected patch/question review, OS-protected review keys and a Claude Skills catalog.** The host retains subscription admission, durable decisions and bounded history recovery. Harness is a provisional codename. See [desktop setup and limits](DESKTOP.md) and [host implementation](M1A_IMPLEMENTATION.md). Claude Skills execution awaits the Claude native adapter.
+**Delivered: a development desktop with Codex conversations, Claude Code connection checks, protected patch/question review, OS-protected review keys and a Claude Skills catalog.** The host retains subscription admission, durable decisions and bounded history recovery. Harness is a provisional codename. See [desktop setup and limits](DESKTOP.md), [Codex host implementation](M1A_IMPLEMENTATION.md) and [Claude connection checks](M1B_CLAUDE.md). Claude **2.1.251** supports version and sign-in observations only; billing remains unknown, and Claude execution and native Skills activation remain blocked pending effective billing and managed policy evidence.
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 
@@ -51,7 +51,8 @@ OpenCode fork/                       original monorepo retained
     │   └── src/
     │       ├── index.ts             adapter interface
     │       ├── codex/               pinned stdio adapter, mapping and generated wire types
-    │       └── claude/, opencode/, generic/, remote/  integration TODOs
+    │       ├── claude/              pinned version/sign-in inspector; execution unsupported
+    │       └── opencode/, generic/, remote/  integration TODOs
     └── harness-control-plane/
         ├── src/index.ts            client and privileged service ports
         ├── src/host.ts             admission, leases, journal, protected artifacts and orchestration
@@ -78,4 +79,4 @@ The filtered, script-disabled install prepares package dependencies. The new des
 
 ## Next implementation step
 
-Complete supported-model discovery, native recovery presentation and OS boundary verification, then validate a separately authorized live repository task with explicit subscription/overage settings. Implement the permitted Claude native adapter and bind Claude Skills activation to its native capabilities and session policy. The current desktop is a development build with one attached session; installers, signing, update channels and the full M1 acceptance flow remain open.
+Complete supported-model discovery, native recovery presentation and OS boundary verification, then validate a separately authorized Codex repository task with explicit subscription/overage settings. Extend Claude beyond connection checks only after a supported native interface can establish effective billing and managed policy before startup side effects. Native Skills activation additionally requires verified source hashes, invocation rules and session policy. The current desktop is a development build with one attached session; installers, signing, update channels and the full M1 acceptance flow remain open.

@@ -1,13 +1,15 @@
-# Claude native adapter — not implemented
+# Claude native adapter — connection checks only
 
-Preferred candidate: the user's unmodified Claude Code binary with its native subscription login, subject to the current official conditions in [ADAPTERS.md](../../../../ADAPTERS.md). Native sign-in choices must remain intact. Direct Agent SDK subscription login is a distinct approval-sensitive integration; API mode is explicit.
+`@harness/adapters/claude` exports `ClaudeAdapter`, pinned to the unmodified **Claude Code 2.1.251** binary. Discovery runs `--version`; status verifies the selected runtime/target/path/version binding, repeats the version check and runs `auth status`. The inspector validates bounded output and exposes only the native `loggedIn` boolean. Sign-in occurs separately through Claude Code. Harness neither imports credentials nor reads native account files directly.
 
-TODO before adding `adapter.ts`:
+Authentication mode, billing, provider overage, models and quota remain unknown. Execution, streaming, sessions, permissions, resume and native Skills activation are unsupported. Preflight and direct execution methods fail without starting a provider operation. Diagnostics use fixed arguments, closed stdin, bounded output/timeouts and a host-owned working directory outside the repository. Disposal invalidates late observations. See [implemented scope](../../../../M1B_CLAUDE.md) and [primary-source evidence](../../../../docs/validation/m1b-claude-native-evidence.md).
 
-1. Select/pin a supported installed binary; record native `auth status` JSON and stream-json schemas without collecting credentials. Claude was not on PATH during reconnaissance.
-2. Implement discovery/preflight, config/environment conflict detection and billing evidence. Subscription login does not establish disabled provider extra usage.
-3. Implement documented programmatic text/tool/result streams and native session IDs, plus the documented permission-host interface. Do not assume private control messages or scrape terminal screens.
-4. Verify deny/expiry, cancellation/process-tree cleanup, resume, partial/final deduplication and subagent-inclusive usage accounting on Windows.
-5. Advertise only verified capabilities; leave subscription quota unknown until an official usable interface exists.
+Before enabling execution:
 
-No fake responses, default API key, native token import or SDK dependency belongs in this folder at this stage.
+1. Establish a supported native interface for effective authentication/provider routing, managed policy and startup extensions before they can cause side effects. A sign-in boolean or environment allowlist is insufficient.
+2. Verify charge policy separately from subscription authentication. Unknown billing or required policy evidence blocks admission; it never enables API fallback.
+3. Pin and test documented text/tool/result streams, session identities and permission ordering. Do not assume private control messages or scrape terminal screens.
+4. Verify denial/expiry, cancellation and descendant cleanup, resume, partial/final deduplication and subagent-inclusive usage accounting.
+5. Bind native Skills activation to exact loaded roots/content hashes, invocation rules and host policy. Catalog metadata never grants execution.
+
+The real native smoke ran only version/status diagnostics in an isolated signed-out profile. It did not inspect the user's account or send a Claude task. Current integration conditions are recorded in [ADAPTERS.md](../../../../ADAPTERS.md); the direct Agent SDK subscription route remains distinct. No fake responses, default API key, native token import or SDK dependency belongs in this adapter.

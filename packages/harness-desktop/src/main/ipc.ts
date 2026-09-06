@@ -19,6 +19,7 @@ export function registerDesktopIpc(window: BrowserWindow, host: HostClient, docu
     ipcMain.handle(channel, async (event, ...args: unknown[]) => {
       guard(event)
       if (args.length > 1) throw new Error("Invalid desktop request")
+      if (method === "selectRuntime" && choosing) throw new Error("Finish the current file selection first")
       if (method.startsWith("choose")) {
         decodeDesktopRequest("getState", args[0])
         if (choosing) throw new Error("Finish the current folder or file selection first")
@@ -31,9 +32,13 @@ export function registerDesktopIpc(window: BrowserWindow, host: HostClient, docu
             method === "chooseWorkspace"
               ? nativeCopy.repository
               : method === "chooseRuntime"
-                ? nativeCopy.runtime
+                ? current.configuration.runtime === "claude"
+                  ? nativeCopy.claudeRuntime
+                  : nativeCopy.runtime
                 : method === "chooseNativeHome"
-                  ? nativeCopy.home
+                  ? current.configuration.runtime === "claude"
+                    ? nativeCopy.claudeHome
+                    : nativeCopy.home
                   : nativeCopy.skills
           const selection = await dialog.showOpenDialog(window, {
             title,

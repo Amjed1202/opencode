@@ -17,6 +17,11 @@ export function decodeDesktopRequest(operation: DesktopOperation, value: unknown
       throw new Error("Invalid session options")
     return structuredClone(input)
   }
+  if (operation === "selectRuntime") {
+    const input = object(value, ["runtime"])
+    if (input.runtime !== "codex" && input.runtime !== "claude") throw new Error("Unsupported runtime")
+    return structuredClone(input)
+  }
   if (operation === "send") {
     const input = object(value, ["text"])
     text(input.text, 64 * 1024)
@@ -71,9 +76,11 @@ export function decodeDesktopRequest(operation: DesktopOperation, value: unknown
   if (operation === "configure") {
     const input = object(
       value,
-      ["workspace", "executable", "nativeHome", "userSkillsRoot"],
-      ["workspace", "executable", "nativeHome", "userSkillsRoot"],
+      ["runtime", "workspace", "executable", "nativeHome", "userSkillsRoot"],
+      ["runtime", "workspace", "executable", "nativeHome", "userSkillsRoot"],
     )
+    if (input.runtime !== undefined && input.runtime !== "codex" && input.runtime !== "claude")
+      throw new Error("Unsupported runtime")
     for (const key of ["executable", "nativeHome", "userSkillsRoot"])
       if (input[key] !== undefined) text(input[key], 4096)
     if (input.workspace !== undefined) {

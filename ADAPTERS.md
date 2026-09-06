@@ -1,13 +1,13 @@
 # Runtime adapters
 
-The Codex App Server adapter is **conditional**, pinned to native version `0.153.4`, with local protocol tests and no live model-task validation. Other Harness runtime adapters remain **unimplemented**. Executable discovery is not compatibility certification. [Implemented scope](M1A_IMPLEMENTATION.md). Research date: **2026-09-06**. OpenCode baseline: `v1.18.29`, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`.
+The Codex App Server adapter is **conditional**, pinned to native version `0.153.4`, with local protocol tests and no live model-task validation. The Claude Code adapter is pinned to `2.1.251` and implements **version and sign-in checks only**; all execution capabilities remain unsupported. Other Harness runtime adapters remain unimplemented. Executable discovery is not compatibility certification. [Codex scope](M1A_IMPLEMENTATION.md), [Claude scope](M1B_CLAUDE.md). Claude evidence was checked **2026-09-07**. OpenCode baseline: `v1.18.29`, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`.
 
 ## Package boundary
 
-Three additive packages preserve upstream layout:
+Three additive runtime-library packages preserve upstream layout; the separate `@harness/desktop` package consumes their host operations:
 
 - `@harness/protocol` in `packages/harness-protocol`: runtime, capability, session, event, permission, usage, collaboration and node types.
-- `@harness/adapters` in `packages/harness-adapters`: exported contracts in `src/index.ts`, plus `claude/`, `codex/`, `opencode/`, `generic/` and `remote/` README folders describing implementation gates.
+- `@harness/adapters` in `packages/harness-adapters`: exported contracts in `src/index.ts`, implemented Codex and Claude status adapters, and provider folders describing their remaining gates.
 - `@harness/control-plane` in `packages/harness-control-plane`: admission, lifecycle and application-service interfaces.
 
 Adapters depend on the protocol; the control plane selects adapters. Renderer code talks to control-plane application operations. Provider-specific settings remain namespaced extensions, never renderer-owned subprocess or provider orchestration.
@@ -35,9 +35,11 @@ Discovery records executable, runtime/adapter versions, protocol variant, target
 
 ## Claude
 
-The default candidate is the **unmodified installed Claude Code binary**, using its documented print/stream interfaces and the user's native subscription login. Current terms conditionally permit platforms to run that binary: preserve built-in auth choices, let users authenticate through Anthropic's flow, and avoid collecting tokens or intermediating/reselling usage. This is a conditional integration route, not blanket permission for an application-owned Claude.ai login. [Claude Code legal conditions](https://code.claude.com/docs/en/legal-and-compliance)
+The implemented route uses the **unmodified installed Claude Code 2.1.251 binary** for `--version` and `auth status`. Native sign-in stays outside Harness. The inspector validates the observed `loggedIn` boolean and matching native exit status, then exposes only the sign-in indicator. It does not read credential files directly or retain raw account output. Authentication mode, provider route, subscription entitlement and overage remain unknown. [Implemented boundary](M1B_CLAUDE.md).
 
-Use native `claude auth login` and JSON `claude auth status`; validate observed fields before displaying account/plan information. Streaming uses `-p --output-format stream-json --verbose --include-partial-messages`; exact session IDs support resume. Investigate the documented `--permission-prompt-tool` MCP host for normalized approvals. No terminal-screen scraping or private bidirectional protocol is assumed. [CLI reference](https://code.claude.com/docs/en/cli-reference), [programmatic execution](https://code.claude.com/docs/en/headless)
+Current terms conditionally permit platforms to run the unmodified binary: preserve built-in authentication choices, let users authenticate through Anthropic's flow, and avoid collecting tokens or intermediating/reselling usage. This is a conditional native route, not blanket permission for application-owned Claude.ai login or SDK token import. [Claude Code legal conditions](https://code.claude.com/docs/en/legal-and-compliance)
+
+The documented print/stream and permission-host interfaces remain candidates for future execution. No prompt, stream, session, model or permission operation is implemented by this Claude adapter. Normal headless startup can load native extensions before a host review; `--bare` bypasses subscription OAuth, while authentication-preserving safe/restricted modes retain managed policy. This increment found no complete native pre-dispatch effective billing/policy interface. Execution and native Skills activation therefore remain blocked, including when sign-in is observed. No private control protocol or terminal-screen scraping is assumed. [Checked native evidence](docs/validation/m1b-claude-native-evidence.md), [CLI reference](https://code.claude.com/docs/en/cli-reference), [programmatic execution](https://code.claude.com/docs/en/headless)
 
 Agent SDK integration remains an alternative: explicit API mode, or subscription mode only where Anthropic's approval/current rules cover this product. Reuse its tools, hooks, MCP, skills and session infrastructure. Do not independently implement Claude's agent loop. [Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)
 
@@ -65,6 +67,8 @@ Remote is an orthogonal execution target: `harness-node` hosts the same native a
 
 ## Native event mapping
 
+The table describes the target cross-runtime mapping. Codex has an implemented event stream; Claude and OpenCode event production remain future work. Claude status checks do not create native sessions or model events.
+
 | Native source                                                                    | Normalized meaning                                                                             |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Claude text deltas; Codex `item/agentMessage/delta`; OpenCode text-part deltas   | `assistant.text.delta`                                                                         |
@@ -82,4 +86,4 @@ The execution environment must deliberately select credential sources, provider 
 
 Automatic API fallback defaults **off**. Subscription login also does not prove provider usage credits/overage are disabled; show that state separately and never claim zero extra charges without evidence. [Claude usage credits](https://support.claude.com/en/articles/12429409-manage-usage-credits-for-paid-claude-plans)
 
-Before enabling an adapter, verify native auth/status and approval schemas, effective configuration, disconnect/interruption behavior, resume, event replay/deduplication, usage scope and reviewer filesystem isolation. Claude was absent from PATH during research. Unsupported quota or billing observations remain unavailable; neither fake sessions nor schemas satisfy the subscription-backed Milestone 1 demonstration.
+Before enabling execution, verify native authentication and approval schemas, effective billing/managed configuration before startup side effects, disconnect/interruption behavior, resume, event replay/deduplication, usage scope and reviewer filesystem isolation. The real Claude 2.1.251 smoke used only version/status commands in a fresh signed-out profile; it establishes no fact about the user's subscription or a provider task. Unsupported quota or billing observations remain unavailable; neither fake sessions nor schemas satisfy the subscription-backed Milestone 1 demonstration.

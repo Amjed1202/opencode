@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-09-06T23:18:11.580Z",
+  "nativeVersion": "2.1.251",
+  "commands": [["--version"], ["auth", "status"]],
+  "isolatedProfile": true,
+  "loggedIn": false,
+  "billing": "unknown",
+  "execution": "unsupported",
+  "providerTaskStarted": false,
+  "rawStatusRetained": false
+}

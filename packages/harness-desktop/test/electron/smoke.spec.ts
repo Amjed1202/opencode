@@ -51,6 +51,7 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
         "resolveInput",
         "resolvePermission",
         "review",
+        "selectRuntime",
         "send",
         "start",
       ])
@@ -106,7 +107,33 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
           return { bytes: Buffer.from(value, "base64").byteLength, encodedBytesDiffer: value !== wrapped }
         }, envelope.wrappedKey),
       ).toEqual({ bytes: 32, encodedBytesDiffer: true })
-      const screenshot = resolve(packageRoot, "../../docs/validation/m1c-desktop.png")
+      const selected = await page.evaluate(() => window.harness.selectRuntime({ runtime: "claude" }))
+      expect(selected.configuration.runtime).toBe("claude")
+      expect(selected.configuration.executable).toBeUndefined()
+      expect(selected.configuration.nativeHome).toBeUndefined()
+      expect(selected.connection).toMatchObject({
+        runtimeName: "Claude Code",
+        authentication: "unknown",
+        billing: "unknown",
+        status: "not-checked",
+      })
+      await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
+      const blocked = await page.evaluate(async () => {
+        try {
+          await window.harness.start({
+            modelId: "must-not-run",
+            acknowledgeOverage: true,
+            acknowledgeUnverifiedBoundary: true,
+            allowFileChanges: false,
+          })
+          return false
+        } catch {
+          return true
+        }
+      })
+      expect(blocked).toBe(true)
+      expect((await page.evaluate(() => window.harness.getState())).session).toBeUndefined()
+      const screenshot = resolve(packageRoot, "../../docs/validation/m1b-claude-desktop.png")
       await mkdir(resolve(screenshot, ".."), { recursive: true })
       await page.screenshot({ path: screenshot })
     } finally {

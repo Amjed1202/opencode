@@ -15,6 +15,7 @@ export function createDesktopBridge(ipc: PreloadIpc): DesktopAPI {
     getState: () => ipc.invoke(desktopChannels.getState) as Promise<DesktopState>,
     chooseWorkspace: () => ipc.invoke(desktopChannels.chooseWorkspace) as Promise<DesktopState>,
     chooseRuntime: () => ipc.invoke(desktopChannels.chooseRuntime) as Promise<DesktopState>,
+    selectRuntime: (input) => ipc.invoke(desktopChannels.selectRuntime, input) as Promise<DesktopState>,
     chooseNativeHome: () => ipc.invoke(desktopChannels.chooseNativeHome) as Promise<DesktopState>,
     chooseSkillsRoot: () => ipc.invoke(desktopChannels.chooseSkillsRoot) as Promise<DesktopState>,
     refresh: () => ipc.invoke(desktopChannels.refresh) as Promise<DesktopState>,

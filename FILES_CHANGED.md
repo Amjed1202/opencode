@@ -1,10 +1,10 @@
 # Changed files
 
-The fork contains architecture, four additive Harness packages, the Codex host/adapter and a development Electron/Solid desktop with OS-protected review keys, protected patch/question presentation and Claude Skills discovery. See [desktop scope](DESKTOP.md), [host scope](M1A_IMPLEMENTATION.md) and [skill integration](CLAUDE_SKILLS.md).
+The fork contains architecture, four additive Harness packages, the Codex host/adapter and an Electron/Solid desktop with OS-protected review keys, protected patch/question presentation, Claude Skills discovery and native Claude connection checks. Claude execution and Skills activation remain unsupported. See [Claude scope](M1B_CLAUDE.md), [desktop scope](DESKTOP.md) and [host scope](M1A_IMPLEMENTATION.md).
 
-Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md gains Harness policy while preserving the original suffix, and bun.lock adds Harness workspace records and existing-catalog type references. No upstream functional source, root workspace/build manifest, package resolution or MIT notice changes. Native generated types retain OpenAI Apache-2.0 attribution and all 72 recorded hashes.
+Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md gains Harness policy while preserving the original suffix, and bun.lock adds Harness workspace records and existing-catalog type references. No upstream functional source, root workspace/build manifest, package resolution or MIT notice changes. Native generated types retain OpenAI Apache-2.0 attribution and all 72 recorded hashes. This Claude increment does not modify bun.lock or dependencies.
 
-There are **278 cumulative changed/added files** below. All others are additions relative to the pinned release. Validation artifacts are reviewable evidence. Runtime tools, installed binaries, caches, build output, browser test output and scratch state are excluded from the commit.
+There are **302 cumulative changed/added files** below. All others are additions relative to the pinned release. Validation artifacts are reviewable evidence. Runtime tools, installed binaries, caches, build output, browser test output and scratch state are excluded from the commit.
 
 ## Exact cumulative inventory
 
@@ -16,6 +16,7 @@ There are **278 cumulative changed/added files** below. All others are additions
 - [FILES_CHANGED.md](FILES_CHANGED.md)
 - [HARNESS.md](HARNESS.md)
 - [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md)
+- [M1B_CLAUDE.md](M1B_CLAUDE.md)
 - [MIGRATION_PLAN.md](MIGRATION_PLAN.md)
 - [MILESTONES.md](MILESTONES.md)
 - [PROTOCOL.md](PROTOCOL.md)
@@ -76,6 +77,23 @@ There are **278 cumulative changed/added files** below. All others are additions
 - [docs/validation/m1a-review-input-results.json](docs/validation/m1a-review-input-results.json)
 - [docs/validation/m1a-review-input-review.md](docs/validation/m1a-review-input-review.md)
 - [docs/validation/m1a-review.md](docs/validation/m1a-review.md)
+- [docs/validation/m1b-claude-adapters-tests.log](docs/validation/m1b-claude-adapters-tests.log)
+- [docs/validation/m1b-claude-build.log](docs/validation/m1b-claude-build.log)
+- [docs/validation/m1b-claude-control-plane-tests.log](docs/validation/m1b-claude-control-plane-tests.log)
+- [docs/validation/m1b-claude-desktop.png](docs/validation/m1b-claude-desktop.png)
+- [docs/validation/m1b-claude-electron-tests.log](docs/validation/m1b-claude-electron-tests.log)
+- [docs/validation/m1b-claude-format.log](docs/validation/m1b-claude-format.log)
+- [docs/validation/m1b-claude-harness-adapters-typecheck.log](docs/validation/m1b-claude-harness-adapters-typecheck.log)
+- [docs/validation/m1b-claude-harness-control-plane-typecheck.log](docs/validation/m1b-claude-harness-control-plane-typecheck.log)
+- [docs/validation/m1b-claude-harness-desktop-typecheck.log](docs/validation/m1b-claude-harness-desktop-typecheck.log)
+- [docs/validation/m1b-claude-harness-protocol-typecheck.log](docs/validation/m1b-claude-harness-protocol-typecheck.log)
+- [docs/validation/m1b-claude-native-evidence.md](docs/validation/m1b-claude-native-evidence.md)
+- [docs/validation/m1b-claude-native-smoke.json](docs/validation/m1b-claude-native-smoke.json)
+- [docs/validation/m1b-claude-oxlint.json](docs/validation/m1b-claude-oxlint.json)
+- [docs/validation/m1b-claude-results.json](docs/validation/m1b-claude-results.json)
+- [docs/validation/m1b-claude-review.md](docs/validation/m1b-claude-review.md)
+- [docs/validation/m1b-claude-ui-tests.log](docs/validation/m1b-claude-ui-tests.log)
+- [docs/validation/m1b-claude-unit-tests.log](docs/validation/m1b-claude-unit-tests.log)
 - [docs/validation/m1c-desktop-adapters-tests.log](docs/validation/m1c-desktop-adapters-tests.log)
 - [docs/validation/m1c-desktop-build.log](docs/validation/m1c-desktop-build.log)
 - [docs/validation/m1c-desktop-control-plane-tests.log](docs/validation/m1c-desktop-control-plane-tests.log)
@@ -112,6 +130,8 @@ There are **278 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/bunfig.toml](packages/harness-adapters/bunfig.toml)
 - [packages/harness-adapters/package.json](packages/harness-adapters/package.json)
 - [packages/harness-adapters/src/claude/README.md](packages/harness-adapters/src/claude/README.md)
+- [packages/harness-adapters/src/claude/adapter.ts](packages/harness-adapters/src/claude/adapter.ts)
+- [packages/harness-adapters/src/claude/inspect.ts](packages/harness-adapters/src/claude/inspect.ts)
 - [packages/harness-adapters/src/codex/README.md](packages/harness-adapters/src/codex/README.md)
 - [packages/harness-adapters/src/codex/adapter.ts](packages/harness-adapters/src/codex/adapter.ts)
 - [packages/harness-adapters/src/codex/generated/.gitattributes](packages/harness-adapters/src/codex/generated/.gitattributes)
@@ -198,6 +218,9 @@ There are **278 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/src/index.ts](packages/harness-adapters/src/index.ts)
 - [packages/harness-adapters/src/opencode/README.md](packages/harness-adapters/src/opencode/README.md)
 - [packages/harness-adapters/src/remote/README.md](packages/harness-adapters/src/remote/README.md)
+- [packages/harness-adapters/test/claude/adapter.test.ts](packages/harness-adapters/test/claude/adapter.test.ts)
+- [packages/harness-adapters/test/claude/fixtures/inspect-peer.ts](packages/harness-adapters/test/claude/fixtures/inspect-peer.ts)
+- [packages/harness-adapters/test/claude/inspect.test.ts](packages/harness-adapters/test/claude/inspect.test.ts)
 - [packages/harness-adapters/test/codex/adapter.test.ts](packages/harness-adapters/test/codex/adapter.test.ts)
 - [packages/harness-adapters/test/codex/app-server-peer.ts](packages/harness-adapters/test/codex/app-server-peer.ts)
 - [packages/harness-adapters/test/codex/environment-parent.ts](packages/harness-adapters/test/codex/environment-parent.ts)
@@ -260,6 +283,7 @@ There are **278 cumulative changed/added files** below. All others are additions
 - [packages/harness-desktop/src/shared/requests.ts](packages/harness-desktop/src/shared/requests.ts)
 - [packages/harness-desktop/test/electron/playwright.config.ts](packages/harness-desktop/test/electron/playwright.config.ts)
 - [packages/harness-desktop/test/electron/smoke.spec.ts](packages/harness-desktop/test/electron/smoke.spec.ts)
+- [packages/harness-desktop/test/fixtures/claude-status-peer.ts](packages/harness-desktop/test/fixtures/claude-status-peer.ts)
 - [packages/harness-desktop/test/fixtures/host-peer.ts](packages/harness-desktop/test/fixtures/host-peer.ts)
 - [packages/harness-desktop/test/ui/playwright.config.ts](packages/harness-desktop/test/ui/playwright.config.ts)
 - [packages/harness-desktop/test/ui/renderer.spec.ts](packages/harness-desktop/test/ui/renderer.spec.ts)

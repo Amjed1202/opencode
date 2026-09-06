@@ -15,6 +15,17 @@ const answer = {
 }
 
 describe("desktop request decoder", () => {
+  test("accepts only a named runtime selection without paths or account overrides", () => {
+    expect(decodeDesktopRequest("selectRuntime", { runtime: "claude" })).toEqual({ runtime: "claude" })
+    expect(decodeDesktopRequest("selectRuntime", { runtime: "codex" })).toEqual({ runtime: "codex" })
+    for (const input of [
+      { runtime: "api" },
+      { runtime: "claude", executable: "untrusted.exe" },
+      {},
+      { runtime: "Claude" },
+    ])
+      expect(() => decodeDesktopRequest("selectRuntime", input)).toThrow()
+  })
   test("accepts bounded operation-specific requests and detaches nested caller state", () => {
     for (const operation of ["getState", "refresh", "interrupt", "shutdown"] as const) {
       for (const value of [undefined, null, {}]) expect(decodeDesktopRequest(operation, value)).toEqual({})

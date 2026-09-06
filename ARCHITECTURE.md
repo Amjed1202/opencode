@@ -1,6 +1,6 @@
 # Harness architecture
 
-Status: architectural baseline with a privileged host, Codex adapter and initial Electron/Solid desktop, 2026-09-06. **Harness is a working codename.** [DESKTOP.md](DESKTOP.md) and [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) distinguish implemented behavior from the broader architecture below. The new desktop is an additive `packages/harness-desktop` application; upstream desktop/app source stays intact.
+Status: architectural baseline with a privileged host, Codex adapter, Claude version/sign-in inspector and initial Electron/Solid desktop, **2026-09-07**. **Harness is a working codename.** [DESKTOP.md](DESKTOP.md), [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) and [M1B_CLAUDE.md](M1B_CLAUDE.md) distinguish implemented behavior from the broader architecture below. Claude Code 2.1.251 is status-only; its execution and native Skills activation remain blocked. The new desktop is an additive `packages/harness-desktop` application; upstream desktop/app source stays intact.
 
 ## Foundation and decision
 
@@ -47,6 +47,8 @@ Some current `SessionV2` operations explicitly return unavailable errors; see `p
 
 Use a provider-specific environment allowlist and sanctioned effective-config metadata. Upstream's `createSidecarEnv()` copies parent variables; it cannot be reused unchanged for subscription sessions. Resolve executable/profile identity before launch; an executable present on PATH is not authenticated or ready. API fallback defaults off and requires scoped consent. Auth, billing route and provider extra usage are separate observations. Unknown facts remain unknown. See [ADAPTERS.md](ADAPTERS.md).
 
+The Claude status inspector illustrates this separation: native `auth status` can establish a validated sign-in indicator, while authentication mode, subscription billing and managed policy remain unknown. Its fixed diagnostics run in the host's private directory, outside the selected repository. No prompt, startup extension or native Skills invocation is used to investigate missing admission evidence. A supported native pre-dispatch effective billing/policy interface is required before adding Claude execution.
+
 ## Session and command flow
 
 1. Trusted picker opens a repository; the control plane canonicalizes the path, resolves target/workspace and obtains the necessary lease.
@@ -54,7 +56,7 @@ Use a provider-specific environment allowlist and sanctioned effective-config me
 3. Admission binds that exact selection, target, workspace, policy and expiring preflight result. Account/config changes invalidate admission. Only an admitted command may start native work.
 4. Adapter returns a command receipt; acceptance is distinct from completion. A continuous event stream spans turns and idle native updates. Native session/turn IDs remain separate from application IDs.
 5. Control plane assigns durable sequence numbers and persists sanitized events before publication. Text deltas and completion snapshots update the same part. Permission replies bind to the original request, target, session and lease.
-6. Resume reconciles native state and the application journal. Switching runtimes creates a new native session, optionally using an explicit context handoff; it cannot resume another vendor's native history.
+6. Resume reconciles native state and the application journal. Future cross-runtime handoff creates a new native session; it cannot resume another vendor's native history. The current desktop rejects runtime switching while a session is attached. Before attachment, switching clears the executable/account-home selection, connection evidence and admission acknowledgments; selecting Claude does not create a session.
 
 Detailed contracts, replay rules and failure semantics are in [PROTOCOL.md](PROTOCOL.md).
 
@@ -72,4 +74,4 @@ Accounts/Runtimes settings will distinguish installed, authenticated, preflight-
 
 ## Deliberate limits
 
-The initial implementation adds local Codex discovery, billing admission, workspace leases, command/event persistence, private stdio and session orchestration. OS isolation attestation, interactive permissions, full recovery, UI, collaboration scheduling and a listening node remain unimplemented. [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) records the exact limits; [MILESTONES.md](MILESTONES.md) retains the full acceptance gates.
+The implementation includes local Codex discovery, billing admission, workspace leases, command/event persistence, private stdio, session orchestration and desktop patch/fixed-choice review. Claude has a pinned version/sign-in inspector and read-only Skills cataloging, with execution and activation unsupported. OS isolation attestation for native work, complete recovery/transcript presentation, additional runtime execution, collaboration scheduling and a listening node remain open. [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) and [M1B_CLAUDE.md](M1B_CLAUDE.md) record the exact limits; [MILESTONES.md](MILESTONES.md) retains the full acceptance gates.

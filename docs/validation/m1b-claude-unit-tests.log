@@ -1,0 +1,76 @@
+bun test v1.3.14 (0d9b296a)
+
+test\unit\backend.test.ts:
+(pass) desktop backend through the pinned local stdio fixture > runtime switching clears native roots and Claude sign-in never enables execution or exposes native status fields [365.17ms]
+(pass) desktop backend through the pinned local stdio fixture > recovery failure closes both storage databases before rejecting startup [88.67ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final text replaces the preview after initial text "" [226.23ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final text replaces the preview after initial text "Incomplete streamed answer" [251.42ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final-only content respects serialized preview bounds [240.65ms]
+(pass) desktop backend through the pinned local stdio fixture > catalog configuration starts no native process and refresh performs only native status reads [192.19ms]
+(pass) desktop backend through the pinned local stdio fixture > starts only after both acknowledgements and streams one explicitly sent message [211.08ms]
+(pass) desktop backend through the pinned local stdio fixture > requires protected patch review before one native file approval [258.01ms]
+(pass) desktop backend through the pinned local stdio fixture > keeps native question labels protected and maps reviewed opaque options once [236.98ms]
+(pass) desktop backend through the pinned local stdio fixture > interrupt reaches the native session and cannot change native roots while attached [207.70ms]
+(pass) desktop backend through the pinned local stdio fixture > recovery does not automatically resume or replay a turn with an uncertain outcome [272.85ms]
+(pass) desktop backend through the pinned local stdio fixture > a fresh display workspace identity cannot bypass uncertain work in the same directory [262.32ms]
+(pass) desktop backend through the pinned local stdio fixture > lost native send acknowledgement keeps one uncertain message and rejects automatic continuation [178.32ms]
+(pass) desktop backend through the pinned local stdio fixture > an uncertain native create with no saved session blocks other workspaces across restarts [378.28ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-wal before opening the database [72.97ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-shm before opening the database [76.13ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-journal before opening the database [72.40ms]
+(pass) desktop backend through the pinned local stdio fixture > bounds serialized UTF-8 and escaped previews beneath private IPC limits without dropping native work [1984.91ms]
+(pass) desktop backend through the pinned local stdio fixture > concurrent state reads do not replace newly streamed deltas with older snapshots [276.40ms]
+
+test\unit\host-client.test.ts:
+(pass) private desktop host process transport > correlates concurrent requests over inherited private pipes [55.12ms]
+(pass) private desktop host process transport > reassembles UTF-8 characters split across native stdout chunks [65.98ms]
+(pass) private desktop host process transport > rejects every pending promise if a correlated response omits its result and error [56.84ms]
+(pass) private desktop host process transport > rejects unknown response IDs and child exit without automatically replaying [111.60ms]
+(pass) private desktop host process transport > fails closed for oversized unterminated output and malformed UTF-8 [104.90ms]
+(pass) private desktop host process transport > rejects ambiguous result/error frames as protocol failures [50.38ms]
+(pass) private desktop host process transport > ignores state output already buffered after the transport has failed [115.52ms]
+(pass) private desktop host process transport > bounds outgoing frames before writing to the child [53.83ms]
+
+test\unit\preload.test.ts:
+(pass) isolated desktop preload bridge > exposes only fixed application operations and preserves their arguments and results [0.51ms]
+(pass) isolated desktop preload bridge > forwards only state data and unsubscribes exactly its own callback [0.19ms]
+(pass) isolated desktop preload bridge > bounds subscriptions while allowing unsubscribed capacity to be reused [0.15ms]
+
+test\unit\requests.test.ts:
+(pass) desktop request decoder > accepts only a named runtime selection without paths or account overrides [0.14ms]
+(pass) desktop request decoder > accepts bounded operation-specific requests and detaches nested caller state [0.27ms]
+(pass) desktop request decoder > requires explicit booleans and rejects unknown or missing start fields [0.19ms]
+(pass) desktop request decoder > bounds text by UTF-8 bytes and rejects empty or NUL input [0.31ms]
+(pass) desktop request decoder > rejects unsupported operations, scalar requests and unrecognized privilege fields [0.14ms]
+(pass) desktop request decoder > accepts only explicit review kinds and safe bounded opaque identities [0.13ms]
+(pass) desktop request decoder > requires one to three distinct question selections for answers and none for cancellation [0.20ms]
+(pass) desktop request decoder > rejects accessors at each object boundary without executing them [0.11ms]
+
+test\unit\security.test.ts:
+(pass) desktop IPC sender boundary > only accepts the registered live web contents and its exact top-level document [0.28ms]
+(pass) desktop IPC sender boundary > rejects navigation, fragments, subframes, destroyed windows, and malformed document URLs [0.21ms]
+(pass) desktop IPC sender boundary > guard rechecks the live document after an asynchronous privileged operation [0.18ms]
+
+test\unit\vault.test.ts:
+(pass) desktop OS-wrapped artifact key > persists only the wrapped key, reloads across instances, and returns independent key buffers [43.86ms]
+(pass) desktop OS-wrapped artifact key > fails closed without safeStorage and rejects the Linux plaintext backend before creating files [9.06ms]
+(pass) desktop OS-wrapped artifact key > preserves corrupt, unsupported, oversized and foreign wrapped keys without rotation [33.85ms]
+(pass) desktop OS-wrapped artifact key > rejects noncanonical decrypted keys, file hard links, and relative roots [26.46ms]
+(pass) desktop OS-wrapped artifact key > rejects directory aliases before reading or creating a key [2.96ms]
+(skip) desktop OS-wrapped artifact key > rejects group/world accessible POSIX key directories and files
+
+test\unit\worker.test.ts:
+(pass) real Bun desktop private worker > initializes empty local state without provider configuration and shuts down cleanly [161.92ms]
+(pass) real Bun desktop private worker > preserves multibyte configure values split between stdin chunks [199.23ms]
+(pass) real Bun desktop private worker > rejects malformed, invalid-UTF8, oversized and truncated frames without creating storage [468.84ms]
+(pass) real Bun desktop private worker > fails closed after initialization when the final frame is truncated [160.19ms]
+(pass) real Bun desktop private worker > rejects invalid key/environment initialization and duplicate initialization [152.83ms]
+
+1 tests skipped:
+(skip) desktop OS-wrapped artifact key > rejects group/world accessible POSIX key directories and files
+
+ 51 pass
+ 1 skip
+ 0 fail
+ 328 expect() calls
+Ran 52 tests across 7 files. [7.79s]

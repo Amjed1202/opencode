@@ -6,7 +6,8 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
-    "./codex": "./src/codex/adapter.ts"
+    "./codex": "./src/codex/adapter.ts",
+    "./claude": "./src/claude/adapter.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

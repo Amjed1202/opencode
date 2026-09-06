@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { lstat, mkdir, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { CodexAdapter } from "@harness/adapters/codex"
+import { ClaudeAdapter } from "@harness/adapters/claude"
 import type { AgentAdapter } from "@harness/adapters"
 import type { AgentEvent, AgentSession, RuntimeDescriptor, SessionIntent } from "@harness/protocol"
 import {
@@ -31,6 +32,7 @@ export interface BackendOptions {
   readonly toolPath: string
   readonly changed: (state: DesktopState) => void
   readonly adapterFactory?: (options: ConstructorParameters<typeof CodexAdapter>[0]) => NativeAdapter
+  readonly claudeAdapterFactory?: (options: ConstructorParameters<typeof ClaudeAdapter>[0]) => NativeAdapter
 }
 
 /** Privileged Bun child. One session at a time; no provider work until explicit start/send requests. */
@@ -113,6 +115,16 @@ export class DesktopBackend {
         return null
       }
       if (operation === "getState") return this.snapshot()
+      if (operation === "selectRuntime") {
+        if (this.session) throw new Error("Restart before changing an attached session's runtime")
+        if ((this.state.configuration.runtime ?? "codex") === input.runtime) return this.publish()
+        const previous = this.state.configuration
+        return this.configure({
+          runtime: input.runtime as "codex" | "claude",
+          ...(previous.workspace ? { workspace: previous.workspace } : {}),
+          ...(previous.userSkillsRoot ? { userSkillsRoot: previous.userSkillsRoot } : {}),
+        })
+      }
       if (operation === "configure") return this.configure(input as DesktopConfiguration)
       if (operation === "refresh") return this.refresh()
       if (operation === "start") return this.start(input as unknown as StartSessionInput)
@@ -161,7 +173,13 @@ export class DesktopBackend {
     this.state = {
       ...this.state,
       configuration: structuredClone(selected),
-      connection: { ...this.state.connection, status: "not-checked", authentication: "unknown", billing: "unknown" },
+      connection: {
+        runtimeName: selected.runtime === "claude" ? "Claude Code" : "Codex",
+        status: "not-checked",
+        authentication: "unknown",
+        billing: "unknown",
+        providerOverage: "unknown",
+      },
       skills: null,
       notices: recovery
         ? ["Previous native work needs native inspection. Automatic recovery and new sessions are blocked."]
@@ -190,35 +208,56 @@ export class DesktopBackend {
     }
     const config = this.state.configuration
     if (!config.workspace || !config.executable || !config.nativeHome)
-      throw new Error("Choose a repository, Codex executable and native account home")
+      throw new Error("Choose a repository, native runtime executable and account home")
     await this.detach()
     const target = { id: "local", kind: "local" as const, name: "This computer" }
-    this.adapter = (this.options.adapterFactory ?? ((options) => new CodexAdapter(options)))({
+    const claude = config.runtime === "claude"
+    const runtimeName = claude ? "Claude Code" : "Codex"
+    const options = {
       executable: config.executable,
-      cwd: config.workspace.path,
+      cwd: claude ? this.options.directory : config.workspace.path,
       target,
       environment: buildNativeEnvironment({
         inherited: this.options.environment,
         home: config.nativeHome,
         path: this.options.toolPath,
       }),
-    })
+    }
+    this.adapter = claude
+      ? (this.options.claudeAdapterFactory ?? ((options) => new ClaudeAdapter(options)))(options)
+      : (this.options.adapterFactory ?? ((options) => new CodexAdapter(options)))(options)
     try {
       this.descriptor = (await this.adapter.discover({ target, allowedExecutablePaths: [config.executable] }))[0]
-      if (!this.descriptor) throw new Error("Pinned Codex runtime is unavailable")
+      if (!this.descriptor) throw new Error("Pinned native runtime is unavailable")
       const observed = await this.adapter.status?.(this.descriptor)
       if (!observed) throw new Error("Native status is unsupported")
       const auth = observed.auth
       this.state = {
         ...this.state,
         connection: {
-          status: auth.status === "authenticated" && auth.mode === "subscription" ? "ready" : "blocked",
-          runtimeName: "Codex",
+          status:
+            !claude &&
+            auth.status === "authenticated" &&
+            auth.mode === "subscription" &&
+            observed.billing.route === "subscription"
+              ? "ready"
+              : "blocked",
+          runtimeName,
           ...(this.descriptor.version ? { runtimeVersion: this.descriptor.version } : {}),
-          authentication: auth.mode === "subscription" && auth.status === "authenticated" ? "subscription" : "unknown",
+          authentication: claude
+            ? auth.status === "authenticated"
+              ? "authenticated"
+              : auth.status === "unauthenticated"
+                ? "unauthenticated"
+                : "unknown"
+            : auth.mode === "subscription" && auth.status === "authenticated"
+              ? "subscription"
+              : "unknown",
           billing: observed.billing.route === "subscription" ? "subscription" : "unknown",
           providerOverage: "unknown",
-          reason: "The billing route and native policy are checked again when starting a session.",
+          reason: claude
+            ? "Claude connection checks are available. Execution and native Skills activation are blocked until effective billing, managed settings and permission policy can be verified before dispatch."
+            : "The billing route and native policy are checked again when starting a session.",
         },
       }
     } catch {
@@ -226,11 +265,11 @@ export class DesktopBackend {
         ...this.state,
         connection: {
           status: "blocked",
-          runtimeName: "Codex",
+          runtimeName,
           authentication: "unknown",
           billing: "unknown",
           providerOverage: "unknown",
-          reason: "Could not verify the pinned Codex runtime and native account. Check your native setup.",
+          reason: "Could not verify the pinned native runtime and account status. Check your native setup.",
         },
       }
     }
@@ -271,6 +310,8 @@ export class DesktopBackend {
   }
 
   private async start(input: StartSessionInput) {
+    if (this.state.configuration.runtime === "claude")
+      throw new Error("Claude execution is unavailable until billing and native policy verification are implemented")
     if (this.session) throw new Error("A session is already attached")
     if (
       !this.adapter ||

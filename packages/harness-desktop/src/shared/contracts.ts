@@ -4,6 +4,7 @@ export const desktopChannels = {
   getState: "harness:state",
   chooseWorkspace: "harness:choose-workspace",
   chooseRuntime: "harness:choose-runtime",
+  selectRuntime: "harness:select-runtime",
   chooseNativeHome: "harness:choose-native-home",
   chooseSkillsRoot: "harness:choose-skills-root",
   refresh: "harness:refresh",
@@ -17,6 +18,7 @@ export const desktopChannels = {
 } as const
 
 export interface DesktopConfiguration {
+  readonly runtime?: "codex" | "claude"
   readonly workspace?: { readonly id: string; readonly name: string; readonly path: string }
   readonly executable?: string
   readonly nativeHome?: string
@@ -30,7 +32,7 @@ export interface DesktopState {
     readonly status: "not-configured" | "not-checked" | "ready" | "blocked"
     readonly runtimeName: string
     readonly runtimeVersion?: string
-    readonly authentication: "unknown" | "subscription"
+    readonly authentication: "unknown" | "subscription" | "authenticated" | "unauthenticated"
     readonly billing: "unknown" | "subscription"
     readonly providerOverage: "unknown"
     readonly reason?: string
@@ -69,6 +71,7 @@ export interface DesktopAPI {
   getState(): Promise<DesktopState>
   chooseWorkspace(): Promise<DesktopState>
   chooseRuntime(): Promise<DesktopState>
+  selectRuntime(input: { readonly runtime: "codex" | "claude" }): Promise<DesktopState>
   chooseNativeHome(): Promise<DesktopState>
   chooseSkillsRoot(): Promise<DesktopState>
   refresh(): Promise<DesktopState>

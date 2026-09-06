@@ -61,6 +61,7 @@ describe("isolated desktop preload bridge", () => {
     expect(await value.bridge.getState()).toEqual(value.result)
     await value.bridge.chooseWorkspace()
     await value.bridge.chooseRuntime()
+    await value.bridge.selectRuntime({ runtime: "claude" })
     await value.bridge.chooseNativeHome()
     await value.bridge.chooseSkillsRoot()
     await value.bridge.refresh()
@@ -74,6 +75,7 @@ describe("isolated desktop preload bridge", () => {
       { channel: desktopChannels.getState, input: undefined },
       { channel: desktopChannels.chooseWorkspace, input: undefined },
       { channel: desktopChannels.chooseRuntime, input: undefined },
+      { channel: desktopChannels.selectRuntime, input: { runtime: "claude" } },
       { channel: desktopChannels.chooseNativeHome, input: undefined },
       { channel: desktopChannels.chooseSkillsRoot, input: undefined },
       { channel: desktopChannels.refresh, input: undefined },
