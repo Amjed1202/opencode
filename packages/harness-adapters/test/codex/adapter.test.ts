@@ -36,6 +36,7 @@ function fixture(
   scenario = "normal",
   environment = { PATH: dirname(process.execPath), HOME: import.meta.dir, USERPROFILE: import.meta.dir },
   approvalTimeoutMs = 1000,
+  beforeNativeReply?: () => Promise<void>,
 ) {
   let transport: StdioJsonRpc | undefined
   const adapter = new CodexAdapter({
@@ -50,6 +51,15 @@ function fixture(
       (transport = new StdioJsonRpc({
         ...options,
         command: [process.execPath, `${import.meta.dir}/app-server-peer.ts`, scenario, ...options.command.slice(1)],
+        ...(beforeNativeReply
+          ? {
+              onRequest: async (message, signal, delivered) => {
+                const reply = await options.onRequest!(message, signal, delivered)
+                await beforeNativeReply()
+                return reply
+              },
+            }
+          : {}),
       })),
   })
   active.push(adapter)
@@ -98,8 +108,12 @@ const input = {
   parts: [{ type: "text", text: "fixture only" }],
 } as const
 
-async function permissionFixture(policy: Partial<SessionIntent["policy"]> = {}, timeout = 1000) {
-  const peer = fixture("hold", undefined, timeout)
+async function permissionFixture(
+  policy: Partial<SessionIntent["policy"]> = {},
+  timeout = 1000,
+  beforeNativeReply?: () => Promise<void>,
+) {
+  const peer = fixture("hold", undefined, timeout, beforeNativeReply)
   const admitted = await admission(peer.adapter, {
     ...intent,
     policy: { ...intent.policy, approval: "ask", filesystem: "workspace-write", ...policy },
@@ -168,8 +182,420 @@ async function permissionFixture(policy: Partial<SessionIntent["policy"]> = {}, 
     if (event.type !== "permission.requested") throw new Error("Wrong event")
     return event.data
   }
-  return { ...peer, context, session, request, next }
+  return { ...peer, context, session, request, next, events }
 }
+
+const nativeChoices = {
+  threadId: "thread-1",
+  turnId: "turn-1",
+  itemId: "item-choice",
+  isBlocking: true,
+  autoResolutionMs: null,
+  questions: [
+    {
+      id: "native-storage",
+      header: "Storage",
+      question: "Which storage should this use?",
+      isOther: false,
+      isSecret: false,
+      options: [
+        { label: "Local", description: "Keep data on this device." },
+        { label: "Remote", description: "Store data remotely." },
+      ],
+    },
+  ],
+}
+async function choiceFixture(timeout = 1000) {
+  const peer = await permissionFixture({}, timeout)
+  await peer.transport().request("fixture/native-request", {
+    request: { id: "native-input", method: "item/tool/requestUserInput", params: nativeChoices },
+  })
+  const event = await peer.next("input.requested")
+  if (event.type !== "input.requested") throw new Error("Wrong event")
+  return { ...peer, request: event.data, event }
+}
+
+test("native choice input journals only opaque metadata and writes exact reviewed labels once", async () => {
+  const peer = await choiceFixture()
+  expect(JSON.stringify(peer.event)).not.toContain("Storage")
+  expect(JSON.stringify(peer.event)).not.toContain("Local")
+  expect(JSON.stringify(peer.event)).not.toContain("native-storage")
+  expect(peer.request.questions).toEqual([{ id: "q1", optionIds: ["o1", "o2"] }])
+  const review = await peer.adapter.reviewInput(peer.context, peer.request.requestId)
+  expect(review.questions[0]?.options[1]).toEqual({ id: "o2", label: "Remote", description: "Store data remotely." })
+  expect((await peer.state()).approvals).toEqual([])
+  const response = { ...peer.request, action: "answer" as const, selections: [{ questionId: "q1", optionId: "o2" }] }
+  await peer.adapter.resolveInput(peer.context, response)
+  expect((await peer.state()).approvals).toEqual([
+    { id: "native-input", result: { answers: { "native-storage": { answers: ["Remote"] } } } },
+  ])
+  await expect(peer.adapter.resolveInput(peer.context, response)).rejects.toThrow("no longer pending")
+  await expect(peer.adapter.reviewInput(peer.context, peer.request.requestId)).rejects.toThrow("no longer pending")
+})
+
+test("native input final host guard prevents answer bytes at the actual reply boundary", async () => {
+  const peer = await choiceFixture()
+  const rejected = await peer.adapter
+    .resolveInput(
+      {
+        ...peer.context,
+        authorizeReply: () => {
+          throw new Error("revoked")
+        },
+      },
+      { ...peer.request, action: "answer", selections: [{ questionId: "q1", optionId: "o1" }] },
+    )
+    .catch((error: Error) => error)
+  expect(String(rejected)).toContain("authorization changed")
+  const state = await peer.state()
+  expect(state.approvals[0]?.error?.code).toBe(-32000)
+  expect(JSON.stringify(state.approvals)).not.toContain("Local")
+})
+
+test("native server cleanup retires input without a late response", async () => {
+  const peer = await choiceFixture()
+  await peer.transport().request("fixture/notification", {
+    method: "serverRequest/resolved",
+    params: { threadId: "thread-1", requestId: "native-input" },
+  })
+  expect((await peer.next("input.resolved")).data).toMatchObject({ outcome: "cancelled" })
+  expect((await peer.state()).approvals).toEqual([])
+  await expect(
+    peer.adapter.resolveInput(peer.context, {
+      ...peer.request,
+      action: "answer",
+      selections: [{ questionId: "q1", optionId: "o1" }],
+    }),
+  ).rejects.toThrow("no longer pending")
+})
+
+test.each([42, "42"])("native retirement preserves number versus string callback identity: %j", async (retiredId) => {
+  const peer = await permissionFixture()
+  const requests = []
+  for (const id of [42, "42"]) {
+    await peer.transport().request("fixture/native-request", {
+      request: { id, method: "item/tool/requestUserInput", params: nativeChoices },
+    })
+    const event = await peer.next("input.requested")
+    if (event.type !== "input.requested") throw new Error("Wrong event")
+    requests.push(event.data)
+  }
+  expect(requests.map((request) => request.nativeRequestId)).toEqual(["number:42", "string:42"])
+  await peer.transport().request("fixture/notification", {
+    method: "serverRequest/resolved",
+    params: { threadId: "foreign-thread", requestId: retiredId },
+  })
+  for (const request of requests)
+    expect((await peer.adapter.reviewInput(peer.context, request.requestId)).requestId).toBe(request.requestId)
+  await peer.transport().request("fixture/notification", {
+    method: "serverRequest/resolved",
+    params: { threadId: "thread-1", requestId: retiredId },
+  })
+  const retiredIndex = typeof retiredId === "number" ? 0 : 1
+  const retired = requests[retiredIndex]!
+  const retained = requests[1 - retiredIndex]!
+  expect((await peer.next("input.resolved")).data).toMatchObject({ requestId: retired.requestId, outcome: "cancelled" })
+  const rejected = await peer.adapter.reviewInput(peer.context, retired.requestId).catch((error: Error) => error)
+  expect(String(rejected)).toContain("no longer pending")
+  await peer.adapter.resolveInput(peer.context, {
+    ...retained,
+    action: "answer",
+    selections: [{ questionId: "q1", optionId: "o1" }],
+  })
+  expect((await peer.state()).approvals).toEqual([
+    {
+      id: typeof retiredId === "number" ? "42" : 42,
+      result: { answers: { "native-storage": { answers: ["Local"] } } },
+    },
+  ])
+})
+
+test("native retirement after the adapter removes a decided handle sends no late response", async () => {
+  const reached = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const peer = await permissionFixture({}, 1000, async () => {
+    reached.resolve()
+    await release.promise
+  })
+  await peer.transport().request("fixture/native-request", {
+    request: { id: "gated-input", method: "item/tool/requestUserInput", params: nativeChoices },
+  })
+  const event = await peer.next("input.requested")
+  if (event.type !== "input.requested") throw new Error("Wrong event")
+  const deciding = peer.adapter
+    .resolveInput(peer.context, { ...event.data, action: "answer", selections: [{ questionId: "q1", optionId: "o1" }] })
+    .catch((error: Error) => error)
+  try {
+    await reached.promise
+    const removed = await peer.adapter.reviewInput(peer.context, event.data.requestId).catch((error: Error) => error)
+    expect(String(removed)).toContain("no longer pending")
+    await peer.transport().request("fixture/notification", {
+      method: "serverRequest/resolved",
+      params: { threadId: "thread-1", requestId: "gated-input" },
+    })
+    expect(String(await deciding)).toContain("resolved without this reply")
+    release.resolve()
+    expect((await peer.state()).approvals).toEqual([])
+  } finally {
+    release.resolve()
+  }
+})
+
+test.each(["account", "config", "terminal", "expiry"])(
+  "native %s change after handle removal blocks answer bytes at beforeWrite",
+  async (change) => {
+    const reached = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const peer = await permissionFixture({}, change === "expiry" ? 100 : 1000, async () => {
+      reached.resolve()
+      await release.promise
+    })
+    await peer.transport().request("fixture/native-request", {
+      request: { id: "gated-input", method: "item/tool/requestUserInput", params: nativeChoices },
+    })
+    const event = await peer.next("input.requested")
+    if (event.type !== "input.requested") throw new Error("Wrong event")
+    const deciding = peer.adapter
+      .resolveInput(peer.context, {
+        ...event.data,
+        action: "answer",
+        selections: [{ questionId: "q1", optionId: "o1" }],
+      })
+      .catch((error: Error) => error)
+    try {
+      await reached.promise
+      if (change === "account") await peer.transport().request("fixture/account-updated", {})
+      if (change === "config")
+        await peer.transport().request("fixture/notification", { method: "config/updated", params: {} })
+      if (change === "terminal")
+        await peer.transport().request("fixture/terminal-notification", { status: "completed" })
+      if (change === "expiry") await Bun.sleep(110)
+      release.resolve()
+      expect(String(await deciding)).toContain("authorization changed")
+      const state = await peer.state()
+      expect(state.approvals).toEqual([
+        { id: "gated-input", error: { code: -32000, message: "Native permission is no longer authorized" } },
+      ])
+      expect(JSON.stringify(state.approvals)).not.toContain("Local")
+    } finally {
+      release.resolve()
+    }
+  },
+)
+
+test("protected patch review returns the bound diff only while pending", async () => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  expect(await peer.adapter.reviewPermission(peer.context, request.requestId)).toEqual({
+    kind: "patch",
+    requestId: request.requestId,
+    operationSha256: request.operationSha256,
+    changes: [{ path: `${import.meta.dir}/proposed-file.txt`, kind: "add", diff: "+fixture content" }],
+  })
+  await peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "deny-once" })
+  await expect(peer.adapter.reviewPermission(peer.context, request.requestId)).rejects.toThrow("no longer pending")
+})
+
+test.each(["cancel", "expiry", "interrupt", "close", "dispose", "account", "config", "terminal"])(
+  "native input %s closes its original callback without an answer",
+  async (action) => {
+    const peer = await choiceFixture(action === "expiry" ? 80 : 1000)
+    if (action === "cancel")
+      await peer.adapter.resolveInput(peer.context, { ...peer.request, action: "cancel", selections: [] })
+    if (action === "expiry") expect((await peer.next("input.resolved")).data).toMatchObject({ outcome: "expired" })
+    if (action === "interrupt") await peer.adapter.interrupt(peer.context)
+    if (action === "close") await peer.adapter.close(peer.session)
+    if (action === "dispose") await peer.adapter.dispose()
+    if (action === "account") await peer.transport().request("fixture/account-updated", {})
+    if (action === "config")
+      await peer.transport().request("fixture/notification", { method: "config/updated", params: {} })
+    if (action === "terminal") await peer.transport().request("fixture/terminal-notification", { status: "completed" })
+    const rejected = await peer.adapter
+      .resolveInput(peer.context, {
+        ...peer.request,
+        action: "answer",
+        selections: [{ questionId: "q1", optionId: "o1" }],
+      })
+      .catch((error: Error) => error)
+    expect(String(rejected)).toContain("no longer pending")
+    if (action !== "dispose")
+      expect((await peer.state()).approvals).toContainEqual({ id: "native-input", result: { answers: {} } })
+  },
+)
+
+test.each([
+  "operationSha256",
+  "nativeRequestId",
+  "nativeTurnId",
+  "nativeSessionId",
+  "sessionId",
+  "workspaceId",
+  "targetId",
+  "runtimeId",
+  "policyId",
+  "policyVersion",
+  "leaseGeneration",
+])("native input rejects mismatched %s and consumes pending callback", async (key) => {
+  const peer = await choiceFixture()
+  const rejected = await peer.adapter
+    .resolveInput(peer.context, {
+      ...peer.request,
+      [key]: key === "leaseGeneration" ? 2 : "wrong",
+      action: "answer",
+      selections: [{ questionId: "q1", optionId: "o1" }],
+    })
+    .catch((error: Error) => error)
+  expect(String(rejected)).toContain("binding mismatch")
+  expect((await peer.state()).approvals).toEqual([{ id: "native-input", result: { answers: {} } }])
+})
+
+test.each(
+  [
+    [],
+    [{ questionId: "q1", optionId: "unknown" }],
+    [{ questionId: "unknown", optionId: "o1" }],
+    [
+      { questionId: "q1", optionId: "o1" },
+      { questionId: "q1", optionId: "o2" },
+    ],
+    [{ questionId: "q1", optionId: "o1", label: "do not accept text" }],
+  ].map((selections) => ({ selections })),
+)("native input rejects invalid selections %#", async ({ selections }) => {
+  const peer = await choiceFixture()
+  const rejected = await peer.adapter
+    .resolveInput(peer.context, { ...peer.request, action: "answer", selections })
+    .catch((error: Error) => error)
+  expect(String(rejected)).toContain("selection mismatch")
+  expect((await peer.state()).approvals).toEqual([{ id: "native-input", result: { answers: {} } }])
+})
+
+test("native answers require a host callback and correct review context", async () => {
+  const peer = await choiceFixture()
+  const context = {
+    session: peer.context.session,
+    admissionId: peer.context.admissionId,
+    leaseGeneration: peer.context.leaseGeneration,
+  }
+  const reviewError = await peer.adapter
+    .reviewInput({ ...peer.context, leaseGeneration: 2 }, peer.request.requestId)
+    .catch((error: Error) => error)
+  expect(String(reviewError)).toContain("binding")
+  const rejected = await peer.adapter
+    .resolveInput(context, { ...peer.request, action: "answer", selections: [{ questionId: "q1", optionId: "o1" }] })
+    .catch((error: Error) => error)
+  expect(String(rejected)).toContain("host write-boundary")
+  expect((await peer.state()).approvals).toEqual([{ id: "native-input", result: { answers: {} } }])
+})
+
+test("question and option display review is cloned and cannot alter native answers", async () => {
+  const peer = await choiceFixture()
+  const review = await peer.adapter.reviewInput(peer.context, peer.request.requestId)
+  Object.assign(review.questions[0]!.options[0]!, { label: "changed" })
+  expect((await peer.adapter.reviewInput(peer.context, peer.request.requestId)).questions[0]!.options[0]!.label).toBe(
+    "Local",
+  )
+  await peer.adapter.resolveInput(peer.context, {
+    ...peer.request,
+    action: "answer",
+    selections: [{ questionId: "q1", optionId: "o1" }],
+  })
+  expect((await peer.state()).approvals).toEqual([
+    { id: "native-input", result: { answers: { "native-storage": { answers: ["Local"] } } } },
+  ])
+})
+
+test("simultaneous duplicate native answers consume the request without answering", async () => {
+  const peer = await choiceFixture()
+  const response = { ...peer.request, action: "answer" as const, selections: [{ questionId: "q1", optionId: "o1" }] }
+  const outcomes = await Promise.allSettled([
+    peer.adapter.resolveInput(peer.context, response),
+    peer.adapter.resolveInput(peer.context, response),
+  ])
+  expect(outcomes.map((outcome) => outcome.status)).toEqual(["rejected", "rejected"])
+  expect((await peer.state()).approvals).toEqual([{ id: "native-input", result: { answers: {} } }])
+})
+
+test("multiple native questions map opaque selections by identity regardless of response order", async () => {
+  const peer = await permissionFixture()
+  await peer.transport().request("fixture/native-request", {
+    request: {
+      id: "two-questions",
+      method: "item/tool/requestUserInput",
+      params: {
+        ...nativeChoices,
+        questions: [nativeChoices.questions[0], { ...nativeChoices.questions[0], id: "constructor" }],
+      },
+    },
+  })
+  const event = await peer.next("input.requested")
+  if (event.type !== "input.requested") throw new Error("Wrong event")
+  await peer.adapter.resolveInput(peer.context, {
+    ...event.data,
+    action: "answer",
+    selections: [
+      { questionId: "q2", optionId: "o2" },
+      { questionId: "q1", optionId: "o1" },
+    ],
+  })
+  expect((await peer.state()).approvals).toEqual([
+    {
+      id: "two-questions",
+      result: { answers: { "native-storage": { answers: ["Local"] }, constructor: { answers: ["Remote"] } } },
+    },
+  ])
+})
+
+test("a replied native input ID cannot be replayed as a fresh question", async () => {
+  const peer = await choiceFixture()
+  await peer.adapter.resolveInput(peer.context, { ...peer.request, action: "cancel", selections: [] })
+  const repeated = await peer
+    .transport()
+    .request("fixture/native-request", {
+      request: { id: "native-input", method: "item/tool/requestUserInput", params: nativeChoices },
+    })
+    .catch((error: Error) => error)
+  expect(repeated).toBeInstanceOf(Error)
+  const closed = await peer.adapter.reviewInput(peer.context, peer.request.requestId).catch((error: Error) => error)
+  expect(String(closed)).toContain("no longer pending")
+})
+
+test.each(["secret", "freeform", "nonblocking", "stale", "malformed"])(
+  "native input %s is cancelled without retaining question display",
+  async (kind) => {
+    const peer = await permissionFixture()
+    const params = {
+      ...nativeChoices,
+      questions: [
+        {
+          ...nativeChoices.questions[0],
+          question: "sensitive-display-canary",
+          ...(kind === "secret" ? { isSecret: true } : {}),
+          ...(kind === "freeform" ? { isOther: true } : {}),
+          ...(kind === "malformed" ? { isSecret: "false" } : {}),
+        },
+      ],
+      ...(kind === "nonblocking" ? { isBlocking: false } : {}),
+      ...(kind === "stale" ? { turnId: "stale-turn" } : {}),
+    }
+    await peer.transport().request("fixture/native-request", {
+      request: { id: "invalid-input", method: "item/tool/requestUserInput", params },
+    })
+    await peer.transport().request("fixture/notification", {
+      method: "item/agentMessage/delta",
+      params: { threadId: "thread-1", turnId: "turn-1", itemId: "marker", delta: "marker" },
+    })
+    const events: AgentEventDraft[] = []
+    for (let index = 0; index < 20; index++) {
+      const event = await peer.events.next()
+      if (event.done) throw new Error("Missing marker")
+      events.push(event.value)
+      if (event.value.type === "assistant.text.delta") break
+    }
+    expect(events.some((event) => event.type === "input.requested")).toBe(false)
+    expect(JSON.stringify(events)).not.toContain("sensitive-display-canary")
+    expect((await peer.state()).approvals).toEqual([{ id: "invalid-input", result: { answers: {} } }])
+  },
+)
 
 test("an observed workspace file approval stays pending and maps allow-once to the original native request", async () => {
   const peer = await permissionFixture()

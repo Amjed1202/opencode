@@ -138,3 +138,100 @@ test("read leases coexist while a writer is excluded", async () => {
     await fixture.close()
   }
 })
+
+test("private storage reservation rejects an overlap with any registered workspace", async () => {
+  const fixture = await admissionFixture()
+  try {
+    const registry = new LocalWorkspaceRegistry()
+    const first = join(fixture.directory, "first")
+    const second = join(fixture.directory, "second")
+    const storage = join(second, "storage")
+    await mkdir(first)
+    await mkdir(storage, { recursive: true })
+    await registry.register({
+      id: "first",
+      projectId: "project",
+      targetId: "local",
+      kind: "repository",
+      rootPath: first,
+    })
+    await registry.register({
+      id: "second",
+      projectId: "project",
+      targetId: "local",
+      kind: "repository",
+      rootPath: second,
+    })
+    expect(() => registry.reservePrivateRoot(storage)).toThrow("workspace")
+  } finally {
+    await fixture.close()
+  }
+})
+
+test.each(["equal", "parent", "child"] as const)(
+  "later %s workspace registration cannot expose reserved private storage",
+  async (relationship) => {
+    const fixture = await admissionFixture()
+    try {
+      const registry = new LocalWorkspaceRegistry()
+      const storage = join(fixture.directory, "storage")
+      const nested = join(storage, "nested")
+      await mkdir(nested, { recursive: true })
+      expect(() => registry.reservePrivateRoot(storage)).not.toThrow()
+      expect(() => registry.reservePrivateRoot(storage)).not.toThrow()
+      const rootPath = relationship === "parent" ? fixture.directory : relationship === "child" ? nested : storage
+      await expect(
+        registry.register({ id: "workspace", projectId: "project", targetId: "local", kind: "repository", rootPath }),
+      ).rejects.toThrow("private")
+      const sibling = join(fixture.directory, "sibling")
+      await mkdir(sibling)
+      await registry.register({
+        id: "sibling",
+        projectId: "project",
+        targetId: "local",
+        kind: "repository",
+        rootPath: sibling,
+      })
+      expect((await registry.get("sibling"))?.rootPath).toBe(sibling)
+    } finally {
+      await fixture.close()
+    }
+  },
+)
+
+test("a reservation made during registration filesystem checks still rejects the workspace", async () => {
+  const fixture = await admissionFixture()
+  try {
+    const registry = new LocalWorkspaceRegistry()
+    const registration = registry.register({
+      id: "workspace",
+      projectId: "project",
+      targetId: "local",
+      kind: "repository",
+      rootPath: fixture.directory,
+    })
+    registry.reservePrivateRoot(fixture.directory)
+    await expect(registration).rejects.toThrow("private")
+    expect(await registry.get("workspace")).toBeUndefined()
+  } finally {
+    await fixture.close()
+  }
+})
+
+test("private storage reservation requires an existing absolute directory without linked ancestors", async () => {
+  const fixture = await admissionFixture()
+  try {
+    const registry = new LocalWorkspaceRegistry()
+    expect(() => registry.reservePrivateRoot("relative/storage")).toThrow("private")
+    expect(() => registry.reservePrivateRoot(join(fixture.directory, "missing"))).toThrow("private")
+    const actual = join(fixture.directory, "actual")
+    const nested = join(actual, "nested")
+    const alias = join(fixture.directory, "alias")
+    await mkdir(nested, { recursive: true })
+    await symlink(actual, alias, "junction")
+    expect(() => registry.reservePrivateRoot(alias)).toThrow("private")
+    expect(() => registry.reservePrivateRoot(join(alias, "nested"))).toThrow("private")
+  } finally {
+    await fixture.close()
+  }
+})

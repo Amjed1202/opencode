@@ -1,6 +1,6 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: architecture plus a billing-safe host and Codex App Server integration with durable permission decisions and bounded history recovery. A new working desktop application is not implemented yet.** Harness is a provisional codename. See [implementation and running instructions](M1A_IMPLEMENTATION.md) for the exact supported scope.
+**Delivered: architecture plus a billing-safe host and Codex App Server integration with protected patch/question review, durable permission and choice-input decisions, and bounded history recovery. A new working desktop application is not implemented yet.** Harness is a provisional codename. See [implementation and running instructions](M1A_IMPLEMENTATION.md) for the exact supported scope.
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 
@@ -51,7 +51,7 @@ OpenCode fork/                       original monorepo retained
     │       └── claude/, opencode/, generic/, remote/  integration TODOs
     └── harness-control-plane/
         ├── src/index.ts            client and privileged service ports
-        ├── src/host.ts             admission, leases, journal and session orchestration
+        ├── src/host.ts             admission, leases, journal, protected artifacts and orchestration
         ├── src/codex-probe.ts       diagnostic command; no inference
         ├── test/                   behavioral and local process integration tests
         └── type-tests/public-contracts.ts
@@ -74,4 +74,4 @@ The filtered, script-disabled install is sufficient for these contracts; it is n
 
 ## Next implementation step
 
-Implement billing-safe admission and a Codex App Server vertical slice, followed by the permitted Claude native route and OpenCode adapter. Do not treat the existing upstream desktop as the finished Harness application. The product manifest is not wired to packaging, auth enforcement or updater behavior; those are explicit M1 gates.
+Complete the Codex slice's remaining acceptance work: host sandbox verification, key/vault provisioning, desktop presentation of protected patch and fixed-choice review, and a separately authorized live repository task. The implemented host APIs encrypt review content and require a short-lived actor-bound review token before grants/answers; no review UI or OS vault integration ships yet. The permitted Claude native route and OpenCode adapter follow. Do not treat the existing upstream desktop as the finished Harness application. The product manifest is not wired to packaging, auth enforcement or updater behavior; those are explicit M1 gates.

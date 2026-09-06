@@ -38,6 +38,10 @@ export type {
   PermissionResolution,
   HumanInputRequest,
   HumanInputResponse,
+  HumanInputResolution,
+  PermissionReviewContent,
+  HumanInputReviewContent,
+  InteractionReview,
 } from "./permissions"
 export type {
   WorkspaceDescriptor,

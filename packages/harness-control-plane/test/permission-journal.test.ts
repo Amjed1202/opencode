@@ -578,6 +578,7 @@ test("independent processes cannot both claim the same native reply handle", asy
 
 test.each([
   JSON.stringify({ protocolVersion: "0.1", type: "permission.requested", data: { requestId: "legacy-unbound" } }),
+  JSON.stringify({ protocolVersion: "0.2", type: "input.requested", data: { requestId: "legacy-input" } }),
   JSON.stringify({ protocolVersion: "9.9", type: "native.event" }),
   JSON.stringify({ protocolVersion: null }),
   JSON.stringify({}),
@@ -589,7 +590,7 @@ test.each([
   legacy.query("INSERT INTO journal_events (id, event) VALUES (?, ?)").run("legacy-event", event)
   legacy.close()
   const preserved = readFileSync(path)
-  expect(() => new SQLiteJournal(path)).toThrow("explicit migration to protocol 0.2")
+  expect(() => new SQLiteJournal(path)).toThrow("explicit migration to protocol 0.3")
   expect(readFileSync(path)).toEqual(preserved)
   const reopened = new Database(path)
   try {
@@ -601,7 +602,7 @@ test.each([
   }
 })
 
-test("an old command-only journal remains compatible and appends new protocol 0.2 events", async () => {
+test("an old command-only journal remains compatible and appends new protocol 0.3 events", async () => {
   const path = database()
   const legacy = new Database(path)
   const command = {
@@ -623,5 +624,5 @@ test("an old command-only journal remains compatible and appends new protocol 0.
   legacy.close()
   const journal = open(path)
   expect(await journal.command(command.id)).toEqual(command)
-  expect((await journal.append("session-1", [requested()]))[0]!.protocolVersion).toBe("0.2")
+  expect((await journal.append("session-1", [requested()]))[0]!.protocolVersion).toBe("0.3")
 })

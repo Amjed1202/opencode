@@ -14,6 +14,7 @@ import type {
   EventDelivery,
   FindingDecision,
   HumanInputResponse,
+  InteractionReview,
   JsonObject,
   NodeGrant,
   NativeSessionInspection,
@@ -41,6 +42,8 @@ export interface ControlPlaneClient {
   inspectSession(sessionId: string): Promise<NativeSessionInspection>
   reconcileSession(sessionId: string): Promise<AgentSession>
   resolveInput(response: HumanInputResponse): Promise<void>
+  reviewPermission(requestId: string): Promise<InteractionReview>
+  reviewInput(requestId: string): Promise<InteractionReview>
   usage(sessionId: string): Promise<readonly UsageSnapshot[]>
   closeSession(sessionId: string): Promise<void>
 }

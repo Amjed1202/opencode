@@ -107,6 +107,17 @@ export class StdioJsonRpc {
     await this.process.exited
   }
 
+  /** The native server already resolved this callback. Never send a second, late response. */
+  retireServerRequest(id: RpcId): boolean {
+    const pending = this.serverRequests.get(id)
+    if (!pending) return false
+    this.serverRequests.delete(id)
+    clearTimeout(pending.timer)
+    pending.controller.abort()
+    pending.reject(new Error("Native server request was resolved without this reply"))
+    return true
+  }
+
   private write(value: unknown): Promise<void> {
     if (this.stopped) throw new Error("Native transport is closed")
     const line = JSON.stringify(value) + "\n"

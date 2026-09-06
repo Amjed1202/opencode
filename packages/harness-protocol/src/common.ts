@@ -2,7 +2,7 @@
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 export type JsonObject = { readonly [key: string]: JsonValue }
 export type Timestamp = string
-export type ProtocolVersion = "0.2"
+export type ProtocolVersion = "0.3"
 
 export interface Evidence {
   readonly source: "native-status" | "native-event" | "provider-report" | "local-observation" | "user-declaration"

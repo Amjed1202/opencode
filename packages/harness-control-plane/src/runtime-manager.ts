@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { isAbsolute, relative } from "node:path"
 import type { AgentAdapter } from "@harness/adapters"
 import type {
   AdmittedSessionRequest,
@@ -12,11 +13,18 @@ import type {
   PermissionBinding,
   PermissionDecision,
   PermissionResolution,
+  PermissionRequest,
+  HumanInputRequest,
+  HumanInputResponse,
+  HumanInputResolution,
+  InteractionReview,
 } from "@harness/protocol"
 import type { CommandRecord } from "./index"
 import type { AdmissionController, AdmissionOptions, AdmissionWorkspaces } from "./admission"
 import { hashConfiguration } from "./environment"
 import type { SQLiteJournal } from "./journal"
+import type { EncryptedArtifactStore } from "./artifacts"
+import { validateReviewContent } from "./review-content"
 
 export interface RuntimeManagerOptions {
   readonly admission: AdmissionController
@@ -26,6 +34,16 @@ export interface RuntimeManagerOptions {
   /** Authenticated host identity; never populated from a renderer request. Grants require it. */
   readonly actorId?: string
   readonly now?: () => number
+  /** Host-owned encrypted storage outside registered workspaces; absent storage disables grants/answers. */
+  readonly artifacts?: EncryptedArtifactStore
+}
+
+interface ReviewProof {
+  readonly kind: "permission" | "input"
+  readonly request: PermissionBinding
+  readonly artifactSha256: string
+  readonly actorId: string
+  readonly expiresAt: number
 }
 
 interface Pump {
@@ -49,11 +67,14 @@ export class LocalRuntimeManager {
   private readonly pumpTasks = new Set<Promise<void>>()
   private readonly versions = new Map<string, number>()
   private readonly listeners = new Map<string, Set<() => void>>()
+  private readonly reviews = new Map<string, ReviewProof>()
   private disposed = false
   private recovering = false
   private disposal?: Promise<void>
 
-  constructor(private readonly options: RuntimeManagerOptions) {}
+  constructor(private readonly options: RuntimeManagerOptions) {
+    if (options.artifacts) options.workspaces.reservePrivateRoot(options.artifacts.rootPath)
+  }
 
   async createSession(admissionId: string, commandId: string): Promise<AgentSession> {
     return this.operation(() =>
@@ -97,7 +118,7 @@ export class LocalRuntimeManager {
           const existing = await this.existing(commandId, digest)
           if (existing) return this.savedResult(existing)
           const session = await this.session(sessionId)
-          if (["running", "awaiting-permission", "uncertain"].includes(session.status))
+          if (["running", "awaiting-permission", "awaiting-input", "uncertain"].includes(session.status))
             throw new Error("Session must be reconciled before resume")
           const request = await this.options.admission.require(admissionId, sessionId, "resume")
           const adapter = this.adapter(session.binding.runtimeId, session.binding.targetId)
@@ -276,12 +297,19 @@ export class LocalRuntimeManager {
       this.serial(`session:${decision.sessionId}`, async () => {
         const actorId = this.options.actorId
         if (!actorId?.trim()) throw new Error("A trusted host actor is required")
-        const claim = await this.options.journal.claimPermission(decision, actorId, this.now())
+        const existing = await this.options.journal.permission(decision.requestId)
+        const review =
+          existing?.state === "pending" &&
+          existing.request.choices.some((choice) => choice.id === decision.choiceId && choice.action === "allow")
+            ? this.reviewProof("permission", existing.request, decision, actorId)
+            : undefined
+        const claim = await this.options.journal.claimPermission(decision, actorId, this.now(), review?.artifactSha256)
         if (!claim.created) {
           if (claim.record.state !== "resolved" || claim.record.resolution?.outcome !== claim.record.intent?.outcome)
             throw new Error("Permission outcome is uncertain or was denied; native replay is blocked")
           return
         }
+        this.revokeReviews(decision.sessionId, decision.requestId)
         try {
           const session = await this.session(decision.sessionId)
           const request = this.active.get(session.id)
@@ -311,6 +339,7 @@ export class LocalRuntimeManager {
           const authorizeReply = () => {
             this.assertOpen()
             if (Date.parse(claim.record.request.expiresAt) <= this.now()) throw new Error("Permission expired")
+            if (review && review.expiresAt <= this.now()) throw new Error("Protected review expired before reply")
             authorization?.()
           }
           authorizeReply()
@@ -332,6 +361,236 @@ export class LocalRuntimeManager {
         }
       }),
     )
+  }
+
+  async reviewPermission(requestId: string): Promise<InteractionReview> {
+    return this.review("permission", requestId)
+  }
+
+  async reviewInput(requestId: string): Promise<InteractionReview> {
+    return this.review("input", requestId)
+  }
+
+  async resolveInput(input: HumanInputResponse): Promise<void> {
+    const response = structuredClone(input)
+    return this.operation(() =>
+      this.serial(`session:${response.sessionId}`, async () => {
+        const actorId = this.options.actorId
+        if (!actorId?.trim()) throw new Error("A trusted host actor is required")
+        const existing = await this.options.journal.input(response.requestId)
+        const review =
+          existing?.state === "pending" && response.action === "answer"
+            ? this.reviewProof("input", existing.request, response, actorId)
+            : undefined
+        const claim = await this.options.journal.claimInput(response, actorId, this.now(), review?.artifactSha256)
+        if (!claim.created) {
+          if (claim.record.state !== "resolved" || claim.record.resolution?.outcome !== claim.record.intent?.outcome)
+            throw new Error("Input outcome is uncertain or was cancelled; native replay is blocked")
+          return
+        }
+        this.revokeReviews(response.sessionId, response.requestId)
+        try {
+          const { session, request, adapter } = await this.interactionContext(response)
+          if (!adapter.resolveInput) throw new Error("Native input handling is unsupported")
+          let authorization: (() => void) | undefined
+          if (claim.record.intent!.outcome === "answered") {
+            if (!["awaiting-input", "awaiting-permission"].includes(session.status))
+              throw new Error("Session cannot answer input")
+            const guard = this.permissionGuards.get(session.id)
+            if (!guard) throw new Error("Input authorization is unavailable")
+            authorization = await guard()
+            if (!this.options.workspaces.current(request.lease)) throw new Error("Input lease expired")
+          }
+          const authorizeReply = () => {
+            this.assertOpen()
+            if (Date.parse(claim.record.request.expiresAt) <= this.now()) throw new Error("Input expired")
+            if (review && review.expiresAt <= this.now()) throw new Error("Protected review expired before reply")
+            authorization?.()
+          }
+          authorizeReply()
+          await adapter.resolveInput(
+            {
+              session: structuredClone(session),
+              admissionId: request.admissionId,
+              leaseGeneration: request.lease.generation,
+              authorizeReply,
+            },
+            structuredClone(claim.record.response!),
+          )
+          await this.options.journal.append(session.id, [this.inputResolution(session, claim.record.intent!)])
+          await this.permissionStatus(session.id)
+          this.notify(session.id)
+        } catch {
+          await this.options.journal.markInputUncertain(response.requestId)
+          throw new Error("Input outcome is uncertain; native replay is blocked")
+        }
+      }),
+    )
+  }
+
+  private async interactionContext(binding: PermissionBinding) {
+    const session = await this.session(binding.sessionId)
+    const request = this.active.get(session.id)
+    const commandId = this.activeTurns.get(session.id)
+    const command = commandId ? await this.options.journal.command(commandId) : undefined
+    if (
+      !request ||
+      !command ||
+      command.receipt.nativeTurnId !== binding.nativeTurnId ||
+      !this.pumps.has(session.id) ||
+      this.pumps.get(session.id)!.stopping
+    )
+      throw new Error("Interaction native handle is detached")
+    this.validatePermissionBinding(session, request, binding)
+    return { session, request, adapter: this.adapter(session.binding.runtimeId, session.binding.targetId) }
+  }
+
+  private review(kind: "permission" | "input", requestId: string): Promise<InteractionReview> {
+    return this.operation(async () => {
+      const original =
+        kind === "permission"
+          ? await this.options.journal.permission(requestId)
+          : await this.options.journal.input(requestId)
+      if (!original) throw new Error("Unknown review request")
+      return this.serial(`session:${original.request.sessionId}`, async () => {
+        const record =
+          kind === "permission"
+            ? await this.options.journal.permission(requestId)
+            : await this.options.journal.input(requestId)
+        const actorId = this.options.actorId
+        const store = this.options.artifacts
+        if (!record || record.state !== "pending" || !actorId?.trim() || !store || !record.request.reviewArtifact)
+          throw new Error("Protected review is unavailable")
+        const { request, session } = await this.interactionContext(record.request)
+        this.checkArtifactLocation(request)
+        if (!["awaiting-input", "awaiting-permission"].includes(session.status))
+          throw new Error("Review session is not awaiting an interaction")
+        const guard = this.permissionGuards.get(session.id)
+        if (!guard) throw new Error("Review authorization is unavailable")
+        const authorize = await guard()
+        const expires = Math.min(Date.parse(record.request.expiresAt), this.now() + 60_000)
+        if (!Number.isFinite(expires) || expires <= this.now()) throw new Error("Protected review expired")
+        const artifact = record.request.reviewArtifact
+        const grant = await store.grant({
+          id: artifact.id,
+          sessionId: session.id,
+          actorId,
+          expiresAt: new Date(expires).toISOString(),
+        })
+        let content: InteractionReview["content"]
+        let bytes: Uint8Array | undefined
+        try {
+          if (this.digest(grant.artifact) !== this.digest(artifact))
+            throw new Error("Protected review artifact changed")
+          bytes = await store.read({ id: artifact.id, grantId: grant.id, sessionId: session.id, actorId })
+          content = validateReviewContent(
+            JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
+            record.request,
+          )
+        } finally {
+          bytes?.fill(0)
+          store.revokeGrant(grant.id)
+        }
+        this.assertOpen()
+        authorize()
+        if (expires <= this.now()) throw new Error("Protected review expired")
+        for (const [id, proof] of this.reviews) if (proof.expiresAt <= this.now()) this.reviews.delete(id)
+        if (this.reviews.size >= 1024) throw new Error("Protected review capacity reached")
+        const reviewToken = randomUUID()
+        const reviewedAt = new Date(this.now()).toISOString()
+        await this.options.journal.append(session.id, [
+          {
+            type: "interaction.reviewed",
+            data: { requestId, artifactId: artifact.id, artifactSha256: artifact.sha256, actorId, reviewedAt },
+            scope: {
+              sessionId: session.id,
+              runtimeId: session.binding.runtimeId,
+              targetId: session.binding.targetId,
+              workspaceId: session.workspaceId,
+              turnId: record.request.nativeTurnId,
+            },
+            origin: {
+              streamId: `host:reviews:${session.id}`,
+              epoch: "1",
+              eventId: randomUUID(),
+              identityStrategy: "adapter-assigned",
+            },
+            observedAt: reviewedAt,
+          },
+        ])
+        this.assertOpen()
+        authorize()
+        if (expires <= this.now()) throw new Error("Protected review expired")
+        this.reviews.set(reviewToken, {
+          kind,
+          request: structuredClone(record.request),
+          artifactSha256: artifact.sha256,
+          actorId,
+          expiresAt: expires,
+        })
+        this.notify(session.id)
+        return { artifact: structuredClone(artifact), content, reviewToken, expiresAt: new Date(expires).toISOString() }
+      })
+    })
+  }
+
+  private reviewProof(
+    kind: "permission" | "input",
+    request: PermissionRequest | HumanInputRequest,
+    response: PermissionBinding & { reviewToken?: string },
+    actorId: string,
+  ) {
+    const proof = response.reviewToken ? this.reviews.get(response.reviewToken) : undefined
+    if (
+      !proof ||
+      proof.kind !== kind ||
+      proof.actorId !== actorId ||
+      proof.expiresAt <= this.now() ||
+      !samePermissionBinding(proof.request, request) ||
+      !samePermissionBinding(request, response) ||
+      !request.reviewArtifact ||
+      proof.artifactSha256 !== request.reviewArtifact.sha256
+    )
+      throw new Error("A current protected review is required")
+    return proof
+  }
+
+  private revokeReviews(sessionId: string, requestId?: string) {
+    for (const [id, proof] of this.reviews)
+      if (proof.request.sessionId === sessionId && (!requestId || proof.request.requestId === requestId))
+        this.reviews.delete(id)
+    if (!requestId) this.options.artifacts?.revokeSession(sessionId)
+  }
+
+  private checkArtifactLocation(request: AdmittedSessionRequest) {
+    const root = this.options.artifacts?.rootPath
+    if (!root || pathContains(request.workspace.rootPath, root) || pathContains(root, request.workspace.rootPath))
+      throw new Error("Protected review storage must be outside the workspace")
+  }
+
+  private async protectReview(
+    request: PermissionRequest | HumanInputRequest,
+    admission: AdmittedSessionRequest,
+    session: AgentSession,
+  ) {
+    this.checkArtifactLocation(admission)
+    const adapter = this.adapter(session.binding.runtimeId, session.binding.targetId)
+    const context = {
+      session: structuredClone(session),
+      admissionId: admission.admissionId,
+      leaseGeneration: admission.lease.generation,
+    }
+    const value =
+      "choices" in request
+        ? await adapter.reviewPermission?.(context, request.requestId)
+        : await adapter.reviewInput?.(context, request.requestId)
+    const content = validateReviewContent(value, request)
+    const bytes = new TextEncoder().encode(JSON.stringify(content))
+    try {
+      return await this.options.artifacts!.put({ sessionId: session.id, content: bytes, mediaType: "application/json" })
+    } finally {
+      bytes.fill(0)
+    }
   }
 
   /** Observation only: never resumes a thread, settles a command, or sends user content. */
@@ -452,6 +711,7 @@ export class LocalRuntimeManager {
           const pending = await this.options.journal.recoverPending()
           await this.options.journal.recoverActiveSessions()
           await this.options.journal.recoverPermissions(this.now())
+          await this.options.journal.recoverInputs(this.now())
           for (const record of pending) {
             const session = await this.options.journal.get(record.sessionId)
             if (session && session.status !== "uncertain")
@@ -471,6 +731,7 @@ export class LocalRuntimeManager {
   async dispose(): Promise<void> {
     if (this.disposal) return this.disposal
     this.disposed = true
+    this.reviews.clear()
     for (const id of this.listeners.keys()) this.notify(id)
     this.disposal = (async () => {
       await Promise.allSettled([...this.operations])
@@ -498,7 +759,7 @@ export class LocalRuntimeManager {
         await this.streamUncertain(sessionId)
         throw new Error("Native close failed; workspace ownership is retained")
       }
-      if (["running", "awaiting-permission", "uncertain"].includes(session.status))
+      if (["running", "awaiting-permission", "awaiting-input", "uncertain"].includes(session.status))
         await this.streamUncertain(sessionId)
       const current = await this.session(sessionId)
       await this.expirePermissions(current, "host:close")
@@ -526,6 +787,7 @@ export class LocalRuntimeManager {
   }
 
   private async uncertain(record: CommandRecord) {
+    this.revokeReviews(record.sessionId)
     const current = await this.options.journal.command(record.id)
     if (current && !(await this.options.journal.isComplete(record.id)))
       await this.options.journal.append(record.sessionId, [], {
@@ -594,6 +856,7 @@ export class LocalRuntimeManager {
   }
 
   private async streamUncertain(sessionId: string) {
+    this.revokeReviews(sessionId)
     const commandId = this.activeTurns.get(sessionId)
     const record = commandId ? await this.options.journal.command(commandId) : undefined
     if (record) return this.uncertain(record)
@@ -615,13 +878,20 @@ export class LocalRuntimeManager {
       (draft.scope.workspaceId !== undefined && draft.scope.workspaceId !== session.workspaceId)
     )
       throw new Error("Native event scope mismatch")
-    if (draft.type === "session.updated") throw new Error("Native adapters cannot replace host session authority")
+    if (draft.type === "session.updated" || draft.type === "interaction.reviewed")
+      throw new Error("Native adapters cannot replace host session authority")
     const command = draft.scope.commandId ? await this.options.journal.command(draft.scope.commandId) : undefined
-    if (draft.type === "permission.requested") {
-      const existing = await this.options.journal.permission(draft.data.requestId)
+    if (draft.type === "permission.requested" || draft.type === "input.requested") {
+      if (draft.data.reviewArtifact !== undefined || draft.data.sourceRequestSha256 !== undefined)
+        throw new Error("Native adapters cannot supply host review authority")
+      const sourceRequestSha256 = this.digest(draft.data)
+      const existing =
+        draft.type === "permission.requested"
+          ? await this.options.journal.permission(draft.data.requestId)
+          : await this.options.journal.input(draft.data.requestId)
       if (existing) {
         if (
-          this.digest(existing.request) !== this.digest(draft.data) ||
+          (existing.request.sourceRequestSha256 ?? this.digest(existing.request)) !== sourceRequestSha256 ||
           !command ||
           command.sessionId !== session.id ||
           command.receipt.nativeTurnId !== draft.data.nativeTurnId
@@ -636,12 +906,41 @@ export class LocalRuntimeManager {
         !command ||
         this.activeTurns.get(session.id) !== command.id ||
         command.receipt.nativeTurnId !== draft.data.nativeTurnId ||
-        !["running", "awaiting-permission"].includes(current.status)
+        !["running", "awaiting-permission", "awaiting-input"].includes(current.status)
       )
         throw new Error("Native permission has no matching active turn")
       this.validatePermissionBinding(current, request, draft.data)
-      if (current.intent.policy.approval !== "ask" && draft.data.choices.some((choice) => choice.action === "allow"))
+      if (
+        draft.type === "permission.requested" &&
+        current.intent.policy.approval !== "ask" &&
+        draft.data.choices.some((choice) => choice.action === "allow")
+      )
         throw new Error("Permission grant contradicts policy")
+      let reviewArtifact: PermissionRequest["reviewArtifact"]
+      if (draft.type === "input.requested" || draft.data.choices.some((choice) => choice.action === "allow")) {
+        try {
+          reviewArtifact = await this.protectReview(draft.data, request, current)
+        } catch {
+          /* Unavailable protected content permits only denial or cancellation. */
+        }
+      }
+      if (draft.type === "permission.requested")
+        draft = {
+          ...draft,
+          data: {
+            ...draft.data,
+            sourceRequestSha256,
+            ...(reviewArtifact ? { reviewArtifact } : {}),
+            choices: reviewArtifact
+              ? draft.data.choices
+              : draft.data.choices.filter((choice) => choice.action === "deny"),
+          },
+        }
+      else
+        draft = {
+          ...draft,
+          data: { ...draft.data, sourceRequestSha256, ...(reviewArtifact ? { reviewArtifact } : {}) },
+        }
     }
     if (draft.type === "permission.resolved") {
       if (draft.data.outcome === "allowed") throw new Error("Native adapters cannot grant host permission")
@@ -655,6 +954,19 @@ export class LocalRuntimeManager {
         ...draft,
         data: { ...draft.data, actorId: "host:native-policy", decidedAt: new Date(this.now()).toISOString() },
       }
+      this.revokeReviews(session.id, draft.data.requestId)
+    }
+    if (draft.type === "input.resolved") {
+      if (draft.data.outcome === "answered") throw new Error("Native adapters cannot answer host input")
+      const existing = await this.options.journal.input(draft.data.requestId)
+      if (!existing || !samePermissionBinding(existing.request, draft.data))
+        throw new Error("Native input resolution binding mismatch")
+      if (existing.state === "resolved" && existing.resolution?.outcome !== "answered") return
+      draft = {
+        ...draft,
+        data: { ...draft.data, actorId: "host:native-policy", decidedAt: new Date(this.now()).toISOString() },
+      }
+      this.revokeReviews(session.id, draft.data.requestId)
     }
     if (draft.type === "agent.completed" || draft.type === "agent.started") {
       if (
@@ -666,9 +978,20 @@ export class LocalRuntimeManager {
       )
         throw new Error("Native lifecycle event has no matching command")
     }
-    const events = await this.options.journal.append(session.id, [draft])
+    const events = await this.options.journal.append(session.id, [draft]).catch(async (error) => {
+      if ((draft.type === "permission.requested" || draft.type === "input.requested") && draft.data.reviewArtifact)
+        await this.options.artifacts
+          ?.delete({ id: draft.data.reviewArtifact.id, sessionId: session.id })
+          .catch(() => {})
+      throw error
+    })
     if (!events.length) return
-    if (draft.type === "permission.requested" || draft.type === "permission.resolved")
+    if (
+      draft.type === "permission.requested" ||
+      draft.type === "permission.resolved" ||
+      draft.type === "input.requested" ||
+      draft.type === "input.resolved"
+    )
       await this.permissionStatus(session.id)
     if (draft.type === "agent.completed" && this.activeTurns.get(session.id) === draft.scope.commandId) {
       const current = await this.session(session.id)
@@ -747,13 +1070,28 @@ export class LocalRuntimeManager {
 
   private async permissionStatus(sessionId: string) {
     const current = await this.session(sessionId)
-    if (!["running", "awaiting-permission"].includes(current.status)) return
-    const status = (await this.options.journal.pendingPermissions(sessionId)).length ? "awaiting-permission" : "running"
+    if (!["running", "awaiting-permission", "awaiting-input"].includes(current.status)) return
+    const status = (await this.options.journal.pendingPermissions(sessionId)).length
+      ? "awaiting-permission"
+      : (await this.options.journal.pendingInputs(sessionId)).length
+        ? "awaiting-input"
+        : "running"
     if (status !== current.status)
       await this.options.journal.save({ ...current, status, revision: current.revision + 1 }, current.revision)
   }
 
   private async expirePermissions(session: AgentSession, actorId: string) {
+    this.revokeReviews(session.id)
+    for (const { request } of await this.options.journal.pendingInputs(session.id)) {
+      await this.options.journal.append(session.id, [
+        this.inputResolution(session, {
+          ...interactionBinding(request),
+          outcome: "expired",
+          actorId,
+          decidedAt: new Date(this.now()).toISOString(),
+        }),
+      ])
+    }
     for (const { request } of await this.options.journal.pendingPermissions(session.id)) {
       const {
         requestId,
@@ -788,6 +1126,27 @@ export class LocalRuntimeManager {
           decidedAt: new Date(this.now()).toISOString(),
         }),
       ])
+    }
+  }
+
+  private inputResolution(session: AgentSession, resolution: HumanInputResolution): AgentEventDraft {
+    return {
+      type: "input.resolved",
+      data: resolution,
+      scope: {
+        sessionId: session.id,
+        runtimeId: session.binding.runtimeId,
+        targetId: session.binding.targetId,
+        workspaceId: session.workspaceId,
+        turnId: resolution.nativeTurnId,
+      },
+      origin: {
+        streamId: `host:inputs:${session.id}`,
+        epoch: "1",
+        eventId: `${resolution.requestId}:${resolution.outcome}`,
+        identityStrategy: "adapter-assigned",
+      },
+      observedAt: new Date(this.now()).toISOString(),
     }
   }
 
@@ -870,6 +1229,42 @@ export class LocalRuntimeManager {
     } finally {
       if (this.locks.get(key) === settled) this.locks.delete(key)
     }
+  }
+}
+
+function pathContains(parent: string, child: string): boolean {
+  const value = relative(parent, child)
+  return value === "" || (!isAbsolute(value) && value !== ".." && !value.startsWith("../") && !value.startsWith("..\\"))
+}
+
+function interactionBinding(request: PermissionBinding): PermissionBinding {
+  const {
+    requestId,
+    sessionId,
+    runtimeId,
+    targetId,
+    workspaceId,
+    nativeSessionId,
+    nativeTurnId,
+    nativeRequestId,
+    policyId,
+    policyVersion,
+    leaseGeneration,
+    operationSha256,
+  } = request
+  return {
+    requestId,
+    sessionId,
+    runtimeId,
+    targetId,
+    workspaceId,
+    nativeSessionId,
+    nativeTurnId,
+    nativeRequestId,
+    policyId,
+    policyVersion,
+    leaseGeneration,
+    operationSha256,
   }
 }
 

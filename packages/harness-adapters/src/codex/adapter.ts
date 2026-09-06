@@ -12,6 +12,10 @@ import type {
   CommandReceipt,
   ExecutionTarget,
   JsonValue,
+  HumanInputRequest,
+  HumanInputResponse,
+  HumanInputReviewContent,
+  PermissionReviewContent,
   PermissionDecision,
   PermissionBinding,
   PermissionRequest,
@@ -25,6 +29,9 @@ import { StdioJsonRpc, isRecord } from "./stdio"
 import { approvalDenial, approvalPlan, fileApprovalEvidence } from "./permissions"
 import type { FileApprovalEvidence } from "./permissions"
 import { inspectCodexHistory } from "./history"
+import { decodeHumanInput } from "./human-input"
+import type { ToolRequestUserInputParams } from "./generated/0.153.4/v2/ToolRequestUserInputParams"
+import type { ToolRequestUserInputResponse } from "./generated/0.153.4/v2/ToolRequestUserInputResponse"
 import type { NativeNotification, NativeReply, NativeRequest, StdioJsonRpcOptions } from "./stdio"
 import type { InitializeParams } from "./generated/0.153.4/InitializeParams"
 import type { ConfigReadParams } from "./generated/0.153.4/v2/ConfigReadParams"
@@ -74,6 +81,11 @@ type PendingApproval = {
   delivered: Promise<void>
   deciding: boolean
 }
+type PendingInput = Omit<PendingApproval, "request" | "files"> & {
+  request: HumanInputRequest
+  params: ToolRequestUserInputParams
+  review: HumanInputReviewContent
+}
 
 // Verified against the pinned official config.schema.json; these never edit config.toml.
 const isolatedConfiguration = {
@@ -122,6 +134,8 @@ export class CodexAdapter implements AgentAdapter {
   private versionVerifiedAt = new Date().toISOString()
   private readonly sessions = new Map<string, OwnedSession>()
   private readonly approvals = new Map<string, PendingApproval>()
+  private readonly inputs = new Map<string, PendingInput>()
+  private readonly serverBindings = new Map<string | number, string>()
 
   constructor(options: CodexAdapterOptions) {
     if (!absolute(options.executable) || !absolute(options.cwd) || options.target.kind !== "local")
@@ -191,7 +205,12 @@ export class CodexAdapter implements AgentAdapter {
         ],
       },
       coding: { status: "unknown", reason: "Native tool mappings and OS enforcement are not verified." },
-      "human-input": { status: "unsupported", reason: "Human input requests are declined." },
+      "human-input": {
+        ...support,
+        limitations: [
+          "Only blocking nonsecret choice questions are supported. Free text, secret, nonblocking and unsupported questions are cancelled. Display content requires protected review.",
+        ],
+      },
     }
   }
 
@@ -446,6 +465,120 @@ export class CodexAdapter implements AgentAdapter {
       threadId: owned.session.binding.nativeSessionId,
       turnId: owned.turnId,
     } satisfies TurnInterruptParams)
+  }
+
+  async reviewPermission(context: AdapterSessionContext, requestId: string): Promise<PermissionReviewContent> {
+    const pending = this.approvals.get(requestId)
+    if (!pending) throw new Error("Native permission is no longer pending")
+    this.requirePending(context, pending)
+    if (!pending.files || !pending.request.choices.some((choice) => choice.action === "allow"))
+      throw new Error("Native patch review is unavailable")
+    return structuredClone({
+      kind: "patch",
+      requestId,
+      operationSha256: pending.request.operationSha256,
+      changes: pending.files.changes.map((change) => ({
+        path: change.path,
+        kind: change.kind.type,
+        diff: change.diff,
+        ...(change.kind.type === "update" && change.kind.move_path !== null ? { movePath: change.kind.move_path } : {}),
+      })),
+    })
+  }
+
+  async reviewInput(context: AdapterSessionContext, requestId: string): Promise<HumanInputReviewContent> {
+    const pending = this.inputs.get(requestId)
+    if (!pending) throw new Error("Native input is no longer pending")
+    this.requirePending(context, pending)
+    return structuredClone(pending.review)
+  }
+
+  async resolveInput(context: AdapterPermissionContext, input: HumanInputResponse): Promise<void> {
+    const response = structuredClone(input)
+    const authorizeReply = context.authorizeReply
+    const pending = this.inputs.get(response.requestId)
+    if (!pending) throw new Error("Native input is no longer pending")
+    try {
+      this.requirePending(context, pending)
+      const binding = permissionBinding(pending.request)
+      if (
+        Object.keys(binding).some(
+          (key) => response[key as keyof HumanInputResponse] !== binding[key as keyof PermissionBinding],
+        )
+      )
+        throw new Error("Native input binding mismatch")
+      if (!Array.isArray(response.selections) || !["answer", "cancel"].includes(response.action))
+        throw new Error("Invalid native input response")
+      const answers: ToolRequestUserInputResponse["answers"] = Object.create(null)
+      if (response.action === "answer") {
+        if (!authorizeReply) throw new Error("Native answers require the host write-boundary authorization guard")
+        if (response.selections.length !== pending.request.questions.length)
+          throw new Error("Native input selection mismatch")
+        for (const [index, question] of pending.request.questions.entries()) {
+          const selected = response.selections.filter((entry) => isRecord(entry) && entry.questionId === question.id)
+          if (
+            selected.length !== 1 ||
+            !question.optionIds.includes(selected[0]!.optionId) ||
+            Object.keys(selected[0]!).some((key) => !["questionId", "optionId"].includes(key))
+          )
+            throw new Error("Native input selection mismatch")
+          const optionIndex = question.optionIds.indexOf(selected[0]!.optionId)
+          answers[pending.params.questions[index]!.id] = {
+            answers: [pending.params.questions[index]!.options![optionIndex]!.label],
+          }
+        }
+      } else if (response.selections.length) throw new Error("Cancelled native input must have no selections")
+      pending.deciding = true
+      if (response.action === "answer") {
+        const observation = await this.observe()
+        if (
+          observation.configurationFingerprint !== pending.owned.session.effective.configurationFingerprint ||
+          observation.auth.accountId !== pending.owned.session.effective.auth.accountId
+        )
+          throw new Error("Native input account or configuration changed")
+      }
+      this.requirePending(context, pending, true)
+      if (this.inputs.get(response.requestId) !== pending) throw new Error("Native input is no longer pending")
+      this.inputs.delete(response.requestId)
+      clearTimeout(pending.timer)
+      pending.reply({
+        result: { answers } satisfies ToolRequestUserInputResponse,
+        ...(response.action === "answer"
+          ? {
+              beforeWrite: () => {
+                this.requirePending(context, pending, true)
+                authorizeReply!()
+              },
+            }
+          : {}),
+      })
+      await pending.delivered
+    } catch (error) {
+      await this.settleInput(pending, "cancelled")
+      throw error
+    }
+  }
+
+  private requirePending(
+    context: AdapterSessionContext,
+    pending: PendingApproval | PendingInput,
+    deciding = false,
+  ): void {
+    const owned = this.owned(context)
+    if (
+      this.disposed ||
+      pending.owned !== owned ||
+      (!deciding && pending.deciding) ||
+      Date.parse(pending.request.expiresAt) <= Date.now() ||
+      pending.epoch !== this.accountEpoch ||
+      pending.approvalEpoch !== owned.approvalEpoch ||
+      !owned.busy ||
+      owned.turnId !== pending.request.nativeTurnId ||
+      ("files" in pending &&
+        pending.files &&
+        owned.files.get((pending.request as PermissionRequest).toolCallId!)?.sha256 !== pending.files.sha256)
+    )
+      throw new Error("Native interaction expired or binding changed")
   }
 
   async close(session: AgentSession): Promise<void> {
@@ -751,6 +884,14 @@ export class CodexAdapter implements AgentAdapter {
     if (!isRecord(params)) return
     const owned = [...this.sessions.values()].find((item) => item.session.binding.nativeSessionId === params.threadId)
     if (!owned) return
+    if (message.method === "serverRequest/resolved") {
+      if (
+        (typeof params.requestId === "string" || typeof params.requestId === "number") &&
+        this.serverBindings.get(params.requestId) === owned.session.binding.nativeSessionId
+      )
+        this.transport?.retireServerRequest(params.requestId)
+      return
+    }
     if (owned.awaitingAck) {
       if (
         owned.buffered.length >= 128 ||
@@ -886,9 +1027,18 @@ export class CodexAdapter implements AgentAdapter {
     signal: AbortSignal,
     delivered: Promise<void>,
   ): Promise<NativeReply> {
+    const requestThreadId = isRecord(message.params) ? message.params.threadId : undefined
+    if (
+      typeof requestThreadId === "string" &&
+      [...this.sessions.values()].some((owned) => owned.session.binding.nativeSessionId === requestThreadId)
+    ) {
+      this.serverBindings.set(message.id, requestThreadId)
+      void delivered.finally(() => this.serverBindings.delete(message.id)).catch(() => undefined)
+    }
     // Never retain authentication exchanges, external tokens, command bodies or unknown request payloads.
     if (message.method.startsWith("account/"))
       return { error: { code: -32601, message: "External authentication is unsupported" } }
+    if (message.method === "item/tool/requestUserInput") return this.inputRequest(message, signal, delivered)
     const denial = approvalDenial(message.method)
     if (denial && isRecord(message.params)) {
       const params = message.params
@@ -1061,8 +1211,149 @@ export class CodexAdapter implements AgentAdapter {
     await Promise.all(
       [...this.approvals.values()]
         .filter((pending) => !owned || pending.owned === owned)
-        .map((pending) => this.settleApproval(pending, "denied")),
+        .map((pending) => this.settleApproval(pending, "denied"))
+        .concat(
+          [...this.inputs.values()]
+            .filter((pending) => !owned || pending.owned === owned)
+            .map((pending) => this.settleInput(pending, "cancelled")),
+        ),
     )
+  }
+
+  private async inputRequest(
+    message: NativeRequest,
+    signal: AbortSignal,
+    delivered: Promise<void>,
+  ): Promise<NativeReply> {
+    const receivedAt = Date.now()
+    const cancelled = { result: { answers: {} } satisfies ToolRequestUserInputResponse }
+    const params = decodeHumanInput(message.params)
+    if (!params) return cancelled
+    const owned = [...this.sessions.values()].find((entry) => entry.session.binding.nativeSessionId === params.threadId)
+    if (owned?.awaitingAck) await owned.ack?.promise
+    const id =
+      typeof message.id === "number"
+        ? `number:${message.id}`
+        : /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(message.id)
+          ? `string:${message.id}`
+          : undefined
+    if (
+      !owned ||
+      !id ||
+      this.disposed ||
+      signal.aborted ||
+      this.accountMode !== "chatgpt" ||
+      !owned.busy ||
+      owned.turnId !== params.turnId
+    )
+      return cancelled
+    const epoch = this.accountEpoch
+    const approvalEpoch = owned.approvalEpoch
+    const deadline = Math.min(
+      receivedAt + (this.options.approvalTimeoutMs ?? 60_000),
+      Date.parse(owned.leaseExpiresAt),
+      params.autoResolutionMs === null ? Infinity : receivedAt + params.autoResolutionMs,
+    )
+    if (deadline <= Date.now()) return cancelled
+    const expiresAt = new Date(deadline).toISOString()
+    const request: HumanInputRequest = {
+      requestId: randomUUID(),
+      sessionId: owned.session.id,
+      targetId: this.options.target.id,
+      runtimeId: this.runtimeId,
+      workspaceId: owned.session.workspaceId,
+      nativeSessionId: params.threadId,
+      nativeTurnId: params.turnId,
+      nativeRequestId: id,
+      policyId: owned.session.intent.policy.id,
+      policyVersion: owned.session.intent.policy.version,
+      leaseGeneration: owned.leaseGeneration,
+      operationSha256: hash({
+        id: message.id,
+        method: message.method,
+        params,
+        binding: owned.session.binding,
+        policy: owned.session.intent.policy,
+        workspace: resolve(this.options.cwd),
+        generation: owned.leaseGeneration,
+        epoch,
+        approvalEpoch,
+        fingerprint: owned.session.effective.configurationFingerprint,
+      }),
+      expiresAt,
+      prompt: "Choose one option for each question.",
+      schemaId: "harness.choice-input.v1",
+      questions: params.questions.map((question, index) => ({
+        id: `q${index + 1}`,
+        optionIds: question.options!.map((_option, index) => `o${index + 1}`),
+      })),
+    }
+    const review: HumanInputReviewContent = {
+      kind: "choice-input",
+      requestId: request.requestId,
+      operationSha256: request.operationSha256,
+      questions: params.questions.map((question, index) => ({
+        id: request.questions[index]!.id,
+        header: question.header,
+        question: question.question,
+        options: question.options!.map((option, index) => ({
+          id: `o${index + 1}`,
+          label: option.label,
+          description: option.description,
+        })),
+      })),
+    }
+    const response = Promise.withResolvers<NativeReply>()
+    const pending: PendingInput = {
+      owned,
+      message: { id: message.id, method: message.method, params },
+      request,
+      params,
+      review,
+      epoch,
+      approvalEpoch,
+      delivered,
+      deciding: false,
+      reply: response.resolve,
+      timer: setTimeout(
+        () => {
+          void this.settleInput(pending, "expired")
+        },
+        Math.max(1, deadline - Date.now()),
+      ),
+    }
+    this.inputs.set(request.requestId, pending)
+    signal.addEventListener(
+      "abort",
+      () => {
+        void this.settleInput(pending, "cancelled")
+      },
+      { once: true },
+    )
+    this.emit(owned, message, { type: "input.requested", data: structuredClone(request) }, params.turnId)
+    return response.promise
+  }
+
+  private async settleInput(pending: PendingInput, outcome: "cancelled" | "expired"): Promise<void> {
+    if (this.inputs.get(pending.request.requestId) !== pending) return
+    this.inputs.delete(pending.request.requestId)
+    clearTimeout(pending.timer)
+    pending.reply({ result: { answers: {} } satisfies ToolRequestUserInputResponse })
+    this.emit(
+      pending.owned,
+      pending.message,
+      {
+        type: "input.resolved",
+        data: {
+          ...permissionBinding(pending.request),
+          outcome,
+          actorId: "codex-adapter",
+          decidedAt: new Date().toISOString(),
+        },
+      },
+      pending.request.nativeTurnId,
+    )
+    await pending.delivered.catch(() => undefined)
   }
 
   private emit(
@@ -1164,7 +1455,7 @@ function requireEnvironment(environment: Readonly<Record<string, string>>): void
     throw new Error("Conflicting native home directories")
 }
 
-function permissionBinding(request: PermissionRequest): PermissionBinding {
+function permissionBinding(request: PermissionBinding): PermissionBinding {
   return {
     requestId: request.requestId,
     sessionId: request.sessionId,

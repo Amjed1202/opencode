@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test"
+import { randomBytes } from "node:crypto"
+import { mkdtemp } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type {
   AgentEventDraft,
@@ -8,15 +11,25 @@ import type {
   PermissionDecision,
   PermissionRequest,
   SessionIntent,
+  HumanInputRequest,
+  HumanInputResponse,
 } from "@harness/protocol"
 import { AdmissionController } from "../src/admission"
 import { hashConfiguration } from "../src/environment"
 import { LocalRuntimeManager } from "../src/runtime-manager"
 import { SQLiteJournal } from "../src/journal"
-import { admissionFixture, intent, now } from "./support"
+import { EncryptedArtifactStore } from "../src/artifacts"
+import { admissionFixture, intent, now, removeFixtureDirectory } from "./support"
 
 async function fixture(sessionIntent: SessionIntent = intent) {
   const base = await admissionFixture()
+  let clock = now
+  const artifactDirectory = await mkdtemp(join(tmpdir(), "harness-review-"))
+  const artifacts = await EncryptedArtifactStore.open({
+    rootPath: artifactDirectory,
+    key: randomBytes(32),
+    now: () => clock,
+  })
   const journal = new SQLiteJournal(join(base.directory, "journal.sqlite"))
   const streams = new Map<string, EventPeer>()
   const nativeCreate = base.adapter.createSession
@@ -31,6 +44,12 @@ async function fixture(sessionIntent: SessionIntent = intent) {
       return { ...session, status: "idle" as const }
     },
     events: (session: AgentSession) => streams.get(session.id)!,
+    reviewPermission: async (_context: unknown, requestId: string) => ({
+      kind: "patch",
+      requestId,
+      operationSha256: "a".repeat(64),
+      changes: [{ path: join(base.directory, "example.txt"), kind: "add", diff: "+private patch content" }],
+    }),
     close: async (session: AgentSession) => {
       streams.get(session.id)?.finish()
     },
@@ -49,7 +68,8 @@ async function fixture(sessionIntent: SessionIntent = intent) {
     runtime: base.options.runtime,
     workspaces: base.workspaces,
     actorId: "host:user-a",
-    now: () => now,
+    now: () => clock,
+    artifacts,
   })
   const result = await admission.preflight({ operation: "create", intent: sessionIntent })
   if (result.status !== "ready") throw new Error("missing admission")
@@ -59,11 +79,17 @@ async function fixture(sessionIntent: SessionIntent = intent) {
     streams,
     journal,
     manager,
+    artifacts,
+    advance(milliseconds: number) {
+      clock += milliseconds
+    },
     admissionId: result.admissionId,
     async close() {
       await manager.dispose()
       journal.close()
+      artifacts.close()
       await base.close()
+      await removeFixtureDirectory(artifactDirectory)
     },
   }
 }
@@ -633,9 +659,14 @@ async function permissionFixture() {
   return { ...state, session, request, draft, decision, lease }
 }
 
-async function publishPermission(state: Awaited<ReturnType<typeof permissionFixture>>) {
+async function publishPermission(state: Awaited<ReturnType<typeof permissionFixture>>, review = true) {
   state.streams.get(state.session.id)!.push(state.draft)
   await waitUntil(async () => (await state.journal.permission(state.request.requestId)) !== undefined)
+  if (review)
+    state.decision = {
+      ...state.decision,
+      reviewToken: (await state.manager.reviewPermission(state.request.requestId)).reviewToken,
+    }
 }
 
 test("permission is durable before delivery and a trusted claim precedes the native reply", async () => {
@@ -907,8 +938,366 @@ test("replayed native denial and request preserve the durable audit and live str
     state.streams.get(state.session.id)!.push(completion(state.session, "turn"))
     await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "idle")
     expect(await state.journal.permission(state.request.requestId)).toEqual(first)
-    expect((await state.journal.cursor(state.session.id))?.sequence).toBe(3)
+    expect((await state.journal.cursor(state.session.id))?.sequence).toBe(4)
   } finally {
     await state.close()
   }
 })
+
+test("a file grant requires delivery of its exact protected review, and review tokens never enter the audit", async () => {
+  const state = await permissionFixture()
+  try {
+    let writes = 0
+    Object.assign(state.adapter, {
+      resolvePermission: async (context: { authorizeReply: () => void }) => {
+        context.authorizeReply()
+        writes++
+      },
+    })
+    await publishPermission(state, false)
+    await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow("review")
+    expect(writes).toBe(0)
+    expect((await state.journal.permission(state.request.requestId))?.state).toBe("pending")
+    const review = await state.manager.reviewPermission(state.request.requestId)
+    expect(JSON.stringify(review.content)).toContain("private patch content")
+    expect(review.artifact.sensitivity).toBe("restricted")
+    await state.manager.resolvePermission({ ...state.decision, reviewToken: review.reviewToken })
+    const record = (await state.journal.permission(state.request.requestId))!
+    expect(record.intent?.reviewArtifactSha256).toBe(review.artifact.sha256)
+    expect(JSON.stringify(record)).not.toContain(review.reviewToken)
+    const audit = []
+    for await (const event of state.journal.read(state.session.id)) audit.push(event)
+    expect(JSON.stringify(audit)).not.toContain("private patch content")
+    expect(JSON.stringify(audit)).not.toContain(review.reviewToken)
+    expect(JSON.stringify(audit)).toContain("interaction.reviewed")
+    expect(writes).toBe(1)
+  } finally {
+    await state.close()
+  }
+})
+
+for (const failure of ["missing-store", "bad-binding", "changed-content"] as const) {
+  test(`unavailable or invalid review (${failure}) cannot offer a file grant`, async () => {
+    const state = await permissionFixture()
+    try {
+      if (failure === "missing-store") state.artifacts.close()
+      if (failure === "bad-binding")
+        Object.assign(state.adapter, {
+          reviewPermission: async () => ({
+            kind: "patch",
+            requestId: state.request.requestId,
+            operationSha256: "f".repeat(64),
+            changes: [],
+          }),
+        })
+      if (failure === "changed-content")
+        Object.assign(state.adapter, {
+          reviewPermission: async () => ({
+            kind: "patch",
+            requestId: state.request.requestId,
+            operationSha256: state.request.operationSha256,
+            changes: [{ path: "foreign-path", kind: "add", diff: "private patch content" }],
+          }),
+        })
+      await publishPermission(state, false)
+      expect(
+        (await state.journal.permission(state.request.requestId))?.request.choices.every(
+          (choice) => choice.action === "deny",
+        ),
+      ).toBe(true)
+      await expect(state.manager.reviewPermission(state.request.requestId)).rejects.toThrow()
+      await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow()
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+async function inputFixture() {
+  const state = await permissionFixture()
+  const request: HumanInputRequest = {
+    requestId: "input-a",
+    sessionId: state.session.id,
+    runtimeId: "runtime",
+    targetId: "local",
+    workspaceId: "workspace",
+    nativeSessionId: state.session.binding.nativeSessionId,
+    nativeTurnId: "native-turn",
+    nativeRequestId: "string:question-a",
+    policyId: "policy",
+    policyVersion: "1",
+    leaseGeneration: state.lease.generation,
+    operationSha256: "b".repeat(64),
+    prompt: "Choose one option for each question.",
+    schemaId: "harness.choice-input.v1",
+    questions: [{ id: "question-a", optionIds: ["option-a", "option-b"] }],
+    expiresAt: new Date(now + 60_000).toISOString(),
+  }
+  Object.assign(state.adapter, {
+    reviewInput: async () => ({
+      kind: "choice-input",
+      requestId: request.requestId,
+      operationSha256: request.operationSha256,
+      questions: [
+        {
+          id: "question-a",
+          header: "Plan",
+          question: "Private question text",
+          options: [
+            { id: "option-a", label: "Private first label", description: "first" },
+            { id: "option-b", label: "Private second label", description: "second" },
+          ],
+        },
+      ],
+    }),
+  })
+  const draft: AgentEventDraft = {
+    ...state.draft,
+    type: "input.requested",
+    data: request,
+    origin: { ...state.draft.origin, eventId: "input-a" },
+  }
+  const response: HumanInputResponse = {
+    ...request,
+    action: "answer",
+    selections: [{ questionId: "question-a", optionId: "option-a" }],
+  }
+  return { ...state, inputRequest: request, inputDraft: draft, response }
+}
+
+async function publishInput(state: Awaited<ReturnType<typeof inputFixture>>) {
+  state.streams.get(state.session.id)!.push(state.inputDraft)
+  await waitUntil(async () => (await state.journal.input(state.inputRequest.requestId)) !== undefined)
+  await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "awaiting-input")
+}
+
+test("input choices require protected review, claim before reply, and persist only option IDs", async () => {
+  const state = await inputFixture()
+  try {
+    let writes = 0
+    Object.assign(state.adapter, {
+      resolveInput: async (context: { authorizeReply: () => void }) => {
+        expect((await state.journal.input(state.inputRequest.requestId))?.state).toBe("claimed")
+        context.authorizeReply()
+        writes++
+      },
+    })
+    await publishInput(state)
+    await expect(state.manager.resolveInput(state.response)).rejects.toThrow("review")
+    const review = await state.manager.reviewInput(state.inputRequest.requestId)
+    expect(JSON.stringify(review.content)).toContain("Private question text")
+    const response = { ...state.response, reviewToken: review.reviewToken }
+    await state.manager.resolveInput(response)
+    await state.manager.resolveInput(response)
+    const record = (await state.journal.input(state.inputRequest.requestId))!
+    expect(record.state).toBe("resolved")
+    expect(record.resolution?.outcome).toBe("answered")
+    expect(record.intent?.actorId).toBe("host:user-a")
+    expect(record.intent?.reviewArtifactSha256).toBe(review.artifact.sha256)
+    expect(JSON.stringify(record)).not.toContain("Private")
+    expect(JSON.stringify(record)).not.toContain(review.reviewToken)
+    expect(writes).toBe(1)
+    expect((await state.journal.get(state.session.id))?.status).toBe("running")
+  } finally {
+    await state.close()
+  }
+})
+
+for (const failure of ["lost-reply", "revoked-before-write"] as const) {
+  test(`input outcome stays uncertain after ${failure} and never replays`, async () => {
+    const state = await inputFixture()
+    try {
+      let writes = 0
+      Object.assign(state.adapter, {
+        resolveInput: async (context: { authorizeReply: () => void }) => {
+          if (failure === "revoked-before-write") await state.admission.invalidate("runtime", "revoked")
+          context.authorizeReply()
+          writes++
+          if (failure === "lost-reply") throw new Error("private transport failure")
+        },
+      })
+      await publishInput(state)
+      const response = {
+        ...state.response,
+        reviewToken: (await state.manager.reviewInput(state.inputRequest.requestId)).reviewToken,
+      }
+      await expect(state.manager.resolveInput(response)).rejects.toThrow("uncertain")
+      await expect(state.manager.resolveInput(response)).rejects.toThrow("uncertain")
+      expect((await state.journal.input(state.inputRequest.requestId))?.state).toBe("uncertain")
+      expect(writes).toBe(failure === "lost-reply" ? 1 : 0)
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+test("cancelling input needs no review and closing expires unanswered input without losing uncertainty", async () => {
+  const state = await inputFixture()
+  try {
+    Object.assign(state.adapter, { resolveInput: async () => {} })
+    await publishInput(state)
+    await state.manager.resolveInput({ ...state.response, action: "cancel", selections: [] })
+    expect((await state.journal.input(state.inputRequest.requestId))?.resolution?.outcome).toBe("cancelled")
+    const next: AgentEventDraft = {
+      ...state.inputDraft,
+      type: "input.requested",
+      data: { ...state.inputRequest, requestId: "input-b", nativeRequestId: "string:question-b" },
+      origin: { ...state.inputDraft.origin, eventId: "input-b" },
+    }
+    state.streams.get(state.session.id)!.push(next)
+    await waitUntil(async () => (await state.journal.input("input-b")) !== undefined)
+    await state.manager.closeSession(state.session.id)
+    expect((await state.journal.input("input-b"))?.resolution?.outcome).toBe("expired")
+    expect((await state.journal.get(state.session.id))?.status).toBe("uncertain")
+  } finally {
+    await state.close()
+  }
+})
+
+test("a review token cannot authorize another interaction and expires before the native write", async () => {
+  const state = await inputFixture()
+  try {
+    let writes = 0
+    Object.assign(state.adapter, {
+      resolveInput: async () => {
+        writes++
+      },
+    })
+    await publishPermission(state)
+    state.streams.get(state.session.id)!.push(state.inputDraft)
+    await waitUntil(async () => (await state.journal.input(state.inputRequest.requestId)) !== undefined)
+    await expect(
+      state.manager.resolveInput({ ...state.response, reviewToken: state.decision.reviewToken! }),
+    ).rejects.toThrow("review")
+    const review = await state.manager.reviewInput(state.inputRequest.requestId)
+    state.advance(60_001)
+    await expect(state.manager.resolveInput({ ...state.response, reviewToken: review.reviewToken })).rejects.toThrow(
+      "review",
+    )
+    await expect(state.manager.reviewInput(state.inputRequest.requestId)).rejects.toThrow()
+    expect((await state.journal.input(state.inputRequest.requestId))?.state).toBe("pending")
+    expect(writes).toBe(0)
+  } finally {
+    await state.close()
+  }
+})
+
+test("input with unavailable protected storage remains cancellable and never offers an answer", async () => {
+  const state = await inputFixture()
+  try {
+    let writes = 0
+    Object.assign(state.adapter, {
+      resolveInput: async (_context: unknown, response: HumanInputResponse) => {
+        expect(response.action).toBe("cancel")
+        writes++
+      },
+    })
+    state.artifacts.close()
+    await publishInput(state)
+    await expect(state.manager.reviewInput(state.inputRequest.requestId)).rejects.toThrow()
+    await expect(state.manager.resolveInput(state.response)).rejects.toThrow("review")
+    await state.manager.resolveInput({ ...state.response, action: "cancel", selections: [] })
+    expect(writes).toBe(1)
+  } finally {
+    await state.close()
+  }
+})
+
+test("revoking account authority prevents protected review disclosure", async () => {
+  const state = await inputFixture()
+  try {
+    await publishInput(state)
+    await state.admission.invalidate("runtime", "account changed")
+    await expect(state.manager.reviewInput(state.inputRequest.requestId)).rejects.toThrow()
+    const events = []
+    for await (const event of state.journal.read(state.session.id)) events.push(event)
+    expect(JSON.stringify(events)).not.toContain("interaction.reviewed")
+  } finally {
+    await state.close()
+  }
+})
+
+test("duplicate input requests and cancellations preserve the audit and active stream", async () => {
+  const state = await inputFixture()
+  try {
+    await publishInput(state)
+    const review = await state.manager.reviewInput(state.inputRequest.requestId)
+    const {
+      prompt: _prompt,
+      schemaId: _schemaId,
+      questions: _questions,
+      expiresAt: _expiresAt,
+      ...binding
+    } = state.inputRequest
+    const cancel: AgentEventDraft = {
+      ...state.inputDraft,
+      type: "input.resolved",
+      data: { ...binding, outcome: "cancelled", actorId: "native", decidedAt: new Date(now).toISOString() },
+      origin: { ...state.inputDraft.origin, eventId: "cancel" },
+    }
+    state.streams.get(state.session.id)!.push(cancel)
+    await waitUntil(async () => (await state.journal.input(state.inputRequest.requestId))?.state === "resolved")
+    const first = await state.journal.input(state.inputRequest.requestId)
+    state.streams.get(state.session.id)!.push(cancel)
+    state.streams.get(state.session.id)!.push(state.inputDraft)
+    state.streams.get(state.session.id)!.push(completion(state.session, "turn"))
+    await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "idle")
+    expect(await state.journal.input(state.inputRequest.requestId)).toEqual(first)
+    await expect(state.manager.resolveInput({ ...state.response, reviewToken: review.reviewToken })).rejects.toThrow()
+    expect((await state.journal.cursor(state.session.id))?.sequence).toBe(4)
+  } finally {
+    await state.close()
+  }
+})
+
+for (const forged of ["artifact", "source", "review-event", "answered"] as const) {
+  test(`native ${forged} cannot acquire host interaction authority`, async () => {
+    const state = await inputFixture()
+    try {
+      await publishInput(state)
+      const review = await state.manager.reviewInput(state.inputRequest.requestId)
+      const draft: AgentEventDraft =
+        forged === "review-event"
+          ? {
+              ...state.inputDraft,
+              type: "interaction.reviewed",
+              data: {
+                requestId: state.inputRequest.requestId,
+                artifactId: review.artifact.id,
+                artifactSha256: review.artifact.sha256,
+                actorId: "native",
+                reviewedAt: new Date(now).toISOString(),
+              },
+            }
+          : forged === "answered"
+            ? {
+                ...state.inputDraft,
+                type: "input.resolved",
+                data: {
+                  ...state.inputRequest,
+                  outcome: "answered",
+                  actorId: "native",
+                  decidedAt: new Date(now).toISOString(),
+                },
+              }
+            : {
+                ...state.inputDraft,
+                type: "input.requested",
+                data: {
+                  ...state.inputRequest,
+                  ...(forged === "source"
+                    ? { sourceRequestSha256: "a".repeat(64) }
+                    : { reviewArtifact: review.artifact }),
+                },
+              }
+      state.streams.get(state.session.id)!.push(draft)
+      await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "uncertain")
+      expect((await state.journal.input(state.inputRequest.requestId))?.state).toBe("pending")
+      await expect(state.manager.resolveInput({ ...state.response, reviewToken: review.reviewToken })).rejects.toThrow(
+        "review",
+      )
+    } finally {
+      await state.close()
+    }
+  })
+}

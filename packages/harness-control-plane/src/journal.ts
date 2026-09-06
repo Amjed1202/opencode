@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite"
+import { Database, type SQLQueryBindings, type Statement } from "bun:sqlite"
 import { createHash, randomUUID } from "node:crypto"
 import type {
   AgentEvent,
@@ -8,6 +8,9 @@ import type {
   EventCursor,
   EventDelivery,
   EventScope,
+  HumanInputRequest,
+  HumanInputResponse,
+  HumanInputResolution,
   PermissionBinding,
   PermissionDecision,
   PermissionRequest,
@@ -30,33 +33,41 @@ export interface PermissionRecord {
   readonly resolution?: PermissionResolution
 }
 
+/** Only bound option identifiers are retained; review tokens and native display content are never stored. */
+export interface InputRecord {
+  readonly request: HumanInputRequest
+  readonly state: "pending" | "claimed" | "resolved" | "uncertain"
+  readonly response?: HumanInputResponse
+  readonly intent?: HumanInputResolution
+  readonly resolution?: HumanInputResolution
+}
+
 export class SQLiteJournal implements EventStore, SessionStore {
   private readonly database: Database
+  private readonly statements = new Map<string, Statement<unknown, SQLQueryBindings[]>>()
 
   /** The caller supplies an application-owned database path; no runtime database is discovered or imported. */
   constructor(path: string) {
     if (!path.trim()) throw new Error("An explicit journal database path is required")
     this.database = new Database(path, { create: true, strict: true })
     try {
-      const events = this.database
-        .query<{ type: string }, []>("SELECT type FROM sqlite_master WHERE name = 'journal_events'")
-        .get()
+      const events = this.query<{ type: string }, []>(
+        "SELECT type FROM sqlite_master WHERE name = 'journal_events'",
+      ).get()
       if (
         events &&
         (events.type !== "table" ||
-          this.database
-            .query(
-              `SELECT 1 FROM journal_events
-            WHERE CASE WHEN json_valid(event) THEN json_extract(event, '$.protocolVersion') IS NOT '0.2' ELSE 1 END
+          this.query(
+            `SELECT 1 FROM journal_events
+            WHERE CASE WHEN json_valid(event) THEN json_extract(event, '$.protocolVersion') IS NOT '0.3' ELSE 1 END
             LIMIT 1`,
-            )
-            .get())
+          ).get())
       )
         throw new Error("Unsupported stored protocol")
     } catch {
       // Never rewrite an old audit trail or partially migrate schema while rejecting its protocol.
-      this.database.close()
-      throw new Error("Incompatible journal event protocol; explicit migration to protocol 0.2 is required")
+      this.close()
+      throw new Error("Incompatible journal event protocol; explicit migration to protocol 0.3 is required")
     }
     this.database.exec(`
       PRAGMA journal_mode = WAL;
@@ -67,6 +78,15 @@ export class SQLiteJournal implements EventStore, SessionStore {
         record TEXT NOT NULL,
         settled INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS journal_inputs (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        record TEXT NOT NULL,
+        scope TEXT,
+        stream_id TEXT
+      );
+      CREATE INDEX IF NOT EXISTS journal_inputs_pending ON journal_inputs (session_id, state);
       CREATE TABLE IF NOT EXISTS journal_permissions (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
@@ -128,9 +148,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
           return { created: false, record: existing }
         }
         if (record.receipt.state !== "admitted") throw new Error("A new command must be admitted")
-        this.database
-          .query("INSERT INTO journal_commands (id, record) VALUES (?, ?)")
-          .run(record.id, JSON.stringify(record))
+        this.query("INSERT INTO journal_commands (id, record) VALUES (?, ?)").run(record.id, JSON.stringify(record))
         return { created: true, record }
       })
       .immediate()
@@ -141,8 +159,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
   }
 
   async commands(sessionId: string): Promise<readonly CommandRecord[]> {
-    return this.database
-      .query<{ record: string }, []>("SELECT record FROM journal_commands ORDER BY id")
+    return this.query<{ record: string }, []>("SELECT record FROM journal_commands ORDER BY id")
       .all()
       .map((row) => JSON.parse(row.record) as CommandRecord)
       .filter((record) => record.sessionId === sessionId)
@@ -153,10 +170,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
   }
 
   async pendingPermissions(sessionId: string): Promise<readonly PermissionRecord[]> {
-    return this.database
-      .query<{ record: string }, [string]>(
-        "SELECT record FROM journal_permissions WHERE session_id = ? AND state = 'pending' ORDER BY id",
-      )
+    return this.query<{ record: string }, [string]>(
+      "SELECT record FROM journal_permissions WHERE session_id = ? AND state = 'pending' ORDER BY id",
+    )
       .all(sessionId)
       .map((row) => JSON.parse(row.record) as PermissionRecord)
   }
@@ -171,6 +187,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
     decision: PermissionDecision,
     trustedActorId: string,
     now = Date.now(),
+    reviewArtifactSha256?: string,
   ): Promise<{ created: boolean; record: PermissionRecord }> {
     const decidedAt = permissionTimestamp(now)
     if (!trustedActorId.trim()) throw new Error("A trusted permission actor is required")
@@ -190,12 +207,14 @@ export class SQLiteJournal implements EventStore, SessionStore {
         }
         if (record.state !== "pending") throw new Error("Permission request is no longer pending")
         if (Date.parse(record.request.expiresAt) <= now) throw new Error("Permission request has expired")
+        validateReviewedArtifact(record.request.reviewArtifact, reviewArtifactSha256, choice.action === "allow")
         const resolution: PermissionResolution = {
           ...permissionBinding(record.request),
           choiceId: choice.id,
           outcome: choice.action === "allow" ? "allowed" : "denied",
           actorId: trustedActorId,
           decidedAt,
+          ...(reviewArtifactSha256 === undefined ? {} : { reviewArtifactSha256 }),
         }
         const next: PermissionRecord = {
           ...record,
@@ -240,10 +259,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
     if (!trustedActorId.trim()) throw new Error("A trusted permission actor is required")
     return this.database
       .transaction(() =>
-        this.database
-          .query<{ record: string }, []>(
-            "SELECT record FROM journal_permissions WHERE state IN ('pending', 'claimed') ORDER BY id",
-          )
+        this.query<{ record: string }, []>(
+          "SELECT record FROM journal_permissions WHERE state IN ('pending', 'claimed') ORDER BY id",
+        )
           .all()
           .map((row) => {
             const record = JSON.parse(row.record) as PermissionRecord
@@ -252,15 +270,12 @@ export class SQLiteJournal implements EventStore, SessionStore {
               this.writePermission(next)
               return next
             }
-            const original = this.database
-              .query<{ scope: string }, [string]>("SELECT scope FROM journal_permission_scopes WHERE request_id = ?")
-              .get(record.request.requestId)
-            const stream = this.database
-              .query<
-                { stream_id: string },
-                [string]
-              >("SELECT stream_id FROM journal_permission_streams WHERE request_id = ?")
-              .get(record.request.requestId)
+            const original = this.query<{ scope: string }, [string]>(
+              "SELECT scope FROM journal_permission_scopes WHERE request_id = ?",
+            ).get(record.request.requestId)
+            const stream = this.query<{ stream_id: string }, [string]>(
+              "SELECT stream_id FROM journal_permission_streams WHERE request_id = ?",
+            ).get(record.request.requestId)
             this.appendEvents(stream?.stream_id ?? record.request.sessionId, [
               {
                 type: "permission.resolved",
@@ -288,6 +303,120 @@ export class SQLiteJournal implements EventStore, SessionStore {
               },
             ])
             return this.lookupPermission(record.request.requestId)!
+          }),
+      )
+      .immediate()
+  }
+
+  async input(id: string): Promise<InputRecord | undefined> {
+    return this.lookupInput(id)
+  }
+
+  async pendingInputs(sessionId: string): Promise<readonly InputRecord[]> {
+    return this.query<{ record: string }, [string]>(
+      "SELECT record FROM journal_inputs WHERE session_id = ? AND state = 'pending' ORDER BY id",
+    )
+      .all(sessionId)
+      .map((row) => JSON.parse(row.record) as InputRecord)
+  }
+
+  /** Persist the normalized intent before consuming the native handle; an exact retry cannot send twice. */
+  async claimInput(
+    response: HumanInputResponse,
+    trustedActorId: string,
+    now = Date.now(),
+    reviewArtifactSha256?: string,
+  ): Promise<{ created: boolean; record: InputRecord }> {
+    const decidedAt = permissionTimestamp(now)
+    if (!trustedActorId.trim()) throw new Error("A trusted input actor is required")
+    return this.database
+      .transaction(() => {
+        const record = this.lookupInput(response.requestId)
+        if (!record) throw new Error("Unknown input request")
+        assertPermissionBinding(record.request, response)
+        const normalized = normalizeInputResponse(record.request, response)
+        if (record.response) {
+          if (canonicalJson(record.response) !== canonicalJson(normalized))
+            throw new Error("Input conflict: request already has a different response")
+          return { created: false, record }
+        }
+        if (record.state !== "pending") throw new Error("Input request is no longer pending")
+        if (Date.parse(record.request.expiresAt) <= now) throw new Error("Input request has expired")
+        validateReviewedArtifact(record.request.reviewArtifact, reviewArtifactSha256, normalized.action === "answer")
+        const next: InputRecord = {
+          ...record,
+          state: "claimed",
+          response: normalized,
+          intent: {
+            ...permissionBinding(record.request),
+            outcome: normalized.action === "answer" ? "answered" : "cancelled",
+            actorId: trustedActorId,
+            decidedAt,
+            ...(normalized.action === "answer"
+              ? { answerSha256: createHash("sha256").update(canonicalJson(normalized.selections)).digest("hex") }
+              : {}),
+            ...(reviewArtifactSha256 === undefined ? {} : { reviewArtifactSha256 }),
+          },
+        }
+        this.writeInput(next)
+        return { created: true, record: next }
+      })
+      .immediate()
+  }
+
+  async markInputUncertain(id: string): Promise<InputRecord> {
+    return this.database
+      .transaction(() => {
+        const record = this.lookupInput(id)
+        if (!record) throw new Error("Unknown input request")
+        if (record.state === "resolved" || record.state === "uncertain") return record
+        if (record.state !== "claimed") throw new Error("Only a claimed input can become uncertain")
+        const next: InputRecord = { ...record, state: "uncertain" }
+        this.writeInput(next)
+        return next
+      })
+      .immediate()
+  }
+
+  /** Exclusive recovery expires lost native handles atomically with their replay events; it never answers. */
+  async recoverInputs(now = Date.now(), trustedActorId = "host:recovery"): Promise<readonly InputRecord[]> {
+    const decidedAt = permissionTimestamp(now)
+    if (!trustedActorId.trim()) throw new Error("A trusted input actor is required")
+    return this.database
+      .transaction(() =>
+        this.query<{ record: string; scope: string | null; stream_id: string | null }, []>(
+          "SELECT record, scope, stream_id FROM journal_inputs WHERE state IN ('pending', 'claimed') ORDER BY id",
+        )
+          .all()
+          .map((row) => {
+            const record = JSON.parse(row.record) as InputRecord
+            if (record.state === "claimed") {
+              const next: InputRecord = { ...record, state: "uncertain" }
+              this.writeInput(next)
+              return next
+            }
+            this.appendEvents(row.stream_id ?? record.request.sessionId, [
+              {
+                type: "input.resolved",
+                data: { ...permissionBinding(record.request), outcome: "expired", actorId: trustedActorId, decidedAt },
+                scope: {
+                  ...(row.scope ? (JSON.parse(row.scope) as EventScope) : {}),
+                  sessionId: record.request.sessionId,
+                  targetId: record.request.targetId,
+                  workspaceId: record.request.workspaceId,
+                  runtimeId: record.request.runtimeId,
+                  turnId: record.request.nativeTurnId,
+                },
+                origin: {
+                  streamId: `host:inputs:${record.request.sessionId}`,
+                  epoch: "1",
+                  eventId: `${record.request.requestId}:expired`,
+                  identityStrategy: "adapter-assigned",
+                },
+                observedAt: decidedAt,
+              },
+            ])
+            return this.lookupInput(record.request.requestId)!
           }),
       )
       .immediate()
@@ -323,7 +452,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
       .transaction(() => {
         const record = this.lookupCommand(id)
         if (record?.receipt.state !== "dispatched") throw new Error("Only a dispatched command can be completed")
-        this.database.query("UPDATE journal_commands SET settled = 1 WHERE id = ?").run(id)
+        this.query("UPDATE journal_commands SET settled = 1 WHERE id = ?").run(id)
       })
       .immediate()
   }
@@ -331,7 +460,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
   /** Distinguishes a durable successful create/resume result from an unresolved dispatch marker. */
   async isComplete(id: string): Promise<boolean> {
     return (
-      this.database.query<{ settled: number }, [string]>("SELECT settled FROM journal_commands WHERE id = ?").get(id)
+      this.query<{ settled: number }, [string]>("SELECT settled FROM journal_commands WHERE id = ?").get(id)
         ?.settled === 1
     )
   }
@@ -340,8 +469,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
   async recoverPending(): Promise<readonly CommandRecord[]> {
     return this.database
       .transaction(() => {
-        const pending = this.database
-          .query<{ record: string }, []>("SELECT record FROM journal_commands WHERE settled = 0 ORDER BY id")
+        const pending = this.query<{ record: string }, []>(
+          "SELECT record FROM journal_commands WHERE settled = 0 ORDER BY id",
+        )
           .all()
           .map((row) => JSON.parse(row.record) as CommandRecord)
           .filter((record) => record.receipt.state === "admitted" || record.receipt.state === "dispatched")
@@ -361,16 +491,22 @@ export class SQLiteJournal implements EventStore, SessionStore {
   async recoverActiveSessions(): Promise<readonly AgentSession[]> {
     return this.database
       .transaction(() => {
-        const active = this.database
-          .query<{ session: string }, []>("SELECT session FROM journal_sessions ORDER BY id")
+        const active = this.query<{ session: string }, []>("SELECT session FROM journal_sessions ORDER BY id")
           .all()
           .map((row) => JSON.parse(row.session) as AgentSession)
-          .filter((session) => session.status === "running" || session.status === "awaiting-permission")
+          .filter(
+            (session) =>
+              session.status === "running" ||
+              session.status === "awaiting-permission" ||
+              session.status === "awaiting-input",
+          )
         return active.map((session): AgentSession => {
           const recovered: AgentSession = { ...session, status: "uncertain", revision: session.revision + 1 }
-          this.database
-            .query("UPDATE journal_sessions SET revision = ?, session = ? WHERE id = ?")
-            .run(recovered.revision, JSON.stringify(recovered), recovered.id)
+          this.query("UPDATE journal_sessions SET revision = ?, session = ? WHERE id = ?").run(
+            recovered.revision,
+            JSON.stringify(recovered),
+            recovered.id,
+          )
           return recovered
         })
       })
@@ -378,15 +514,14 @@ export class SQLiteJournal implements EventStore, SessionStore {
   }
 
   async get(id: string): Promise<AgentSession | undefined> {
-    const row = this.database
-      .query<{ session: string }, [string]>("SELECT session FROM journal_sessions WHERE id = ?")
-      .get(id)
+    const row = this.query<{ session: string }, [string]>("SELECT session FROM journal_sessions WHERE id = ?").get(id)
     return row ? (JSON.parse(row.session) as AgentSession) : undefined
   }
 
   async list(workspaceId: string): Promise<readonly AgentSession[]> {
-    return this.database
-      .query<{ session: string }, [string]>("SELECT session FROM journal_sessions WHERE workspace_id = ? ORDER BY id")
+    return this.query<{ session: string }, [string]>(
+      "SELECT session FROM journal_sessions WHERE workspace_id = ? ORDER BY id",
+    )
       .all(workspaceId)
       .map((row) => JSON.parse(row.session) as AgentSession)
   }
@@ -402,17 +537,15 @@ export class SQLiteJournal implements EventStore, SessionStore {
     }
     this.database
       .transaction(() => {
-        const existing = this.database
-          .query<{ revision: number }, [string]>("SELECT revision FROM journal_sessions WHERE id = ?")
-          .get(session.id)
+        const existing = this.query<{ revision: number }, [string]>(
+          "SELECT revision FROM journal_sessions WHERE id = ?",
+        ).get(session.id)
         if (expectedRevision === null ? existing !== null : existing?.revision !== expectedRevision)
           throw new Error("Session revision conflict")
-        this.database
-          .query(
-            `INSERT INTO journal_sessions (id, workspace_id, revision, session) VALUES (?, ?, ?, ?)
+        this.query(
+          `INSERT INTO journal_sessions (id, workspace_id, revision, session) VALUES (?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET workspace_id = excluded.workspace_id, revision = excluded.revision, session = excluded.session`,
-          )
-          .run(session.id, session.workspaceId, session.revision, JSON.stringify(session))
+        ).run(session.id, session.workspaceId, session.revision, JSON.stringify(session))
       })
       .immediate()
   }
@@ -436,22 +569,29 @@ export class SQLiteJournal implements EventStore, SessionStore {
     const appended = drafts.flatMap((draft) => {
       validateOrigin(draft)
       const content = createHash("sha256").update(canonicalJson(draft)).digest("hex")
-      const existing = this.database
-        .query<
-          { host_stream_id: string; content: string },
-          [string, string, string]
-        >("SELECT host_stream_id, content FROM journal_origins WHERE stream_id = ? AND epoch = ? AND event_id = ?")
-        .get(draft.origin.streamId, draft.origin.epoch, draft.origin.eventId)
+      const existing = this.query<{ host_stream_id: string; content: string }, [string, string, string]>(
+        "SELECT host_stream_id, content FROM journal_origins WHERE stream_id = ? AND epoch = ? AND event_id = ?",
+      ).get(draft.origin.streamId, draft.origin.epoch, draft.origin.eventId)
       if (existing) {
         if (existing.host_stream_id !== streamId || existing.content !== content)
           throw new Error("Origin conflict: source identity has different content or host stream")
         return []
       }
-      if (draft.type === "permission.requested" || draft.type === "permission.resolved") {
-        const original = this.database
-          .query<{ scope: string }, [string]>("SELECT scope FROM journal_permission_scopes WHERE request_id = ?")
-          .get(draft.data.requestId)
-        const scope = original ? (JSON.parse(original.scope) as EventScope) : undefined
+      if (
+        draft.type === "permission.requested" ||
+        draft.type === "permission.resolved" ||
+        draft.type === "input.requested" ||
+        draft.type === "input.resolved"
+      ) {
+        const original =
+          draft.type === "input.requested" || draft.type === "input.resolved"
+            ? this.query<{ scope: string | null }, [string]>("SELECT scope FROM journal_inputs WHERE id = ?").get(
+                draft.data.requestId,
+              )
+            : this.query<{ scope: string }, [string]>(
+                "SELECT scope FROM journal_permission_scopes WHERE request_id = ?",
+              ).get(draft.data.requestId)
+        const scope = original?.scope ? (JSON.parse(original.scope) as EventScope) : undefined
         if (
           draft.scope.sessionId !== draft.data.sessionId ||
           draft.scope.targetId !== draft.data.targetId ||
@@ -465,42 +605,53 @@ export class SQLiteJournal implements EventStore, SessionStore {
                 scope[key as keyof EventScope] !== undefined &&
                 value !== scope[key as keyof EventScope],
             )) ||
-          (draft.type === "permission.resolved" &&
+          ((draft.type === "permission.resolved" || draft.type === "input.resolved") &&
             draft.scope.commandId !== undefined &&
             draft.scope.commandId !== scope?.commandId)
         )
-          throw new Error("Permission event scope mismatch")
+          throw new Error("Permission or input event scope mismatch")
         if (draft.type === "permission.requested") {
           this.writePermissionRequest(draft.data)
-          this.database
-            .query("INSERT OR IGNORE INTO journal_permission_scopes (request_id, scope) VALUES (?, ?)")
-            .run(draft.data.requestId, JSON.stringify(draft.scope))
-          this.database
-            .query("INSERT OR IGNORE INTO journal_permission_streams (request_id, stream_id) VALUES (?, ?)")
-            .run(draft.data.requestId, streamId)
+          this.query("INSERT OR IGNORE INTO journal_permission_scopes (request_id, scope) VALUES (?, ?)").run(
+            draft.data.requestId,
+            JSON.stringify(draft.scope),
+          )
+          this.query("INSERT OR IGNORE INTO journal_permission_streams (request_id, stream_id) VALUES (?, ?)").run(
+            draft.data.requestId,
+            streamId,
+          )
         }
         if (draft.type === "permission.resolved") this.writePermissionResolution(draft.data)
+        if (draft.type === "input.requested") {
+          this.writeInputRequest(draft.data)
+          this.query(
+            "UPDATE journal_inputs SET scope = COALESCE(scope, ?), stream_id = COALESCE(stream_id, ?) WHERE id = ?",
+          ).run(JSON.stringify(draft.scope), streamId, draft.data.requestId)
+        }
+        if (draft.type === "input.resolved") this.writeInputResolution(draft.data)
       }
-      this.database.query("INSERT OR IGNORE INTO journal_streams (id, epoch) VALUES (?, ?)").run(streamId, randomUUID())
+      this.query("INSERT OR IGNORE INTO journal_streams (id, epoch) VALUES (?, ?)").run(streamId, randomUUID())
       const stream = this.lookupStream(streamId)!
       if (!Number.isSafeInteger(stream.last_sequence + 1)) throw new Error("Host stream sequence exhausted")
       const event: AgentEvent = {
         ...draft,
-        protocolVersion: "0.2",
+        protocolVersion: "0.3",
         id: randomUUID(),
         streamId,
         epoch: stream.epoch,
         sequence: stream.last_sequence + 1,
       }
-      this.database
-        .query(
-          "INSERT INTO journal_origins (stream_id, epoch, event_id, host_stream_id, content) VALUES (?, ?, ?, ?, ?)",
-        )
-        .run(draft.origin.streamId, draft.origin.epoch, draft.origin.eventId, streamId, content)
-      this.database
-        .query("INSERT INTO journal_events (id, stream_id, epoch, sequence, event) VALUES (?, ?, ?, ?, ?)")
-        .run(event.id, streamId, event.epoch, event.sequence, JSON.stringify(event))
-      this.database.query("UPDATE journal_streams SET last_sequence = ? WHERE id = ?").run(event.sequence, streamId)
+      this.query(
+        "INSERT INTO journal_origins (stream_id, epoch, event_id, host_stream_id, content) VALUES (?, ?, ?, ?, ?)",
+      ).run(draft.origin.streamId, draft.origin.epoch, draft.origin.eventId, streamId, content)
+      this.query("INSERT INTO journal_events (id, stream_id, epoch, sequence, event) VALUES (?, ?, ?, ?, ?)").run(
+        event.id,
+        streamId,
+        event.epoch,
+        event.sequence,
+        JSON.stringify(event),
+      )
+      this.query("UPDATE journal_streams SET last_sequence = ? WHERE id = ?").run(event.sequence, streamId)
       return [event]
     })
     drafts.forEach((draft) => {
@@ -524,7 +675,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
         },
         [draft],
       )
-      this.database.query("UPDATE journal_commands SET settled = 1 WHERE id = ?").run(record.id)
+      this.query("UPDATE journal_commands SET settled = 1 WHERE id = ?").run(record.id)
     })
     return appended
   }
@@ -535,12 +686,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
       const stream = this.lookupStream(streamId)
       if (after) validateCursor(streamId, stream, after)
       if (!stream) return []
-      const retention = this.database
-        .query<
-          { through_sequence: number; snapshot: string },
-          [string]
-        >("SELECT through_sequence, snapshot FROM journal_retention WHERE stream_id = ?")
-        .get(streamId)
+      const retention = this.query<{ through_sequence: number; snapshot: string }, [string]>(
+        "SELECT through_sequence, snapshot FROM journal_retention WHERE stream_id = ?",
+      ).get(streamId)
       if (retention && (after?.sequence ?? 0) < retention.through_sequence) {
         return [
           {
@@ -554,10 +702,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
           } satisfies EventDelivery,
         ]
       }
-      return this.database
-        .query<{ event: string }, [string, string, number]>(
-          "SELECT event FROM journal_events WHERE stream_id = ? AND epoch = ? AND sequence > ? ORDER BY sequence",
-        )
+      return this.query<{ event: string }, [string, string, number]>(
+        "SELECT event FROM journal_events WHERE stream_id = ? AND epoch = ? AND sequence > ? ORDER BY sequence",
+      )
         .all(streamId, stream.epoch, after?.sequence ?? 0)
         .map((row): EventDelivery => ({ kind: "event", event: JSON.parse(row.event) as AgentEvent }))
     })()
@@ -582,53 +729,120 @@ export class SQLiteJournal implements EventStore, SessionStore {
     this.database
       .transaction(() => {
         validateCursor(streamId, this.lookupStream(streamId), through)
-        const existing = this.database
-          .query<
-            { through_sequence: number },
-            [string]
-          >("SELECT through_sequence FROM journal_retention WHERE stream_id = ?")
-          .get(streamId)
+        const existing = this.query<{ through_sequence: number }, [string]>(
+          "SELECT through_sequence FROM journal_retention WHERE stream_id = ?",
+        ).get(streamId)
         if (existing && through.sequence < existing.through_sequence)
           throw new Error("Retention cursor cannot move backward")
-        this.database
-          .query(
-            `INSERT INTO journal_retention (stream_id, through_sequence, snapshot) VALUES (?, ?, ?)
+        this.query(
+          `INSERT INTO journal_retention (stream_id, through_sequence, snapshot) VALUES (?, ?, ?)
         ON CONFLICT (stream_id) DO UPDATE SET through_sequence = excluded.through_sequence, snapshot = excluded.snapshot`,
-          )
-          .run(streamId, through.sequence, JSON.stringify(snapshot))
-        this.database
-          .query("DELETE FROM journal_events WHERE stream_id = ? AND epoch = ? AND sequence <= ?")
-          .run(streamId, through.epoch, through.sequence)
+        ).run(streamId, through.sequence, JSON.stringify(snapshot))
+        this.query("DELETE FROM journal_events WHERE stream_id = ? AND epoch = ? AND sequence <= ?").run(
+          streamId,
+          through.epoch,
+          through.sequence,
+        )
         // Keep compact origin hashes: replaying pruned output must not mint fresh host events.
       })
       .immediate()
   }
 
   close() {
-    this.database.close()
+    // Bun 1.3.14's query cache evicts after 20 statements without finalizing them. Own every
+    // static query so close never leaves a SQLite zombie connection waiting for garbage collection.
+    for (const statement of this.statements.values()) statement.finalize()
+    this.statements.clear()
+    this.database.close(true)
+  }
+
+  private query<Row = unknown, Parameters extends SQLQueryBindings[] = SQLQueryBindings[]>(sql: string) {
+    const existing = this.statements.get(sql)
+    if (existing) return existing as Statement<Row, Parameters>
+    const statement = this.database.prepare<Row, Parameters>(sql)
+    this.statements.set(sql, statement as Statement<unknown, SQLQueryBindings[]>)
+    return statement
   }
 
   private lookupCommand(id: string): CommandRecord | undefined {
-    const row = this.database
-      .query<{ record: string }, [string]>("SELECT record FROM journal_commands WHERE id = ?")
-      .get(id)
+    const row = this.query<{ record: string }, [string]>("SELECT record FROM journal_commands WHERE id = ?").get(id)
     return row ? (JSON.parse(row.record) as CommandRecord) : undefined
   }
 
   private lookupPermission(id: string): PermissionRecord | undefined {
-    const row = this.database
-      .query<{ record: string }, [string]>("SELECT record FROM journal_permissions WHERE id = ?")
-      .get(id)
+    const row = this.query<{ record: string }, [string]>("SELECT record FROM journal_permissions WHERE id = ?").get(id)
     return row ? (JSON.parse(row.record) as PermissionRecord) : undefined
   }
 
+  private lookupInput(id: string): InputRecord | undefined {
+    const row = this.query<{ record: string }, [string]>("SELECT record FROM journal_inputs WHERE id = ?").get(id)
+    return row ? (JSON.parse(row.record) as InputRecord) : undefined
+  }
+
+  private writeInput(record: InputRecord) {
+    this.query(
+      `INSERT INTO journal_inputs (id, session_id, state, record) VALUES (?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET state = excluded.state, record = excluded.record`,
+    ).run(record.request.requestId, record.request.sessionId, record.state, JSON.stringify(record))
+  }
+
+  private writeInputRequest(request: HumanInputRequest) {
+    validateInputRequest(request)
+    const existing = this.lookupInput(request.requestId)
+    if (existing) {
+      if (canonicalJson(existing.request) !== canonicalJson(request))
+        throw new Error("Input conflict: ID is already bound to a different request")
+      return
+    }
+    this.writeInput({ request: structuredClone(request), state: "pending" })
+  }
+
+  private writeInputResolution(resolution: HumanInputResolution) {
+    const record = this.lookupInput(resolution.requestId)
+    if (!record) throw new Error("Unknown input request")
+    assertPermissionBinding(record.request, resolution)
+    if (
+      !resolution.actorId?.trim() ||
+      !Number.isFinite(Date.parse(resolution.decidedAt)) ||
+      !["answered", "cancelled", "expired"].includes(resolution.outcome) ||
+      Object.keys(resolution).some(
+        (key) =>
+          ![
+            ...Object.keys(permissionBinding(resolution)),
+            "outcome",
+            "actorId",
+            "decidedAt",
+            "answerSha256",
+            "reviewArtifactSha256",
+          ].includes(key),
+      ) ||
+      (resolution.answerSha256 !== undefined &&
+        (!/^[a-f0-9]{64}$/i.test(resolution.answerSha256) || resolution.outcome !== "answered"))
+    )
+      throw new Error("Invalid input resolution")
+    validateReviewedArtifact(record.request.reviewArtifact, resolution.reviewArtifactSha256, false)
+    if (
+      resolution.outcome === "answered" &&
+      (!record.intent ||
+        canonicalJson(record.intent) !== canonicalJson(resolution) ||
+        record.state === "pending" ||
+        (record.resolution && record.resolution.outcome !== "answered") ||
+        Date.parse(resolution.decidedAt) >= Date.parse(record.request.expiresAt))
+    )
+      throw new Error("Input answer has no matching live host intent")
+    if (record.state === "resolved" && record.resolution?.outcome !== "answered") {
+      if (canonicalJson(record.resolution) !== canonicalJson(resolution))
+        throw new Error("Input conflict: terminal cancellation or expiry cannot be replaced")
+      return
+    }
+    this.writeInput({ ...record, state: "resolved", resolution: structuredClone(resolution) })
+  }
+
   private writePermission(record: PermissionRecord) {
-    this.database
-      .query(
-        `INSERT INTO journal_permissions (id, session_id, state, record) VALUES (?, ?, ?, ?)
+    this.query(
+      `INSERT INTO journal_permissions (id, session_id, state, record) VALUES (?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET state = excluded.state, record = excluded.record`,
-      )
-      .run(record.request.requestId, record.request.sessionId, record.state, JSON.stringify(record))
+    ).run(record.request.requestId, record.request.sessionId, record.state, JSON.stringify(record))
   }
 
   private writePermissionRequest(request: PermissionRequest): { created: boolean; record: PermissionRecord } {
@@ -654,6 +868,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
       !["allowed", "denied", "expired"].includes(resolution.outcome)
     )
       throw new Error("Invalid permission resolution")
+    validateReviewedArtifact(record.request.reviewArtifact, resolution.reviewArtifactSha256, false)
     const choice = record.request.choices.find((choice) => choice.id === resolution.choiceId)
     if (
       resolution.choiceId !== undefined &&
@@ -681,9 +896,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
   }
 
   private lookupStream(id: string) {
-    return this.database
-      .query<StreamRow, [string]>("SELECT id, epoch, last_sequence FROM journal_streams WHERE id = ?")
-      .get(id)
+    return this.query<StreamRow, [string]>("SELECT id, epoch, last_sequence FROM journal_streams WHERE id = ?").get(id)
   }
 
   private writeCommand(record: CommandRecord, drafts: readonly AgentEventDraft[]) {
@@ -691,9 +904,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
     const existing = this.lookupCommand(record.id)
     if (!existing) {
       if (record.receipt.state !== "admitted") throw new Error("A new command must be admitted")
-      this.database
-        .query("INSERT INTO journal_commands (id, record) VALUES (?, ?)")
-        .run(record.id, JSON.stringify(record))
+      this.query("INSERT INTO journal_commands (id, record) VALUES (?, ?)").run(record.id, JSON.stringify(record))
       return
     }
     assertCommandIdentity(existing, record)
@@ -702,9 +913,9 @@ export class SQLiteJournal implements EventStore, SessionStore {
     }
     const before = existing.receipt.state
     const after = record.receipt.state
-    const settled = this.database
-      .query<{ settled: number }, [string]>("SELECT settled FROM journal_commands WHERE id = ?")
-      .get(record.id)!.settled
+    const settled = this.query<{ settled: number }, [string]>("SELECT settled FROM journal_commands WHERE id = ?").get(
+      record.id,
+    )!.settled
     if (settled && before !== after) throw new Error("A settled command receipt cannot regress")
     const allowed =
       before === after ||
@@ -712,7 +923,7 @@ export class SQLiteJournal implements EventStore, SessionStore {
       (before === "dispatched" && after === "uncertain") ||
       (before === "uncertain" && after === "dispatched" && drafts.some((draft) => isCompletion(record, draft)))
     if (!allowed) throw new Error("Invalid command receipt transition")
-    this.database.query("UPDATE journal_commands SET record = ? WHERE id = ?").run(JSON.stringify(record), record.id)
+    this.query("UPDATE journal_commands SET record = ? WHERE id = ?").run(JSON.stringify(record), record.id)
   }
 }
 
@@ -751,7 +962,7 @@ function permissionBinding(value: PermissionBinding): PermissionBinding {
   }
 }
 
-function assertPermissionBinding(request: PermissionRequest, candidate: PermissionBinding) {
+function assertPermissionBinding(request: PermissionBinding, candidate: PermissionBinding) {
   if (canonicalJson(permissionBinding(request)) !== canonicalJson(permissionBinding(candidate)))
     throw new Error("Permission binding mismatch")
 }
@@ -774,6 +985,8 @@ function validatePermissionRequest(request: PermissionRequest) {
     !Number.isSafeInteger(request.leaseGeneration) ||
     request.leaseGeneration < 0 ||
     !/^[a-f0-9]{64}$/i.test(request.operationSha256) ||
+    (request.sourceRequestSha256 !== undefined &&
+      (typeof request.sourceRequestSha256 !== "string" || !/^[a-f0-9]{64}$/.test(request.sourceRequestSha256))) ||
     !Number.isFinite(Date.parse(request.expiresAt)) ||
     !Array.isArray(request.resources) ||
     request.resources.some((resource) => typeof resource !== "string") ||
@@ -791,6 +1004,121 @@ function validatePermissionRequest(request: PermissionRequest) {
   )
     throw new Error("Invalid permission request")
   canonicalJson(request)
+  validateReviewArtifact(request.reviewArtifact)
+}
+
+function validateReviewArtifact(artifact: ArtifactReference | undefined) {
+  if (artifact === undefined) return
+  if (
+    !artifact ||
+    typeof artifact.id !== "string" ||
+    !artifact.id.trim() ||
+    artifact.id.length > 256 ||
+    artifact.sensitivity !== "restricted" ||
+    !/^[a-f0-9]{64}$/i.test(artifact.sha256) ||
+    typeof artifact.mediaType !== "string" ||
+    !artifact.mediaType ||
+    artifact.mediaType.length > 128 ||
+    !Number.isSafeInteger(artifact.sizeBytes) ||
+    artifact.sizeBytes < 0 ||
+    Object.keys(artifact).some((key) => !["id", "sha256", "mediaType", "sizeBytes", "sensitivity"].includes(key))
+  )
+    throw new Error("Invalid restricted review artifact")
+}
+
+function validateReviewedArtifact(
+  artifact: ArtifactReference | undefined,
+  sha256: string | undefined,
+  required: boolean,
+) {
+  if (
+    (required && artifact && sha256 === undefined) ||
+    (sha256 !== undefined && (!/^[a-f0-9]{64}$/i.test(sha256) || artifact?.sha256 !== sha256))
+  )
+    throw new Error("Reviewed artifact does not match the bound request")
+}
+
+function validateInputRequest(request: HumanInputRequest) {
+  const binding = permissionBinding(request)
+  if (
+    Object.entries(binding).some(([key, value]) =>
+      key === "leaseGeneration"
+        ? !Number.isSafeInteger(value) || Number(value) < 0
+        : typeof value !== "string" || !value.trim(),
+    ) ||
+    !/^[a-f0-9]{64}$/i.test(request.operationSha256) ||
+    (request.sourceRequestSha256 !== undefined &&
+      (typeof request.sourceRequestSha256 !== "string" || !/^[a-f0-9]{64}$/.test(request.sourceRequestSha256))) ||
+    request.prompt !== "Choose one option for each question." ||
+    request.schemaId !== "harness.choice-input.v1" ||
+    !Number.isFinite(Date.parse(request.expiresAt)) ||
+    Object.keys(request).some(
+      (key) =>
+        ![
+          ...Object.keys(binding),
+          "prompt",
+          "schemaId",
+          "questions",
+          "expiresAt",
+          "reviewArtifact",
+          "sourceRequestSha256",
+        ].includes(key),
+    ) ||
+    !Array.isArray(request.questions) ||
+    request.questions.length < 1 ||
+    request.questions.length > 3 ||
+    Array.from(request.questions).some(
+      (question) =>
+        !question ||
+        Object.keys(question).some((key) => !["id", "optionIds"].includes(key)) ||
+        !inputIdentifier(question.id) ||
+        !Array.isArray(question.optionIds) ||
+        question.optionIds.length < 2 ||
+        question.optionIds.length > 8 ||
+        Array.from(question.optionIds).some((id: unknown) => !inputIdentifier(id)) ||
+        new Set(question.optionIds).size !== question.optionIds.length,
+    ) ||
+    new Set(request.questions.map((question) => question.id)).size !== request.questions.length
+  )
+    throw new Error("Invalid option-only input request")
+  validateReviewArtifact(request.reviewArtifact)
+  canonicalJson(request)
+}
+
+function normalizeInputResponse(request: HumanInputRequest, response: HumanInputResponse): HumanInputResponse {
+  if (
+    !Array.isArray(response.selections) ||
+    !["answer", "cancel"].includes(response.action) ||
+    Array.from(response.selections).some(
+      (selection) =>
+        !selection ||
+        Object.keys(selection).some((key) => !["questionId", "optionId"].includes(key)) ||
+        !inputIdentifier(selection.questionId) ||
+        !inputIdentifier(selection.optionId),
+    ) ||
+    (response.action === "cancel" && response.selections.length !== 0) ||
+    (response.action === "answer" &&
+      (response.selections.length !== request.questions.length ||
+        new Set(response.selections.map((selection) => selection.questionId)).size !== request.questions.length ||
+        response.selections.some(
+          (selection) =>
+            !request.questions
+              .find((question) => question.id === selection.questionId)
+              ?.optionIds.includes(selection.optionId),
+        )))
+  )
+    throw new Error("Input response must select exactly one offered option per question, or cancel with no selections")
+  return {
+    ...permissionBinding(request),
+    action: response.action,
+    selections: response.selections
+      .map((selection) => ({ questionId: selection.questionId, optionId: selection.optionId }))
+      .sort((left, right) => (left.questionId < right.questionId ? -1 : left.questionId > right.questionId ? 1 : 0)),
+  }
+}
+
+function inputIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value)
 }
 
 function permissionTimestamp(now: number) {

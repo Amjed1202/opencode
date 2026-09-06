@@ -1,4 +1,4 @@
-import type { JsonValue, Timestamp } from "./common"
+import type { ArtifactReference, JsonValue, Timestamp } from "./common"
 
 export interface ExecutionPolicy {
   readonly id: string
@@ -48,11 +48,16 @@ export interface PermissionRequest extends PermissionBinding {
   readonly details: JsonValue
   readonly choices: readonly PermissionChoice[]
   readonly expiresAt: Timestamp
+  readonly reviewArtifact?: ArtifactReference
+  /** Assigned by the host before adding protected review metadata. */
+  readonly sourceRequestSha256?: string
 }
 
 /** Host resolves only choices offered by the still-current bound request. */
 export interface PermissionDecision extends PermissionBinding {
   readonly choiceId: string
+  /** Ephemeral host review capability. Never persisted in audit records. */
+  readonly reviewToken?: string
 }
 
 /** Actor and timestamp are assigned by the authenticated host, never by the renderer. */
@@ -61,20 +66,60 @@ export interface PermissionResolution extends PermissionBinding {
   readonly choiceId?: string
   readonly actorId: string
   readonly decidedAt: Timestamp
+  readonly reviewArtifactSha256?: string
 }
 
-export interface HumanInputRequest {
-  readonly requestId: string
-  readonly sessionId: string
-  readonly targetId: string
-  readonly prompt: string
-  readonly schemaId?: string
+export interface HumanInputRequest extends PermissionBinding {
+  readonly prompt: "Choose one option for each question."
+  readonly schemaId: "harness.choice-input.v1"
+  readonly questions: readonly { readonly id: string; readonly optionIds: readonly string[] }[]
   readonly expiresAt: Timestamp
+  readonly reviewArtifact?: ArtifactReference
+  readonly sourceRequestSha256?: string
 }
 
-export interface HumanInputResponse {
+export interface HumanInputResponse extends PermissionBinding {
+  readonly action: "answer" | "cancel"
+  readonly selections: readonly { readonly questionId: string; readonly optionId: string }[]
+  readonly reviewToken?: string
+}
+
+export interface HumanInputResolution extends PermissionBinding {
+  readonly outcome: "answered" | "cancelled" | "expired"
+  readonly actorId: string
+  readonly decidedAt: Timestamp
+  readonly answerSha256?: string
+  readonly reviewArtifactSha256?: string
+}
+
+/** Restricted display content, fetched only through a host-authorized review path. */
+export interface PermissionReviewContent {
+  readonly kind: "patch"
   readonly requestId: string
-  readonly sessionId: string
-  readonly targetId: string
-  readonly value: JsonValue
+  readonly operationSha256: string
+  readonly changes: readonly {
+    readonly path: string
+    readonly kind: "add" | "delete" | "update"
+    readonly diff: string
+    readonly movePath?: string
+  }[]
+}
+
+export interface HumanInputReviewContent {
+  readonly kind: "choice-input"
+  readonly requestId: string
+  readonly operationSha256: string
+  readonly questions: readonly {
+    readonly id: string
+    readonly header: string
+    readonly question: string
+    readonly options: readonly { readonly id: string; readonly label: string; readonly description: string }[]
+  }[]
+}
+
+export interface InteractionReview {
+  readonly artifact: ArtifactReference
+  readonly content: PermissionReviewContent | HumanInputReviewContent
+  readonly reviewToken: string
+  readonly expiresAt: Timestamp
 }

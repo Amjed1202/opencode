@@ -39,6 +39,8 @@ export interface ScopedBillingConsent {
 }
 
 export interface AdmissionWorkspaces {
+  /** Permanently exclude host-owned storage from all current and future workspace roots. */
+  reservePrivateRoot(rootPath: string): void
   get(id: string): Promise<WorkspaceDescriptor | undefined>
   lease(workspaceId: string, ownerId: string, mode: "read" | "write"): Promise<WorkspaceLease>
   valid(lease: WorkspaceLease): Promise<boolean>

@@ -1,6 +1,6 @@
 # Harness security architecture
 
-Status: proposed design, 2026-09-06. Harness is a provisional codename. This stage adds contracts only; none of the enforcement described below is implemented. The original OpenCode policy is preserved after this section and applies to upstream OpenCode, not to new Harness security guarantees or reporting ownership.
+Status: host admission, bound native interactions and encrypted review storage are implemented and tested with local fixtures, 2026-09-06. OS sandbox enforcement, authenticated desktop/node transport and vault provisioning remain acceptance work; see [the exact implemented scope](M1A_IMPLEMENTATION.md). Harness is a provisional codename. The original OpenCode policy is preserved after this section and applies to upstream OpenCode, not to new Harness security guarantees or reporting ownership.
 
 ## Boundaries and authority
 
@@ -10,6 +10,8 @@ Advertised capabilities describe support, not authority. Record enforcement stre
 
 Permission decisions bind to session, node identity, native request ID, immutable operation digest, policy revision, expiry, and allowed decision scope. Reject stale, conflicting, replayed, or changed requests. Pending requests remain denied/blocked on timeout or disconnection. Audit actor, decision, scope, and outcome.
 
+The local Codex host limits grants to observed once-only workspace file changes. Commands, network and session/workspace expansions remain deny-only. Fixed-choice input uses the same full binding, claim-before-reply journal and final host authorization callback at the actual stdio write boundary. Only one to three blocking nonsecret questions with two to eight fixed options are supported; free-form, secret, nonblocking and malformed requests are cancelled. Native callback cleanup invalidates a pending request without a late reply. Nothing in answering a question widens the separate execution policy, and native extension isolation remains checked.
+
 Resolve filesystem paths on the execution host, including symlinks, Windows reparse points, case rules, UNC paths, and race conditions. Cwd and path-prefix checks alone are insufficient isolation. Shell scripts, package managers, Git hooks, and MCP can mutate files or access networks even when edit tools are hidden. Read-only review requires the enforceable boundaries in [COLLABORATION.md](COLLABORATION.md). Claude SDK permission callbacks are not a universal intercept; the documented permission ordering must inform its adapter. [Claude SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions)
 
 ## Authentication, billing, and secrets
@@ -18,7 +20,11 @@ Subscription is the preferred intent; automatic paid API fallback defaults to di
 
 Compile provider-specific minimum launch environments. Do not inherit unrelated API keys, bearer tokens, endpoint overrides, cloud-provider flags, or profile/home overrides. Inspect supported effective configuration because helpers/settings can supersede environment choices; block conflicts without modifying user-global authentication. Do not use inference as a billing probe. Native login remains native-owned; no browser cookies, token copying, private endpoint reproduction, or application-owned subscription OAuth. Claude's unmodified-binary route and restricted SDK route remain distinct implementation gates. [Claude authentication](https://code.claude.com/docs/en/authentication), [Claude legal conditions](https://code.claude.com/docs/en/legal-and-compliance)
 
-Our own secrets use OS secure storage where available; persistence holds opaque references. Native credentials remain with the runtime and execution host. An unavailable secure store does not justify plaintext fallback. Auth exchanges never enter ordinary events. Apply field redaction before persistence/export; raw native diagnostics require explicit retention policy and protected artifacts. Local audit provides traceability, not tamper-proof evidence against the host owner. Retention/deletion covers SQLite, artifacts, indexes, exports, and backups.
+Future API/node secrets require OS secure storage and opaque persistence references; OS vault integration and key provisioning are not implemented. Native credentials remain with the runtime and execution host. An unavailable secure store does not justify plaintext fallback. Auth exchanges never enter ordinary events. Apply field redaction before persistence/export; raw native diagnostics require explicit retention policy and protected artifacts. Local audit provides traceability, not tamper-proof evidence against the host owner. Retention/deletion covers SQLite, artifacts, indexes, exports, and backups.
+
+Implemented review storage encrypts patch and question display content with AES-256-GCM in a separate SQLite store, including content metadata. The host must supply a 32-byte key and an existing private directory outside registered workspaces. Path/file identity checks reject known links and replacements; they do not isolate storage from a hostile same-privilege process. Logical deletion is not secure erasure of backups or storage media. Ordinary journals retain scope paths, identifiers, hashes and restricted artifact references, not raw patches or question/option labels.
+
+An allow/answer requires protected content delivery through the authenticated host actor's review path. Its in-memory review token binds actor, full request, operation hash and artifact hash for at most 60 seconds and never survives restart. The host then revalidates authority before native delivery. `interaction.reviewed` audits that content was made available, not that a person read or understood it; no desktop review UI ships here. Missing protected storage prevents grants/answers while denial/cancellation remains available. Duplicate or uncertain decisions are not replayed after recovery.
 
 ## Verified upstream integration hazards
 

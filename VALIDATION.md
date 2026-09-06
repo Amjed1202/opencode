@@ -2,7 +2,27 @@
 
 Executed 2026-09-06 on Windows with Bun **1.3.14** and Node **24.14.1**. The continuation adds behavioral checks for the initial host and Codex integration; [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) defines its scope. There is no live model-task, charge, OS isolation, desktop, collaboration or remote-node acceptance claim.
 
-## Permission and native-history continuation
+## Protected review and fixed-choice input continuation
+
+| Final check | Result | Evidence |
+| --- | --- | --- |
+| Complete host suite | **264 pass, 1 platform skip, 0 fail**, 1,001 assertions | [Log](docs/validation/m1a-review-input-control-plane-tests.log) |
+| Complete adapter/stdio/input suite | **214 pass, 0 fail**, 549 assertions | [Log](docs/validation/m1a-review-input-adapters-tests.log) |
+| Three Harness package typechecks | **3 pass** | [Protocol](docs/validation/m1a-review-input-harness-protocol-typecheck.log), [adapters](docs/validation/m1a-review-input-harness-adapters-typecheck.log), [host](docs/validation/m1a-review-input-harness-control-plane-typecheck.log) |
+| Authored-source Prettier | **Pass** | [Log](docs/validation/m1a-review-input-format.log) |
+| Oxlint, 50 authored TypeScript files | **0 errors, 229 warnings**, exit 0 | [Diagnostics](docs/validation/m1a-review-input-oxlint.json) |
+| Official generated protocol files | **72 hashes match**, unmodified | [Provenance](packages/harness-adapters/src/codex/generated/0.153.4/provenance.json) |
+| Independent boundary reviews | **Three findings fixed and rechecked** | [Review](docs/validation/m1a-review-input-review.md) |
+
+Total: **478 passing tests, 1 platform skip, 1,550 assertions**. The skipped test renames a directory holding an open SQLite database, which Windows disallows; live database and sidecar replacement/link checks are exercised separately. Warnings remain, primarily Bun assertion typings and typed JSON/test assertions. [Command/results record](docs/validation/m1a-review-input-results.json).
+
+The local end-to-end fixtures use the actual host, encrypted artifact store, journal, Codex adapter and stdio transport. They verify protected patch/question delivery, exact reviewed hashes, once-only native answers, cancellation, native callback retirement, final authorization checks and token/content exclusion from ordinary audit events. Artifact tests inspect ciphertext-only SQLite/WAL data, wrong-key/tamper/cross-session rejection, expiring actor-bound grants and forced-process-kill recovery. Private-root reservations reject overlap with all existing and future registered workspaces, including an in-flight registration. Input journal recovery atomically expires pending handles while retaining claimed uncertainty without replay.
+
+Wire protocol **0.3** adds bound choice input and protected review receipts. Earlier event journals, including 0.2, require an explicit migration or separate database and remain unchanged on rejection. Native Codex remains pinned to **0.153.4** with `experimentalApi: false`; [pinned official source findings](docs/validation/m1a-review-input-native-source.md) explain why the supported request does not require broader experimental negotiation.
+
+This continuation made no native provider thread/turn, login, refresh, account operation or inference call. Final process tests used sandbox-approved local fixture peers. Recurring Windows SQLite cleanup failures were traced to statement-cache eviction in pinned Bun 1.3.14, rather than dismissed as transient file locks. The journal now owns and finalizes its static prepared statements before strict close; a public-workload regression checks immediate cleanup. No retry limit was increased. No new dependencies or upstream functional source changed, so earlier installation and upstream baseline checks were not repeated. There is no desktop approval/question UI, OS vault provisioning, aggregate artifact retention limit, OS isolation attestation or live model-task acceptance. Artifacts are limited to 1 MiB each, with explicit logical deletion; encrypted resolved artifacts persist until the host deletes them.
+
+## Permission and native-history continuation (historical)
 
 | Final check | Result | Evidence |
 | --- | --- | --- |

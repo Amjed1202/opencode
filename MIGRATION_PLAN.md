@@ -2,9 +2,9 @@
 
 **Goal:** add a universal control plane around native harnesses while retaining a maintainable OpenCode fork.
 
-**Architecture:** three additive contract packages now; privileged control-plane worker and native adapters next; a narrow new desktop route after native admission works. Upstream paths and agent engines remain intact.
+**Architecture:** three additive packages now contain protocol contracts, privileged host libraries and the pinned Codex adapter; a narrow new desktop route follows the remaining native acceptance gates. Upstream paths and agent engines remain intact.
 
-**Tech stack:** pinned Bun 1.3.14, existing TypeScript/catalog toolchain, Electron/Solid upstream, SQLite/Drizzle planned for application storage.
+**Tech stack:** pinned Bun 1.3.14, existing TypeScript/catalog toolchain, Electron/Solid upstream, Bun SQLite for host journals and encrypted review artifacts. Upstream persistence stays separate.
 
 **Spec:** [ARCHITECTURE.md](ARCHITECTURE.md), [PROTOCOL.md](PROTOCOL.md), [ADAPTERS.md](ADAPTERS.md), and linked policy documents.
 
@@ -67,9 +67,9 @@ Then implement local process supervision and the SQLite command/event journal. V
 
 ## 5. Codex vertical slice — initial local protocol implementation delivered
 
-Implemented continuation: native deferred permission replies, host claim/audit journaling, bounded once-only file grants with a final host write guard, deny-only command/network expansions, readonly paginated history and exact-known-turn reconciliation. Native billing/OS/live-task gates, approval presentation and full transcript/artifact retention remain open. [Current scope](M1A_IMPLEMENTATION.md).
+Implemented continuation: native deferred permission/input replies, host claim/audit journaling, encrypted patch/question artifacts and short-lived actor-bound review tokens, bounded once-only file grants and blocking fixed-choice input with a final host write guard, deny-only command/network expansions, read-only paginated history and exact-known-turn reconciliation. Wire protocol 0.3 explicitly gates older event journals behind migration or a separate database. Native billing/OS/live-task gates, key/vault provisioning, desktop presentation and full transcript/artifact retention remain open. [Current scope](M1A_IMPLEMENTATION.md).
 
-Create `packages/harness-adapters/src/codex/adapter.ts` and versioned mapping fixtures. Generate official wire types from a pinned supported executable into an adapter-private generated directory, retaining provenance. Use App Server stdio, initialize, native account read/login UI, thread start/resume, turn start/interrupt and native server approval requests. Bind native request/turn/item IDs and preserve unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
+Continue `packages/harness-adapters/src/codex/adapter.ts` and its versioned mapping fixtures. Keep official wire types in the adapter-private generated directory with provenance. The implemented route uses App Server stdio, initialize, native account/config reads, thread start/resume, turn start/interrupt and deferred approval/question callbacks; native login UI remains future work. `experimentalApi` stays false because the pinned source forwards fixed-choice input without opting in. Bind native request/turn/item IDs and retain only sanitized metadata for unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
 
 ## 6. Claude and OpenCode vertical slices
 

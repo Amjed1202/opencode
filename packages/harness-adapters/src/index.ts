@@ -9,6 +9,8 @@ import type {
   CommandReceipt,
   ExecutionTarget,
   HumanInputResponse,
+  HumanInputReviewContent,
+  PermissionReviewContent,
   ModelDescriptor,
   NativeSessionInspection,
   PermissionDecision,
@@ -49,7 +51,9 @@ export interface AgentAdapter {
   readonly resume?: (request: AdmittedSessionRequest, existing: AgentSession) => Promise<AgentSession>
   readonly inspect?: (session: AgentSession) => Promise<NativeSessionInspection>
   readonly resolvePermission?: (context: AdapterPermissionContext, decision: PermissionDecision) => Promise<void>
-  readonly resolveInput?: (context: AdapterSessionContext, response: HumanInputResponse) => Promise<void>
+  readonly resolveInput?: (context: AdapterPermissionContext, response: HumanInputResponse) => Promise<void>
+  readonly reviewPermission?: (context: AdapterSessionContext, requestId: string) => Promise<PermissionReviewContent>
+  readonly reviewInput?: (context: AdapterSessionContext, requestId: string) => Promise<HumanInputReviewContent>
   readonly models?: (runtime: RuntimeDescriptor) => Promise<readonly ModelDescriptor[]>
   readonly usage?: (session: AgentSession) => Promise<readonly UsageSnapshot[]>
   readonly quota?: (runtime: RuntimeDescriptor) => Promise<readonly QuotaSnapshot[]>

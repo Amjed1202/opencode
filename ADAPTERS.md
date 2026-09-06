@@ -24,6 +24,9 @@ Adapters depend on the protocol; the control plane selects adapters. Renderer co
 | `interrupt(session)` | Request cancellation; terminal state arrives through events. |
 | `resume(...)` | Optional, advertised only after native resume behavior is verified. |
 | `resolvePermission(...)` | Resolve the correlated native request using its supported decisions and scopes. |
+| `reviewPermission(...)`, `reviewInput(...)` | Host-only access to a cloned pending patch or question display, bound to the current session and operation. The host protects it before presentation. |
+| `resolveInput(...)` | Resolve a bound native question using offered option IDs or cancellation. Answer delivery requires the final host authorization callback. |
+| `inspect(session)` | Optional bounded read-only history evidence; does not resume or replay native work. |
 | `models(...)`, `usage(...)` | Optional native discovery/observations; unavailable is distinct from empty or zero. |
 | `close(session)` | Release the attachment and owned resources without deleting native history. |
 
@@ -45,6 +48,12 @@ Prefer Codex App Server, intended for custom clients requiring authentication, h
 
 Start with private stdio transport. Preserve thread/turn/item IDs and version-generated native schemas inside the adapter. Local research found Codex `0.153.4`; schema inspection is not execution certification. The SDK remains useful for automation, but the interactive desktop needs the richer App Server boundary. [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk)
 
+The implemented adapter defers bounded native file approvals and blocking fixed-choice input while continuing to drain stdio. Both use exact native request/session/turn identity, operation hashes, expiry and an asynchronous flush acknowledgement. File grants remain limited to observed once-only workspace changes; command execution and broader permission expansions remain deny-only. Questions require one to three nonsecret blocking items with two to eight fixed options; free-form, secret, nonblocking and unknown shapes are cancelled. Public input events carry generated IDs, while exact labels remain private pending data for protected review and the original response.
+
+The host encrypts patch/question review artifacts and requires an actor-bound review token before granting or answering. After fresh native account/config checks, a synchronous host callback runs immediately before reply bytes are written. Native `serverRequest/resolved` retires the exact callback without sending a late response; interruption, terminal state, expiry, account/config changes and close also invalidate pending interactions. Replies never replay after a host restart.
+
+The handshake keeps `experimentalApi: false`. In the pinned official source, `ToolRequestUserInput` has experimental prose but no experimental gate, and the transport forwards it independently of that capability. This does not promise compatibility with another release or enable unrelated experimental APIs. [Pinned request declaration](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server-protocol/src/protocol/common.rs#L1702), [pinned transport](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/transport.rs#L180), [implementation evidence](docs/validation/m1a-review-input-native-source.md).
+
 ## OpenCode, generic and remote
 
 Initially wrap the established `@opencode-ai/sdk/v2` compatibility surface and isolate its session, event, permission and PTY calls. That SDK version label does not mean the newer Core `SessionV2` is interchangeable. At the pinned release, Core `shell`, `skill`, `compact` and `wait` return `OperationUnavailableError`. Move to the newer `/api` client only after parity tests establish required behavior. Keep each operation on a coherent backend; do not secretly combine sessions from two implementations. Evidence: [pinned Core session implementation](https://github.com/anomalyco/opencode/blob/16747470f976aca3d362ad730bcd3fe82ecc2c9a/packages/core/src/session.ts), [legacy SDK](https://github.com/anomalyco/opencode/blob/16747470f976aca3d362ad730bcd3fe82ecc2c9a/packages/sdk/js/src/v2/gen/sdk.gen.ts).
@@ -60,10 +69,11 @@ Remote is an orthogonal execution target: `harness-node` hosts the same native a
 | Claude text deltas; Codex `item/agentMessage/delta`; OpenCode text-part deltas | `assistant.text.delta` |
 | Claude tool-use/result; Codex tool item lifecycle; OpenCode tool parts | Tool requested/started/output/completed, according to actual lifecycle evidence |
 | Claude permission host; Codex server approval request; OpenCode permission event | `permission.requested` with native correlation and scope |
+| Codex `item/tool/requestUserInput` | `input.requested` with bound choice IDs and protected display; unsupported forms are cancelled |
 | Claude result/model usage; Codex thread token snapshots; OpenCode message usage | `usage.updated`, retaining source and cumulative/delta semantics |
 | Native session status, compaction and subagent events | Corresponding lifecycle/context events; unknown variants retained |
 
-Retain native source payloads through protected, redacted records/artifact references. Never persist authentication exchanges, tokens or complete process environments. Deduplicate partial/final messages and cumulative usage; missing fields stay unknown.
+Retain supported sensitive display payloads through protected artifact references; the current implementation covers bounded patches and fixed-choice questions. Unknown native bodies remain omitted. Never persist authentication exchanges, tokens or complete process environments. Deduplicate partial/final messages and cumulative usage; missing fields stay unknown.
 
 ## Admission and implementation gates
 

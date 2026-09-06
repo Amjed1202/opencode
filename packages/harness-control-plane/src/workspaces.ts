@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
+import { lstatSync, realpathSync } from "node:fs"
 import { realpath, stat } from "node:fs/promises"
-import { isAbsolute, relative, sep } from "node:path"
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import type { WorkspaceDescriptor, WorkspaceLease } from "@harness/protocol"
 
 /** Single host ownership. Expiry blocks use; it never transfers a running writer's lease. */
@@ -9,6 +10,7 @@ export class LocalWorkspaceRegistry {
   private readonly leases = new Map<string, WorkspaceLease>()
   private readonly generations = new Map<string, number>()
   private readonly identities = new Map<string, { dev: bigint; ino: bigint }>()
+  private readonly privateRoots = new Set<string>()
   private readonly now: () => number
   private readonly lifetime: number
 
@@ -16,6 +18,41 @@ export class LocalWorkspaceRegistry {
     this.now = options.now ?? Date.now
     this.lifetime = options.leaseMilliseconds ?? 300_000
     if (!Number.isFinite(this.lifetime) || this.lifetime <= 0) throw new Error("Invalid lease lifetime")
+  }
+
+  /** Permanent for this registry lifetime: stored artifacts may outlive the manager reserving their root. */
+  reservePrivateRoot(rootPath: string): void {
+    try {
+      if (
+        typeof rootPath !== "string" ||
+        rootPath.includes("\0") ||
+        !isAbsolute(rootPath) ||
+        (process.platform === "win32" && !/^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)/.test(rootPath))
+      )
+        throw new Error("Invalid root")
+      const selected = resolve(rootPath)
+      let current = selected
+      while (true) {
+        const identity = lstatSync(current, { bigint: true })
+        const canonical = realpathSync(current)
+        if (
+          !identity.isDirectory() ||
+          identity.isSymbolicLink() ||
+          (process.platform === "win32" ? canonical.toLowerCase() !== current.toLowerCase() : canonical !== current)
+        )
+          throw new Error("Linked root")
+        const parent = dirname(current)
+        if (parent === current) break
+        current = parent
+      }
+      const canonical = realpathSync(selected)
+      for (const workspace of this.workspaces.values())
+        if (contains(workspace.rootPath, canonical) || contains(canonical, workspace.rootPath))
+          throw new Error("Existing workspace overlaps private storage")
+      this.privateRoots.add(canonical)
+    } catch {
+      throw new Error("Cannot reserve private storage: invalid root or overlapping workspace")
+    }
   }
 
   /** Host calls this only after an authorized directory selection. */
@@ -37,6 +74,10 @@ export class LocalWorkspaceRegistry {
       if (value.id !== selected.id && (contains(value.rootPath, rootPath) || contains(rootPath, value.rootPath)))
         throw new Error("Workspace directory overlaps an existing workspace")
     }
+    // Check after filesystem awaits so an in-flight registration cannot race a new reservation.
+    for (const root of this.privateRoots)
+      if (contains(root, rootPath) || contains(rootPath, root))
+        throw new Error("Workspace directory overlaps reserved private storage")
     this.workspaces.set(selected.id, descriptor)
     this.identities.set(selected.id, { dev: identity.dev, ino: identity.ino })
   }

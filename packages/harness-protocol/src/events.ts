@@ -9,7 +9,7 @@ import type {
   Timestamp,
 } from "./common"
 import type { ReviewFinding } from "./collaboration"
-import type { HumanInputRequest, PermissionRequest, PermissionResolution } from "./permissions"
+import type { HumanInputRequest, HumanInputResolution, PermissionRequest, PermissionResolution } from "./permissions"
 import type { ReplayStatus } from "./remote"
 import type { RuntimeAuthState, BillingEvidence } from "./runtime"
 import type { AgentSession } from "./session"
@@ -53,7 +53,14 @@ export interface AgentEventMap {
   "permission.requested": PermissionRequest
   "permission.resolved": PermissionResolution
   "input.requested": HumanInputRequest
-  "input.resolved": { readonly requestId: string; readonly outcome: "answered" | "cancelled" | "expired" }
+  "input.resolved": HumanInputResolution
+  "interaction.reviewed": {
+    readonly requestId: string
+    readonly artifactId: string
+    readonly artifactSha256: string
+    readonly actorId: string
+    readonly reviewedAt: Timestamp
+  }
   "task.started": { readonly taskId: string; readonly title: string }
   "task.updated": { readonly taskId: string; readonly state: string; readonly revision: number }
   "task.completed": { readonly taskId: string; readonly outcome: "succeeded" | "failed" | "cancelled" }

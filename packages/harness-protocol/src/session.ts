@@ -82,7 +82,15 @@ export interface AgentSession {
   readonly intent: SessionIntent
   readonly binding: NativeSessionBinding
   readonly effective: RuntimePreflight
-  readonly status: "idle" | "running" | "awaiting-permission" | "interrupted" | "failed" | "closed" | "uncertain"
+  readonly status:
+    | "idle"
+    | "running"
+    | "awaiting-permission"
+    | "awaiting-input"
+    | "interrupted"
+    | "failed"
+    | "closed"
+    | "uncertain"
   readonly createdAt: Timestamp
   readonly revision: number
 }

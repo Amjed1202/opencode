@@ -1,10 +1,10 @@
 # Universal agent protocol
 
-Status: protocol `0.2` contracts with native stdio decoding, local command/event/permission journals and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
+Status: protocol `0.3` contracts with native stdio decoding, local command/event/permission/input journals, protected review and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
 
 ## Domain and versioning
 
-Compatibility note for 0.2: permission bindings now require `runtimeId`, `nativeSessionId`, `nativeTurnId`, `nativeRequestId` and `policyId` in addition to the original workspace/target/session/policy-version/lease/hash fields. The native request ID retains its string-versus-number identity through an explicit prefix. The host also exposes bounded native inspection DTOs. Old 0.1 permission decisions cannot authorize this protocol. Existing 0.1 event journals require an explicit migration or a separate new database; no automatic conversion or deletion is performed. Workspace package versions remain development package versions and are distinct from this wire version.
+Compatibility note for 0.3: human-input requests/responses now use the complete `PermissionBinding`, fixed-choice metadata and explicit answer/cancel outcomes. Permission and input requests may reference a protected review artifact; resolutions record its digest, and `interaction.reviewed` audits authorized content delivery. Responses may carry a short-lived host review token, which is never persisted. Existing 0.2 and older event journals require an explicit migration or a separate new database; no automatic conversion or deletion is performed. The full runtime/native/policy binding introduced in 0.2 remains required, including string-versus-number native request identity. Workspace package versions remain development package versions and are distinct from this wire version.
 
 Use separate application `sessionId`, native session/turn IDs, command ID, workspace ID, target ID, runtime ID, adapter ID and provider/model IDs. A runtime can offer models from several providers. Remote is an execution target/transport; an API runtime can itself run on a remote node. Human account labels are optional, sanitized and not credential identifiers.
 
@@ -38,6 +38,7 @@ Before assigning host IDs, deduplicate drafts by `EventOrigin` `(streamId, epoch
 | `terminal.started`, `.output`, `.completed` | Actual terminal/process identity only; ordinary shell tool output need not be a PTY |
 | `file.read`, `.changed`, `.created`, `.deleted`, `diff.created`, `git.changed` | Workspace-relative resources, change source and artifact/snapshot identity; a proposed patch is distinct from an applied change |
 | `permission.requested`, `.resolved`, `input.requested`, `.resolved` | Security approvals are distinct from questions or MCP elicitation |
+| `interaction.reviewed` | Host-assigned actor/time and artifact digest establish authorized content delivery, not human comprehension |
 | `task.started`, `.updated`, `.completed`, `session.updated` | State projections and native bindings; changes carry explicit versions |
 | `usage.updated`, `context.updated`, `context.compacted` | Provenanced observations with cumulative/delta scope and epoch; unknown counts stay unknown |
 | `subagent.started`, `.completed`, `collaboration.review.created` | Native child relationships versus application collaboration roles remain distinct |
@@ -59,8 +60,12 @@ A request binds request ID, native correlation, session, target, workspace, tool
 
 The binding includes the immutable operation SHA-256 digest. Resolution events record authenticated actor and decision time assigned by the host, including policy/timeout decisions; renderer input cannot choose the audit actor.
 
+`HumanInputRequest` carries the fixed prompt `Choose one option for each question.`, schema `harness.choice-input.v1`, generated question/option IDs and expiry. A response supplies one offered option per question or cancels with no selections. Question headers, prose and option labels are excluded from ordinary events. The Codex implementation permits only one to three blocking nonsecret questions with two to eight fixed options each; other forms are cancelled. Native labels remain private to the adapter's pending callback and protected review artifact.
+
+Privileged `reviewPermission`/`reviewInput` returns validated display content, its restricted artifact reference and an in-memory review token. Grants and answers require that token bound to the actor, full request, operation and artifact digest, plus a fresh admission/lease check at the actual native reply write boundary. Review expiry is capped at 60 seconds and request expiry. A token is not a replacement for session authority, is not an event payload, and cannot authorize replay after restart. Denial/cancellation does not require protected content access. Pending and claimed interaction recovery follows the command ledger's fail-closed, no-replay semantics.
+
 Extensions use an adapter namespace, version and JSON-schema identifier. Native model effort, review modes, hooks or structured output may appear in a generic extension control surface after explicit support negotiation. Raw native data is an observability channel, never a bypass for arbitrary provider commands.
 
 ## Required future protocol checks
 
-Round-trip/invalid-frame tests; unknown event retention; stream replay without tool reexecution; delta/completion deduplication; permission timeout and cross-node replay rejection; interrupted/error usage; native ID remapping on resume; cumulative usage reset; unexpected auth/provider change; admission expiry; concurrent writers; and crash-after-dispatch reconciliation. The structural package checks only compile-time shape constraints and must not be cited as evidence these behaviors work.
+Public IPC/node frame decoding, cross-node replay rejection, interrupted/error usage and cumulative usage reset remain future checks. Local native framing, durable command/interaction claims, expiry, binding mismatches, review capabilities, account/config invalidation and exact-turn reconciliation have behavioral fixture coverage; see [validation](VALIDATION.md) for the precise evidence. Compile-time shape checks do not establish live provider execution or OS isolation.
