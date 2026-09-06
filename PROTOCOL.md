@@ -1,8 +1,10 @@
 # Universal agent protocol
 
-Status: protocol `0.1` contracts with initial native stdio decoding, a local command/event journal and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
+Status: protocol `0.2` contracts with native stdio decoding, local command/event/permission journals and host admission. A public renderer/node wire decoder is still pending. Authoritative contracts: `packages/harness-protocol/src`; they have no runtime dependency on OpenCode, Electron, a vendor SDK or Node. See [implemented scope](M1A_IMPLEMENTATION.md).
 
 ## Domain and versioning
+
+Compatibility note for 0.2: permission bindings now require `runtimeId`, `nativeSessionId`, `nativeTurnId`, `nativeRequestId` and `policyId` in addition to the original workspace/target/session/policy-version/lease/hash fields. The native request ID retains its string-versus-number identity through an explicit prefix. The host also exposes bounded native inspection DTOs. Old 0.1 permission decisions cannot authorize this protocol. Existing 0.1 event journals require an explicit migration or a separate new database; no automatic conversion or deletion is performed. Workspace package versions remain development package versions and are distinct from this wire version.
 
 Use separate application `sessionId`, native session/turn IDs, command ID, workspace ID, target ID, runtime ID, adapter ID and provider/model IDs. A runtime can offer models from several providers. Remote is an execution target/transport; an API runtime can itself run on a remote node. Human account labels are optional, sanitized and not credential identifiers.
 
@@ -16,9 +18,9 @@ Capabilities are a map of known feature names to supported/unsupported/unknown o
 
 `SessionIntent` contains the selected runtime, model, execution target, workspace, auth mode, billing intent and required policy. `PreflightResult` is either blocked with reasons or ready with an expiring opaque admission reference and effective evidence. An internal `AdmittedSessionRequest` is produced only after control-plane validation. Its TypeScript shape is not a security token: the host must validate the stored admission binding, expiry, policy version and current account/configuration at execution time. No credentials occur in renderer-visible DTOs.
 
-`PreflightRequest` identifies create, resume or turn admission. For resume/turn, the host resolves the stored session and supplies it in `AdapterPreflightRequest`, so native persisted configuration is inspected before admission. The operation is part of the admission binding; a create admission cannot authorize a resume or turn.
+`PreflightRequest` identifies create, resume or turn admission. For resume/turn, the host resolves the stored session and supplies it in `AdapterPreflightRequest`, so current account/cwd configuration is checked against the host-stored binding before admission. Native thread settings are validated during open/resume; each turn repeats explicit sandbox and approval settings. The operation is part of the admission binding; a create admission cannot authorize a resume or turn.
 
-`send` acknowledges admission with a command receipt; `events` is a separate continuous asynchronous stream. This supports idle account updates, tool/permission events, more than one turn and reconnects. It avoids tying a session's lifetime to a single HTTP response. One writer per session executes admitted input serially. Initial delivery is queue/when-idle; steering can be added as a verified native extension without pretending all runtimes support it.
+`send` acknowledges admission with a command receipt; `events` is a separate continuous asynchronous stream. This supports idle account updates, tool/permission events, more than one turn and reconnects. It avoids tying a session's lifetime to a single HTTP response. One writer per session executes admitted input serially. The DTO reserves queue/when-idle delivery, but this implementation accepts only when-idle and rejects queue; steering can be added as a verified native extension without pretending all runtimes support it.
 
 ## Event envelope
 

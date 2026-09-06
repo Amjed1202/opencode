@@ -159,6 +159,20 @@ export async function admissionFixture() {
       if (change === "advisory")
         state.effective = { ...current, enforcement: { ...current.enforcement, mechanism: "advisory" } }
     },
-    close: () => rm(directory, { recursive: true, force: true }),
+    close: () => removeFixtureDirectory(directory),
+  }
+}
+
+/** Windows may briefly retain SQLite handles after all fixture owners have closed. */
+export async function removeFixtureDirectory(directory: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rm(directory, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (attempt === 40 || typeof error !== "object" || error === null || !("code" in error) || error.code !== "EBUSY")
+        throw error
+      await Bun.sleep(50)
+    }
   }
 }

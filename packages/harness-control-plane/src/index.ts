@@ -16,6 +16,7 @@ import type {
   HumanInputResponse,
   JsonObject,
   NodeGrant,
+  NativeSessionInspection,
   PermissionDecision,
   PreflightResult,
   PreflightRequest,
@@ -37,6 +38,8 @@ export interface ControlPlaneClient {
   events(sessionId: string, after?: EventCursor): AsyncIterable<EventDelivery>
   interrupt(sessionId: string, commandId: string): Promise<CommandReceipt>
   resolvePermission(decision: PermissionDecision): Promise<void>
+  inspectSession(sessionId: string): Promise<NativeSessionInspection>
+  reconcileSession(sessionId: string): Promise<AgentSession>
   resolveInput(response: HumanInputResponse): Promise<void>
   usage(sessionId: string): Promise<readonly UsageSnapshot[]>
   closeSession(sessionId: string): Promise<void>

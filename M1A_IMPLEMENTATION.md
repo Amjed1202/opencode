@@ -1,6 +1,6 @@
-# Initial local host and Codex implementation
+# Local host and Codex implementation
 
-This continuation implements the first runnable host libraries from migration tasks 4–5. It does not complete M1a or create a desktop application. OpenCode's functional source remains unchanged.
+The host libraries from migration tasks 4–5 now include durable permission decisions and bounded native history inspection. This does not complete M1a or create a desktop application. OpenCode's functional source remains unchanged.
 
 ## Implemented behavior
 
@@ -10,12 +10,12 @@ This continuation implements the first runnable host libraries from migration ta
 | Admission | Checks the selected runtime, target, provider, native authentication method, billing evidence, policy, capabilities and optional capacity observation. Issues expiring tokens bound to the workspace, session, operation and command digest. Rechecks evidence, runtime identity, consent and lease validity before dispatch. |
 | Environment | Builds an OS allowlist from explicit host inputs. Native home and executable search path are deliberate selections. Credentials, provider/profile overrides, proxies, shell controls and runtime injection variables are not inherited. |
 | Workspace registry | Canonical authorized directories, overlapping-root rejection, process-local read/write leases and generation checks. Expiration blocks further use without transferring a possibly running writer's ownership. |
-| SQLite journal | Durable session revisions, exact-command idempotency, event origin deduplication, host sequence numbers, atomic event/receipt writes, bounded-history snapshot gaps and explicit uncertain recovery. |
-| Runtime manager | Create, send, interrupt, close and native-ID resume; a durable dispatch marker precedes the native call. It consumes native events into the journal and serves replay plus live events. Ambiguous calls and disconnected execution cannot automatically replay. |
-| `@harness/adapters/codex` | Explicit local executable, private stdio JSON-RPC, pinned `0.153.4` handshake, managed account/config reads, native thread/turn lifecycle and text/completion mapping. Native approval requests are denied. Unknown events retain sanitized identity metadata. |
+| SQLite journal | Durable session revisions, exact-command idempotency, event origin deduplication, host sequence numbers, atomic event/receipt writes, permission claims and audit outcomes, snapshot gaps and explicit uncertain recovery. |
+| Runtime manager | Create, send, interrupt, close, native-ID resume, permission decisions and read-only inspection. Exact known terminal turns can reconcile detached uncertain sessions. A durable dispatch marker or permission claim precedes the native call; ambiguous execution cannot automatically replay. |
+| `@harness/adapters/codex` | Explicit local executable, private stdio JSON-RPC, pinned `0.153.4` handshake, managed account/config reads, native lifecycle/text mapping, bounded history and optional once-only file approvals. Commands and permission-scope expansions remain deny-only. Unknown events retain sanitized identity metadata. |
 | Diagnostic command | Reads native compatibility and subscription-route evidence; creates no admission token, thread, turn or login. |
 
-The protocol package remains independent of Bun, Node, Electron and vendor runtimes. Official generated native types stay private to the Codex adapter; their provenance, hashes and third-party license notices are retained.
+Wire protocol 0.2 requires complete native/runtime/policy permission bindings. Journals containing event JSON that is invalid or has a missing/incompatible protocol version require an explicit migration or a separate new database; opening them does not rewrite or delete the original. The protocol package remains independent of Bun, Node, Electron and vendor runtimes. Official generated native types stay private to the Codex adapter; their provenance, hashes and third-party license notices are retained.
 
 ## Subscription and policy behavior
 
@@ -23,7 +23,7 @@ The concrete Codex adapter offers only managed ChatGPT subscription mode. It exp
 
 Authentication evidence does not prove that extra provider charges are disabled. Codex currently reports provider overage as **unknown**. `require-disabled` therefore blocks; execution through this initial adapter requires an explicit `acknowledge-provider-settings` intent. The diagnostic uses that value only to observe the route and never authorizes execution.
 
-Native sandbox settings are requested and checked, but OS enforcement is not attested. The adapter accepts only an explicit `requireEnforcedBoundary: false` policy with native sandboxing, denied network, denied approvals and no approved MCP servers. Enforced reviewers remain blocked. This is an experimental integration condition, not evidence that arbitrary tools are safely isolated.
+Native sandbox settings are requested and checked, but OS enforcement is not attested. The adapter accepts only an explicit `requireEnforcedBoundary: false` policy with native sandboxing, denied network and no approved MCP servers. Approval policy may deny everything or ask for a bounded once-only file decision. Enforced reviewers remain blocked. This is an experimental integration condition, not evidence that arbitrary tools are safely isolated.
 
 Native account/configuration observations are checked repeatedly but cannot atomically lock the provider's billing decision. The pinned account response identifies email and plan, not a stable organization/workspace identity; the stored digest is an observation fingerprint. A different organization with identical reported fields cannot be distinguished by this interface. No zero-cost guarantee or native quota value is invented.
 
@@ -69,12 +69,24 @@ The host registers an authorized directory in `LocalWorkspaceRegistry`, construc
 
 These are privileged in-process APIs. There is no renderer IPC decoder, account authorization layer or network listener yet. A caller cannot safely expose these constructors directly to a renderer or remote client.
 
+## Permission decisions and recovery
+
+Configure `LocalRuntimeManager` with a trusted `actorId` to resolve decisions. The future authenticated transport must supply that identity from host context; a renderer's actor/timestamp fields have no authority. `permission.requested` is committed with its ledger record before delivery. `resolvePermission(decision)` claims the exact offered once choice, recording actor and time, then calls the native adapter. `permission.resolved` means the reply was flushed or an autonomous denial/expiry was recorded; it does not prove a file operation executed. A lost reply leaves a separate uncertain claim and is never sent again.
+
+Every decision binds the runtime, target, workspace, session, native thread/turn/request, policy ID/version, lease generation and operation hash. A grant requires current account/configuration/billing/policy evidence and the original live workspace lease. The original command token may expire while a tool waits; revocation still blocks the grant. After asynchronous native checks, a host-only callback rechecks authority synchronously at the stdio write boundary. The callback is never serialized to Codex.
+
+Only a complete, observed pending file-change item can offer **allow once**, under a workspace-write policy. File paths and rename destinations must remain inside the canonical workspace; linked paths, existing hard links, protected `.git`/`.codex`/`.agents` paths and session-wide write roots are rejected. File contents and commands are represented by hashes in permission metadata, not retained as a raw approval transcript. A future review UI still needs a protected patch-artifact presentation. Arbitrary commands, network grants, policy amendments and session/workspace grants cannot be accepted in this slice. Path checks do not attest OS enforcement or eliminate filesystem races with another process.
+
+`inspectSession(sessionId)` reads metadata and paginated turn summaries through official App Server methods, with account/config checks before and after. Defaults are four pages, 200 turns and 1 MiB of responses; incomplete or changing history cannot establish idle; observed active work remains running, and malformed responses produce unknown state. No message bodies, preview content or native error bodies are returned.
+
+`reconcileSession(sessionId)` requires a detached, uncertain session and exclusive ownership of its native processes. It settles only saved command records whose exact native turn IDs appear as terminal in complete, idle history. Missing turn acknowledgements, partial pages or running/unknown evidence remain uncertain. It does not infer identity from user text/message IDs, replay a command or attach a stream. Resume remains a separate fresh admission. Restart recovery expires pending native reply handles and marks previously claimed decisions uncertain; it never reconstructs permission to grant.
+
 ## Remaining acceptance work
 
 - A separately authorized live repository task, including supported-model discovery and actual host sandbox verification. No live subscription inference was performed in this continuation.
-- Interactive permission grants, expiry and human-input handling. This release denies approval requests instead of presenting them.
+- Permission presentation with protected patch artifacts, broader native tool mappings and human-input handling. The host API supports bounded file decisions and expiry; no approval UI ships yet.
 - Rich tool/file/diff/subagent mappings, protected raw-artifact retention, token/context/quota telemetry and accounting. Unknown native bodies are deliberately omitted, not archived in full.
-- Native history hydration and reconciliation of uncertain turns after restart. Native-ID resume is implemented; it does not establish that an ambiguous previous turn is safe to repeat.
+- Full native transcript hydration and recovery of lost acknowledgements without a known native turn ID. Bounded inspection and exact-turn reconciliation do not establish that ambiguous work is safe to repeat.
 - A cross-process host ownership service and OS process-tree supervision. Lease state is process-local. Recovery requires exclusive ownership of the journal and its native processes; two independent hosts must not operate the same workspace. SQLite atomicity alone does not provide that ownership.
 - An uncertain detach or ambiguous create retains its workspace lease. The host must stop the native adapter/process and reconcile its work before releasing that ownership; a generic close acknowledgement is not proof of provider-side termination.
 - Secret-vault implementation for future API/node credentials, desktop IPC/UI, Claude/OpenCode adapters, collaboration and remote nodes.

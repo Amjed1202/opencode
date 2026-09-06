@@ -472,3 +472,47 @@ describe("admission security regressions", () => {
     }
   })
 })
+
+test("permission revalidation outlives command-token expiry but still requires fresh evidence and revocation epoch", async () => {
+  const state = await admissionFixture()
+  let clock = now
+  const admission = new AdmissionController({ ...state.options, now: () => clock })
+  const native = state.adapter.preflight
+  Object.assign(state.adapter, {
+    preflight: async (...args: Parameters<typeof native>) => {
+      const result = await native(...args)
+      if (result.status !== "ready") return result
+      const observedAt = new Date(clock).toISOString()
+      const evidence = { source: "native-status" as const, observedAt }
+      return {
+        ...result,
+        effective: {
+          ...result.effective,
+          checkedAt: observedAt,
+          expiresAt: new Date(clock + 60_000).toISOString(),
+          auth: { ...result.effective.auth, evidence },
+          billing: { ...result.effective.billing, evidence },
+          capabilities: { chat: { status: "supported", verification: "verified", evidence, limitations: [] } },
+        },
+      }
+    },
+  })
+  try {
+    const ready = await admission.preflight({ operation: "create", intent })
+    if (ready.status !== "ready") throw new Error("missing admission")
+    const request = await admission.require(ready.admissionId, "session", "create")
+    state.sessions.set("session", await state.adapter.createSession(request))
+    const guard = admission.permissionGuard(request)
+    clock += 61_000
+    // Pruning expired command tokens cannot accidentally erase the retained revocation epoch.
+    await admission.preflight({ operation: "create", intent })
+    await expect(admission.validate(request)).rejects.toThrow("expired")
+    const final = await guard()
+    expect(() => final()).not.toThrow()
+    await admission.invalidate("runtime", "revoked after validation")
+    expect(() => final()).toThrow("revoked")
+    await expect(guard()).rejects.toThrow("revoked")
+  } finally {
+    await state.close()
+  }
+})

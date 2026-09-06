@@ -2,6 +2,26 @@
 
 Executed 2026-09-06 on Windows with Bun **1.3.14** and Node **24.14.1**. The continuation adds behavioral checks for the initial host and Codex integration; [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) defines its scope. There is no live model-task, charge, OS isolation, desktop, collaboration or remote-node acceptance claim.
 
+## Permission and native-history continuation
+
+| Final check | Result | Evidence |
+| --- | --- | --- |
+| Complete host suite | **169 pass, 0 fail**, 544 assertions | [Log](docs/validation/m1a-permissions-control-plane-tests.log) |
+| Complete adapter/stdio/history suite | **144 pass, 0 fail**, 360 assertions | [Log](docs/validation/m1a-permissions-adapter-tests.log) |
+| Three Harness package typechecks | **3 pass** | [Protocol](docs/validation/m1a-permissions-harness-protocol-typecheck.log), [adapters](docs/validation/m1a-permissions-harness-adapters-typecheck.log), [host](docs/validation/m1a-permissions-harness-control-plane-typecheck.log) |
+| Authored-source Prettier | **Pass** | [Log](docs/validation/m1a-permissions-format.log) |
+| Oxlint, 41 authored TypeScript files | **0 errors, 152 warnings**, exit 0 | [Diagnostics](docs/validation/m1a-permissions-oxlint.json) |
+| Official generated protocol files | **65 hashes match**, unmodified | [Provenance](packages/harness-adapters/src/codex/generated/0.153.4/provenance.json) |
+| Independent host and native reviews | **Four findings fixed and rechecked** | [Review](docs/validation/m1a-permissions-review.md) |
+
+Total: **313 tests, 904 assertions**, all passing. Lint warnings are retained, predominantly Bun promise-assertion typings and typed JSON/test assertions; the result is not warning-free. [Command/results record](docs/validation/m1a-permissions-results.json).
+
+The new host integration tests exercise real stdio transport, the Codex adapter, admission, permission claims, SQLite audit events, completion and read-only history reconciliation together. They use only local Bun peers. Restart tests kill local SQLite writers, contend from separate processes and verify that uncertain decisions never replay. Pending expiry and its replay event commit atomically, with original stream/command scope preserved and rollback tested. Six compatibility cases verify that old or malformed event journals are rejected before schema changes, remain byte-identical, and require an explicit migration; compatible command-only databases can emit protocol 0.2 events.
+
+Earlier red tests exposed the missing implementations and review defects. Windows briefly held a closed fixture SQLite file during integration cleanup; a bounded asynchronous EBUSY retry resolved that cleanup failure. No production cleanup exception was suppressed. The full final suite above is green. Subprocess fixtures required permission outside the default process sandbox. No real Codex thread, turn, login, refresh, account operation or inference was performed in this continuation; the prior read-only native smoke remains historical evidence below.
+
+Wire protocol 0.2 adds required native/runtime/policy permission bindings; it does not change native Codex version 0.153.4. No dependencies or upstream functional source changed in this continuation, so the earlier frozen filtered install and upstream baseline checks were not repeated. Live billing, OS isolation, desktop UI, complete transcript/patch retention and cross-process host ownership remain unverified or unimplemented as described in [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md).
+
 ## Initial host continuation
 
 | Final check | Result | Evidence |

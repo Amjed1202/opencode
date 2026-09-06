@@ -64,3 +64,69 @@ test("close rejects in-flight work and terminates its owned subprocess", async (
   await transport.close()
   expect(await result).toBeInstanceOf(Error)
 })
+
+test("async native requests keep draining responses until their exact reply is flushed", async () => {
+  let release: (() => void) | undefined
+  const transport = peer({
+    onRequest: async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { result: "accepted" }
+    },
+  })
+  const pending = transport.request("server-request", {})
+  expect(await transport.request("echo", "still-draining")).toBe("still-draining")
+  release!()
+  expect(await pending).toBe("accepted")
+})
+
+test("duplicate native request IDs cancel the original pending approval and stop the peer", async () => {
+  let cancelled = false
+  const transport = peer({
+    onRequest: (_request, signal) =>
+      new Promise((resolve) =>
+        signal.addEventListener("abort", () => {
+          cancelled = true
+          resolve({ result: "denied" })
+        }),
+      ),
+  })
+  await expect(transport.request("duplicate-request", {})).rejects.toThrow()
+  expect(cancelled).toBe(true)
+})
+
+test("bounded native request expiry aborts the handler and sends a denial error", async () => {
+  let cancelled = false
+  const transport = peer({
+    serverRequestTimeoutMs: 30,
+    onRequest: (_request, signal) =>
+      new Promise((resolve) =>
+        signal.addEventListener("abort", () => {
+          cancelled = true
+          resolve({ result: "too-late" })
+        }),
+      ),
+  })
+  expect(await transport.request("server-request", {})).toBe(-32000)
+  expect(cancelled).toBe(true)
+})
+
+test("a revoked approval guard is checked after promise scheduling at the wire write boundary", async () => {
+  let authorized = true
+  const transport = peer({
+    onRequest: () => {
+      queueMicrotask(() => {
+        authorized = false
+      })
+      return {
+        result: "allowed",
+        beforeWrite: () => {
+          if (!authorized) throw new Error("revoked")
+        },
+      }
+    },
+  })
+  expect(await transport.request("server-request", {})).toBe(-32000)
+  expect(await transport.request("echo", "alive")).toBe("alive")
+})

@@ -10,6 +10,7 @@ import type {
   ExecutionTarget,
   HumanInputResponse,
   ModelDescriptor,
+  NativeSessionInspection,
   PermissionDecision,
   QuotaSnapshot,
   RuntimeDescriptor,
@@ -27,6 +28,11 @@ export interface AdapterSessionContext {
   readonly leaseGeneration: number
 }
 
+/** Host-only callback, invoked synchronously at the final native approval write boundary. */
+export interface AdapterPermissionContext extends AdapterSessionContext {
+  readonly authorizeReply?: () => void
+}
+
 /** Host-only interface. Concrete native implementations are exposed through separate adapter entry points. */
 export interface AgentAdapter {
   readonly id: string
@@ -41,7 +47,8 @@ export interface AgentAdapter {
   /** Detach/cleanup, never delete the native conversation. */
   close(session: AgentSession): Promise<void>
   readonly resume?: (request: AdmittedSessionRequest, existing: AgentSession) => Promise<AgentSession>
-  readonly resolvePermission?: (context: AdapterSessionContext, decision: PermissionDecision) => Promise<void>
+  readonly inspect?: (session: AgentSession) => Promise<NativeSessionInspection>
+  readonly resolvePermission?: (context: AdapterPermissionContext, decision: PermissionDecision) => Promise<void>
   readonly resolveInput?: (context: AdapterSessionContext, response: HumanInputResponse) => Promise<void>
   readonly models?: (runtime: RuntimeDescriptor) => Promise<readonly ModelDescriptor[]>
   readonly usage?: (session: AgentSession) => Promise<readonly UsageSnapshot[]>

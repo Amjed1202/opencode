@@ -1,6 +1,6 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: architecture plus the initial billing-safe host and Codex App Server implementation. A new working desktop application is not implemented yet.** Harness is a provisional codename. See [implementation and running instructions](M1A_IMPLEMENTATION.md) for the exact supported scope.
+**Delivered: architecture plus a billing-safe host and Codex App Server integration with durable permission decisions and bounded history recovery. A new working desktop application is not implemented yet.** Harness is a provisional codename. See [implementation and running instructions](M1A_IMPLEMENTATION.md) for the exact supported scope.
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 

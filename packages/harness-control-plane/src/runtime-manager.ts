@@ -8,6 +8,10 @@ import type {
   CommandReceipt,
   EventCursor,
   EventDelivery,
+  NativeSessionInspection,
+  PermissionBinding,
+  PermissionDecision,
+  PermissionResolution,
 } from "@harness/protocol"
 import type { CommandRecord } from "./index"
 import type { AdmissionController, AdmissionOptions, AdmissionWorkspaces } from "./admission"
@@ -19,6 +23,9 @@ export interface RuntimeManagerOptions {
   readonly journal: SQLiteJournal
   readonly runtime: AdmissionOptions["runtime"]
   readonly workspaces: AdmissionWorkspaces
+  /** Authenticated host identity; never populated from a renderer request. Grants require it. */
+  readonly actorId?: string
+  readonly now?: () => number
 }
 
 interface Pump {
@@ -37,6 +44,7 @@ export class LocalRuntimeManager {
   private readonly active = new Map<string, AdmittedSessionRequest>()
   private readonly pumps = new Map<string, Pump>()
   private readonly activeTurns = new Map<string, string>()
+  private readonly permissionGuards = new Map<string, () => Promise<() => void>>()
   private readonly operations = new Set<Promise<unknown>>()
   private readonly pumpTasks = new Set<Promise<void>>()
   private readonly versions = new Map<string, number>()
@@ -169,6 +177,7 @@ export class LocalRuntimeManager {
             await this.options.journal.save(running, session.revision)
             await this.options.admission.validate(request)
             this.assertOpen()
+            this.permissionGuards.set(sessionId, this.options.admission.permissionGuard(request))
             const receipt = structuredClone(
               await adapter.send(
                 { session: structuredClone(running), admissionId, leaseGeneration: request.lease.generation },
@@ -261,6 +270,176 @@ export class LocalRuntimeManager {
     return this.operation(() => this.close(sessionId))
   }
 
+  async resolvePermission(input: PermissionDecision): Promise<void> {
+    const decision = structuredClone(input)
+    return this.operation(() =>
+      this.serial(`session:${decision.sessionId}`, async () => {
+        const actorId = this.options.actorId
+        if (!actorId?.trim()) throw new Error("A trusted host actor is required")
+        const claim = await this.options.journal.claimPermission(decision, actorId, this.now())
+        if (!claim.created) {
+          if (claim.record.state !== "resolved" || claim.record.resolution?.outcome !== claim.record.intent?.outcome)
+            throw new Error("Permission outcome is uncertain or was denied; native replay is blocked")
+          return
+        }
+        try {
+          const session = await this.session(decision.sessionId)
+          const request = this.active.get(session.id)
+          const commandId = this.activeTurns.get(session.id)
+          const command = commandId ? await this.options.journal.command(commandId) : undefined
+          if (
+            !request ||
+            !command ||
+            command.receipt.nativeTurnId !== decision.nativeTurnId ||
+            !this.pumps.has(session.id) ||
+            this.pumps.get(session.id)!.stopping
+          )
+            throw new Error("Permission native handle is detached")
+          this.validatePermissionBinding(session, request, decision)
+          const adapter = this.adapter(session.binding.runtimeId, session.binding.targetId)
+          if (!adapter.resolvePermission) throw new Error("Native permission handling is unsupported")
+          let authorization: (() => void) | undefined
+          if (claim.record.intent!.outcome === "allowed") {
+            if (session.intent.policy.approval !== "ask" || session.status !== "awaiting-permission")
+              throw new Error("Session cannot grant permission")
+            const guard = this.permissionGuards.get(session.id)
+            if (!guard) throw new Error("Permission authorization is unavailable")
+            authorization = await guard()
+            if (!this.options.workspaces.current(request.lease)) throw new Error("Permission lease expired")
+          }
+          this.assertOpen()
+          const authorizeReply = () => {
+            this.assertOpen()
+            if (Date.parse(claim.record.request.expiresAt) <= this.now()) throw new Error("Permission expired")
+            authorization?.()
+          }
+          authorizeReply()
+          await adapter.resolvePermission(
+            {
+              session: structuredClone(session),
+              admissionId: request.admissionId,
+              leaseGeneration: request.lease.generation,
+              authorizeReply,
+            },
+            structuredClone(claim.record.decision!),
+          )
+          await this.options.journal.append(session.id, [this.permissionResolution(session, claim.record.intent!)])
+          await this.permissionStatus(session.id)
+          this.notify(session.id)
+        } catch {
+          await this.options.journal.markPermissionUncertain(decision.requestId)
+          throw new Error("Permission outcome is uncertain; native replay is blocked")
+        }
+      }),
+    )
+  }
+
+  /** Observation only: never resumes a thread, settles a command, or sends user content. */
+  async inspectSession(sessionId: string): Promise<NativeSessionInspection> {
+    return this.operation(() =>
+      this.serial(`session:${sessionId}`, async () => this.inspect(await this.session(sessionId))),
+    )
+  }
+
+  /** Caller owns the native processes exclusively. Reconcile detached state, never replay work. */
+  async reconcileSession(sessionId: string): Promise<AgentSession> {
+    return this.operation(() =>
+      this.serial(`session:${sessionId}`, async () => {
+        const pump = this.pumps.get(sessionId)
+        if (pump && !pump.stopping) throw new Error("Reconciliation requires a detached native stream")
+        const session = await this.session(sessionId)
+        if (session.status !== "uncertain") throw new Error("Only uncertain sessions require reconciliation")
+        const observed = await this.inspect(session)
+        if (
+          observed.completeness !== "complete" ||
+          observed.nativeState !== "idle" ||
+          observed.turns.some((turn) => turn.status === "running" || turn.status === "unknown")
+        )
+          return session
+        const commands = await this.options.journal.commands(sessionId)
+        let unresolved = false
+        for (const command of commands) {
+          if (await this.options.journal.isComplete(command.id)) continue
+          const turn = observed.turns.find((turn) => turn.nativeTurnId === command.receipt.nativeTurnId)
+          if (!turn || (turn.status !== "succeeded" && turn.status !== "failed" && turn.status !== "interrupted")) {
+            unresolved = true
+            continue
+          }
+          await this.options.journal.append(sessionId, [
+            {
+              type: "agent.completed",
+              data: { nativeTurnId: turn.nativeTurnId, outcome: turn.status },
+              scope: {
+                sessionId,
+                targetId: session.binding.targetId,
+                runtimeId: session.binding.runtimeId,
+                workspaceId: session.workspaceId,
+                commandId: command.id,
+                turnId: turn.nativeTurnId,
+              },
+              origin: {
+                streamId: `host:recovery:${sessionId}`,
+                epoch: "1",
+                eventId: command.id,
+                identityStrategy: "adapter-assigned",
+              },
+              observedAt: observed.observedAt,
+            },
+          ])
+        }
+        await this.expirePermissions(session, "host:recovery")
+        if (unresolved) {
+          this.notify(sessionId)
+          return this.session(sessionId)
+        }
+        const current = await this.session(sessionId)
+        const updated: AgentSession = { ...current, status: "idle", revision: current.revision + 1 }
+        await this.options.journal.save(updated, current.revision)
+        this.activeTurns.delete(sessionId)
+        this.permissionGuards.delete(sessionId)
+        this.notify(sessionId)
+        return structuredClone(updated)
+      }),
+    )
+  }
+
+  private async inspect(session: AgentSession): Promise<NativeSessionInspection> {
+    const adapter = this.adapter(session.binding.runtimeId, session.binding.targetId)
+    if (!adapter.inspect) throw new Error("Native history inspection is unsupported")
+    const observed = structuredClone(await adapter.inspect(structuredClone(session)))
+    const timestamp = Date.parse(observed.observedAt)
+    if (
+      observed.sessionId !== session.id ||
+      this.digest(observed.binding) !== this.digest(session.binding) ||
+      !Number.isFinite(timestamp) ||
+      timestamp > this.now() ||
+      timestamp < this.now() - 60_000 ||
+      !["idle", "running", "unknown"].includes(observed.nativeState) ||
+      !["complete", "partial"].includes(observed.completeness) ||
+      !Array.isArray(observed.turns) ||
+      observed.turns.length > 2000
+    )
+      throw new Error("Invalid native inspection binding or evidence")
+    const ids = new Set<string>()
+    for (const turn of observed.turns) {
+      if (
+        typeof turn.nativeTurnId !== "string" ||
+        !turn.nativeTurnId ||
+        turn.nativeTurnId.length > 256 ||
+        ids.has(turn.nativeTurnId) ||
+        !["running", "succeeded", "failed", "interrupted", "unknown"].includes(turn.status)
+      )
+        throw new Error("Invalid native turn observation")
+      ids.add(turn.nativeTurnId)
+    }
+    if (
+      observed.nativeState === "idle" &&
+      (observed.completeness !== "complete" || observed.turns.some((turn) => turn.status === "running"))
+    )
+      throw new Error("Inconsistent native inspection")
+    return observed
+  }
+
   /** Requires exclusive ownership of this host journal and native processes. Never dispatches commands. */
   async recover(): Promise<readonly CommandReceipt[]> {
     this.assertOpen()
@@ -272,6 +451,7 @@ export class LocalRuntimeManager {
         try {
           const pending = await this.options.journal.recoverPending()
           await this.options.journal.recoverActiveSessions()
+          await this.options.journal.recoverPermissions(this.now())
           for (const record of pending) {
             const session = await this.options.journal.get(record.sessionId)
             if (session && session.status !== "uncertain")
@@ -321,6 +501,7 @@ export class LocalRuntimeManager {
       if (["running", "awaiting-permission", "uncertain"].includes(session.status))
         await this.streamUncertain(sessionId)
       const current = await this.session(sessionId)
+      await this.expirePermissions(current, "host:close")
       if (current.status !== "uncertain") {
         await this.options.journal.save(
           { ...current, status: "closed", revision: current.revision + 1 },
@@ -331,6 +512,7 @@ export class LocalRuntimeManager {
         this.active.delete(sessionId)
       }
       this.activeTurns.delete(sessionId)
+      this.permissionGuards.delete(sessionId)
       this.notify(sessionId)
     })
     // An event ingestion may be waiting for the session lock above; drain after releasing it.
@@ -435,6 +617,45 @@ export class LocalRuntimeManager {
       throw new Error("Native event scope mismatch")
     if (draft.type === "session.updated") throw new Error("Native adapters cannot replace host session authority")
     const command = draft.scope.commandId ? await this.options.journal.command(draft.scope.commandId) : undefined
+    if (draft.type === "permission.requested") {
+      const existing = await this.options.journal.permission(draft.data.requestId)
+      if (existing) {
+        if (
+          this.digest(existing.request) !== this.digest(draft.data) ||
+          !command ||
+          command.sessionId !== session.id ||
+          command.receipt.nativeTurnId !== draft.data.nativeTurnId
+        )
+          throw new Error("Conflicting permission replay")
+        return
+      }
+      const current = await this.session(session.id)
+      const request = this.active.get(session.id)
+      if (
+        !request ||
+        !command ||
+        this.activeTurns.get(session.id) !== command.id ||
+        command.receipt.nativeTurnId !== draft.data.nativeTurnId ||
+        !["running", "awaiting-permission"].includes(current.status)
+      )
+        throw new Error("Native permission has no matching active turn")
+      this.validatePermissionBinding(current, request, draft.data)
+      if (current.intent.policy.approval !== "ask" && draft.data.choices.some((choice) => choice.action === "allow"))
+        throw new Error("Permission grant contradicts policy")
+    }
+    if (draft.type === "permission.resolved") {
+      if (draft.data.outcome === "allowed") throw new Error("Native adapters cannot grant host permission")
+      const existing = await this.options.journal.permission(draft.data.requestId)
+      if (!existing || !samePermissionBinding(existing.request, draft.data))
+        throw new Error("Native permission resolution binding mismatch")
+      // A repeated or late negative acknowledgement cannot replace the first terminal denial,
+      // nor acquire a different timestamp under an already durable source-event identity.
+      if (existing.state === "resolved" && existing.resolution?.outcome !== "allowed") return
+      draft = {
+        ...draft,
+        data: { ...draft.data, actorId: "host:native-policy", decidedAt: new Date(this.now()).toISOString() },
+      }
+    }
     if (draft.type === "agent.completed" || draft.type === "agent.started") {
       if (
         !command ||
@@ -447,12 +668,16 @@ export class LocalRuntimeManager {
     }
     const events = await this.options.journal.append(session.id, [draft])
     if (!events.length) return
+    if (draft.type === "permission.requested" || draft.type === "permission.resolved")
+      await this.permissionStatus(session.id)
     if (draft.type === "agent.completed" && this.activeTurns.get(session.id) === draft.scope.commandId) {
       const current = await this.session(session.id)
       const status =
         draft.data.outcome === "succeeded" ? "idle" : draft.data.outcome === "interrupted" ? "interrupted" : "failed"
       await this.options.journal.save({ ...current, status, revision: current.revision + 1 }, current.revision)
+      await this.expirePermissions(current, "host:turn-completed")
       this.activeTurns.delete(session.id)
+      this.permissionGuards.delete(session.id)
     }
     if (
       draft.type === "stream.gap" ||
@@ -479,6 +704,95 @@ export class LocalRuntimeManager {
       !Number.isFinite(Date.parse(session.createdAt))
     )
       throw new Error("Native session intent or effective settings differ from admission")
+  }
+
+  private validatePermissionBinding(
+    session: AgentSession,
+    request: AdmittedSessionRequest,
+    binding: PermissionBinding,
+  ) {
+    if (
+      binding.sessionId !== session.id ||
+      binding.runtimeId !== session.binding.runtimeId ||
+      binding.targetId !== session.binding.targetId ||
+      binding.workspaceId !== session.workspaceId ||
+      binding.nativeSessionId !== session.binding.nativeSessionId ||
+      binding.policyId !== session.intent.policy.id ||
+      binding.policyVersion !== session.intent.policy.version ||
+      binding.leaseGeneration !== request.lease.generation
+    )
+      throw new Error("Permission binding mismatch")
+  }
+
+  private permissionResolution(session: AgentSession, resolution: PermissionResolution): AgentEventDraft {
+    return {
+      type: "permission.resolved",
+      data: resolution,
+      scope: {
+        sessionId: session.id,
+        runtimeId: session.binding.runtimeId,
+        targetId: session.binding.targetId,
+        workspaceId: session.workspaceId,
+        turnId: resolution.nativeTurnId,
+      },
+      origin: {
+        streamId: `host:permissions:${session.id}`,
+        epoch: "1",
+        eventId: `${resolution.requestId}:${resolution.outcome}`,
+        identityStrategy: "adapter-assigned",
+      },
+      observedAt: new Date(this.now()).toISOString(),
+    }
+  }
+
+  private async permissionStatus(sessionId: string) {
+    const current = await this.session(sessionId)
+    if (!["running", "awaiting-permission"].includes(current.status)) return
+    const status = (await this.options.journal.pendingPermissions(sessionId)).length ? "awaiting-permission" : "running"
+    if (status !== current.status)
+      await this.options.journal.save({ ...current, status, revision: current.revision + 1 }, current.revision)
+  }
+
+  private async expirePermissions(session: AgentSession, actorId: string) {
+    for (const { request } of await this.options.journal.pendingPermissions(session.id)) {
+      const {
+        requestId,
+        sessionId,
+        runtimeId,
+        targetId,
+        workspaceId,
+        nativeSessionId,
+        nativeTurnId,
+        nativeRequestId,
+        policyId,
+        policyVersion,
+        leaseGeneration,
+        operationSha256,
+      } = request
+      await this.options.journal.append(session.id, [
+        this.permissionResolution(session, {
+          requestId,
+          sessionId,
+          runtimeId,
+          targetId,
+          workspaceId,
+          nativeSessionId,
+          nativeTurnId,
+          nativeRequestId,
+          policyId,
+          policyVersion,
+          leaseGeneration,
+          operationSha256,
+          outcome: "expired",
+          actorId,
+          decidedAt: new Date(this.now()).toISOString(),
+        }),
+      ])
+    }
+  }
+
+  private now() {
+    return (this.options.now ?? Date.now)()
   }
 
   private record(request: AdmittedSessionRequest, commandId: string, requestSha256: string): CommandRecord {
@@ -557,4 +871,23 @@ export class LocalRuntimeManager {
       if (this.locks.get(key) === settled) this.locks.delete(key)
     }
   }
+}
+
+function samePermissionBinding(left: PermissionBinding, right: PermissionBinding): boolean {
+  return (
+    [
+      "requestId",
+      "sessionId",
+      "runtimeId",
+      "targetId",
+      "workspaceId",
+      "nativeSessionId",
+      "nativeTurnId",
+      "nativeRequestId",
+      "policyId",
+      "policyVersion",
+      "leaseGeneration",
+      "operationSha256",
+    ] as const
+  ).every((key) => left[key] === right[key])
 }

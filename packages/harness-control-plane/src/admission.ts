@@ -219,6 +219,52 @@ export class AdmissionController implements AdmissionService {
     this.checkEffective(record.request.intent, admitted.effective, runtime.descriptor.version)
   }
 
+  /** Capture authority for an in-flight native permission without extending command admission. */
+  permissionGuard(request: AdmittedSessionRequest): () => Promise<() => void> {
+    const admitted = structuredClone(request)
+    const record = this.record(admitted.admissionId)
+    if (
+      record.sessionId !== admitted.sessionId ||
+      hashConfiguration(record.request.intent) !== hashConfiguration(admitted.intent) ||
+      this.identity(record.effective) !== this.identity(admitted.effective)
+    )
+      fail("permission-denied", "Permission admission binding mismatch")
+    // A pending native operation may outlive its admission token. Retain its revocation epoch,
+    // runtime identity and immutable intent, then require fresh evidence for each grant.
+    return async () => {
+      const validEpoch = () => {
+        if (record.revoked || record.epoch !== (this.epochs.get(admitted.intent.selection.runtimeId) ?? 0))
+          fail("permission-denied", "Permission admission was revoked")
+      }
+      validEpoch()
+      const current = await this.check({ operation: "resume", sessionId: admitted.sessionId, intent: admitted.intent })
+      if (
+        current.adapter !== record.adapter ||
+        current.runtimeFingerprint !== record.runtimeFingerprint ||
+        this.identity(current.effective) !== this.identity(record.effective) ||
+        hashConfiguration(current.workspace) !== hashConfiguration(record.workspace)
+      )
+        fail("permission-denied", "Permission runtime, account, configuration or workspace changed")
+      if (!(await this.options.workspaces.valid(admitted.lease))) fail("workspace-conflict", "Permission lease expired")
+      const final = () => {
+        validEpoch()
+        this.checkEffective(admitted.intent, current.effective)
+        const runtime = this.options.runtime(admitted.intent.selection.runtimeId, admitted.intent.selection.targetId)
+        if (
+          !runtime ||
+          runtime.adapter !== record.adapter ||
+          this.runtimeFingerprint(runtime.descriptor, runtime.adapter) !== record.runtimeFingerprint
+        )
+          fail("unavailable", "Permission runtime changed")
+        if (current.consent && Date.parse(current.consent.expiresAt) <= this.now())
+          fail("billing-conflict", "Permission consent expired")
+        if (!this.options.workspaces.current(admitted.lease)) fail("workspace-conflict", "Permission lease expired")
+      }
+      final()
+      return final
+    }
+  }
+
   /** One admitted intent permits one exact command payload, including its idempotency key. */
   bindCommand(admissionId: string, commandId: string, requestSha256: string): void {
     const record = this.record(admissionId)

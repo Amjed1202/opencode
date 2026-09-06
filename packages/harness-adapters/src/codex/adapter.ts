@@ -12,12 +12,19 @@ import type {
   CommandReceipt,
   ExecutionTarget,
   JsonValue,
+  PermissionDecision,
+  PermissionBinding,
+  PermissionRequest,
+  NativeSessionInspection,
   RuntimeDescriptor,
   RuntimePreflight,
   SessionIntent,
 } from "@harness/protocol"
-import type { AdapterSessionContext, AgentAdapter, DiscoveryContext } from "../index"
+import type { AdapterSessionContext, AdapterPermissionContext, AgentAdapter, DiscoveryContext } from "../index"
 import { StdioJsonRpc, isRecord } from "./stdio"
+import { approvalDenial, approvalPlan, fileApprovalEvidence } from "./permissions"
+import type { FileApprovalEvidence } from "./permissions"
+import { inspectCodexHistory } from "./history"
 import type { NativeNotification, NativeReply, NativeRequest, StdioJsonRpcOptions } from "./stdio"
 import type { InitializeParams } from "./generated/0.153.4/InitializeParams"
 import type { ConfigReadParams } from "./generated/0.153.4/v2/ConfigReadParams"
@@ -26,9 +33,7 @@ import type { ThreadStartParams } from "./generated/0.153.4/v2/ThreadStartParams
 import type { ThreadResumeParams } from "./generated/0.153.4/v2/ThreadResumeParams"
 import type { TurnStartParams } from "./generated/0.153.4/v2/TurnStartParams"
 import type { TurnInterruptParams } from "./generated/0.153.4/v2/TurnInterruptParams"
-import type { CommandExecutionRequestApprovalResponse } from "./generated/0.153.4/v2/CommandExecutionRequestApprovalResponse"
 import type { FileChangeRequestApprovalResponse } from "./generated/0.153.4/v2/FileChangeRequestApprovalResponse"
-import type { PermissionsRequestApprovalResponse } from "./generated/0.153.4/v2/PermissionsRequestApprovalResponse"
 import type { McpServerElicitationRequestResponse } from "./generated/0.153.4/v2/McpServerElicitationRequestResponse"
 export interface CodexAdapterOptions {
   readonly executable: string
@@ -38,11 +43,13 @@ export interface CodexAdapterOptions {
   readonly runtimeId?: string
   readonly requestTimeoutMs?: number
   readonly maxMessageBytes?: number
+  readonly approvalTimeoutMs?: number
   readonly transportFactory?: (options: StdioJsonRpcOptions) => StdioJsonRpc
 }
 type OwnedSession = {
   session: AgentSession
   leaseGeneration: number
+  leaseExpiresAt: string
   stream: EventStream
   busy: boolean
   commandId?: string
@@ -51,6 +58,21 @@ type OwnedSession = {
   seenCommands: Set<string>
   awaitingAck: boolean
   buffered: NativeNotification[]
+  ack?: ReturnType<typeof Promise.withResolvers<void>>
+  files: Map<string, FileApprovalEvidence>
+  approvalEpoch: number
+}
+type PendingApproval = {
+  owned: OwnedSession
+  message: NativeRequest
+  request: PermissionRequest
+  files?: FileApprovalEvidence
+  epoch: number
+  approvalEpoch: number
+  timer: ReturnType<typeof setTimeout>
+  reply: (reply: NativeReply) => void
+  delivered: Promise<void>
+  deciding: boolean
 }
 
 // Verified against the pinned official config.schema.json; these never edit config.toml.
@@ -99,11 +121,19 @@ export class CodexAdapter implements AgentAdapter {
   private accountMode: unknown = "chatgpt"
   private versionVerifiedAt = new Date().toISOString()
   private readonly sessions = new Map<string, OwnedSession>()
+  private readonly approvals = new Map<string, PendingApproval>()
 
   constructor(options: CodexAdapterOptions) {
     if (!absolute(options.executable) || !absolute(options.cwd) || options.target.kind !== "local")
       throw new Error("Codex requires an explicit absolute local executable and workspace")
     requireEnvironment(options.environment)
+    if (
+      options.approvalTimeoutMs !== undefined &&
+      (!Number.isFinite(options.approvalTimeoutMs) ||
+        options.approvalTimeoutMs < 10 ||
+        options.approvalTimeoutMs > 60_000)
+    )
+      throw new Error("Invalid approval timeout")
     this.options = { ...options, environment: Object.freeze({ ...options.environment }), target: { ...options.target } }
     this.runtimeId = options.runtimeId ?? "codex-local"
   }
@@ -151,12 +181,14 @@ export class CodexAdapter implements AgentAdapter {
       "session-resume": {
         ...support,
         limitations: [
-          "Native ID resume only; historical event hydration and uncertain-turn reconciliation are not implemented.",
+          "Native ID resume and bounded status inspection; full transcript hydration is not implemented. Only acknowledged native turn IDs can support reconciliation.",
         ],
       },
       permissions: {
         ...support,
-        limitations: ["All native approval requests are denied; interactive permission grants are unsupported."],
+        limitations: [
+          "Only observed file changes strictly within a workspace-write policy can be approved once. Command, network, profile and session expansions are denied. Filesystem checks are observational and do not attest OS enforcement.",
+        ],
       },
       coding: { status: "unknown", reason: "Native tool mappings and OS enforcement are not verified." },
       "human-input": { status: "unsupported", reason: "Human input requests are declined." },
@@ -207,6 +239,48 @@ export class CodexAdapter implements AgentAdapter {
     return this.open(request, nativeId(existing.binding.nativeSessionId))
   }
 
+  async inspect(input: AgentSession): Promise<NativeSessionInspection> {
+    const session = structuredClone(input)
+    try {
+      this.requireIntent(session.intent)
+      if (
+        session.binding.adapterId !== this.id ||
+        session.binding.runtimeId !== this.runtimeId ||
+        session.binding.targetId !== this.options.target.id ||
+        session.workspaceId !== session.intent.workspaceId
+      )
+        throw new Error("Invalid native inspection binding")
+      const before = await this.observe()
+      if (
+        before.auth.accountId !== session.effective.auth.accountId ||
+        before.configurationFingerprint !== session.effective.configurationFingerprint
+      )
+        throw new Error("Native inspection account or configuration changed")
+      const transport = await this.connect()
+      const result = await inspectCodexHistory({
+        session,
+        cwd: this.options.cwd,
+        request: (method, params) => transport.request(method, params),
+      })
+      const after = await this.observe()
+      if (
+        after.auth.accountId !== before.auth.accountId ||
+        after.configurationFingerprint !== before.configurationFingerprint
+      )
+        throw new Error("Native inspection changed during pagination")
+      return result
+    } catch {
+      return {
+        sessionId: session.id,
+        binding: session.binding,
+        observedAt: new Date().toISOString(),
+        nativeState: "unknown",
+        completeness: "partial",
+        turns: [],
+      }
+    }
+  }
+
   async send(context: AdapterSessionContext, input: AgentInput): Promise<CommandReceipt> {
     const receipt = (state: CommandReceipt["state"], message?: string): CommandReceipt => ({
       commandId: input.commandId,
@@ -253,7 +327,7 @@ export class CodexAdapter implements AgentAdapter {
         ),
         model: context.session.intent.selection.model.modelId,
         cwd: this.options.cwd,
-        approvalPolicy: "never",
+        approvalPolicy: context.session.intent.policy.approval === "ask" ? "on-request" : "never",
         approvalsReviewer: "user",
         sandboxPolicy:
           context.session.intent.policy.filesystem === "read-only"
@@ -268,18 +342,21 @@ export class CodexAdapter implements AgentAdapter {
         serviceTierForTurn: "default",
       } satisfies TurnStartParams
       owned.awaitingAck = true
+      owned.ack = Promise.withResolvers<void>()
       const result = await (await this.connect()).request("turn/start", params)
       if (!isRecord(result) || !isRecord(result.turn)) throw new Error("Invalid turn response")
       const id = nativeId(result.turn.id)
       owned.turnId = id
       owned.awaitingAck = false
       for (const event of owned.buffered.splice(0)) this.notification(event)
+      owned.ack.resolve()
       return { ...receipt("dispatched"), nativeTurnId: id }
     } catch {
       // Dispatch may already have happened. The host journal owns reconciliation and must not replay this command.
       owned.busy = true
       owned.awaitingAck = false
       owned.buffered.length = 0
+      owned.ack?.resolve()
       return receipt("uncertain", "Native turn acknowledgement was lost or invalid; do not retry automatically")
     }
   }
@@ -291,8 +368,77 @@ export class CodexAdapter implements AgentAdapter {
     return owned.stream
   }
 
+  async resolvePermission(context: AdapterPermissionContext, input: PermissionDecision): Promise<void> {
+    const decision = structuredClone(input)
+    const authorizeReply = context.authorizeReply
+    const pending = this.approvals.get(decision.requestId)
+    if (!pending) throw new Error("Native permission is no longer pending")
+    try {
+      const owned = this.owned(context)
+      const binding = permissionBinding(pending.request)
+      if (
+        pending.owned !== owned ||
+        pending.deciding ||
+        Object.keys(binding).some(
+          (key) => decision[key as keyof PermissionDecision] !== binding[key as keyof typeof binding],
+        )
+      )
+        throw new Error("Native permission binding mismatch")
+      const choice = pending.request.choices.find((item) => item.id === decision.choiceId)
+      if (!choice || choice.scope !== "once") throw new Error("Native permission choice was not offered")
+      pending.deciding = true
+      if (choice.action === "allow") {
+        if (!authorizeReply) throw new Error("Native grants require the host write-boundary authorization guard")
+        const observation = await this.observe()
+        if (
+          observation.configurationFingerprint !== owned.session.effective.configurationFingerprint ||
+          observation.auth.accountId !== owned.session.effective.auth.accountId ||
+          !(await approvalPlan(pending.message, owned.session.intent.policy, this.options.cwd, pending.files)).allow
+        )
+          throw new Error("Native permission policy or account changed")
+      }
+      if (
+        this.approvals.get(decision.requestId) !== pending ||
+        Date.parse(pending.request.expiresAt) <= Date.now() ||
+        pending.epoch !== this.accountEpoch ||
+        pending.approvalEpoch !== owned.approvalEpoch ||
+        !owned.busy ||
+        owned.turnId !== pending.request.nativeTurnId ||
+        (pending.files && owned.files.get(pending.request.toolCallId!)?.sha256 !== pending.files.sha256)
+      )
+        throw new Error("Native permission expired or operation changed")
+      this.approvals.delete(decision.requestId)
+      clearTimeout(pending.timer)
+      pending.reply(
+        choice.action === "allow"
+          ? {
+              result: { decision: "accept" } satisfies FileChangeRequestApprovalResponse,
+              beforeWrite: () => {
+                if (
+                  this.disposed ||
+                  Date.parse(pending.request.expiresAt) <= Date.now() ||
+                  pending.epoch !== this.accountEpoch ||
+                  pending.approvalEpoch !== owned.approvalEpoch ||
+                  !owned.busy ||
+                  owned.turnId !== pending.request.nativeTurnId ||
+                  (pending.files && owned.files.get(pending.request.toolCallId!)?.sha256 !== pending.files.sha256)
+                )
+                  throw new Error("Native permission changed before reply")
+                authorizeReply!()
+              },
+            }
+          : approvalDenial(pending.message.method)!,
+      )
+      await pending.delivered
+    } catch (error) {
+      await this.settleApproval(pending, "denied")
+      throw error
+    }
+  }
+
   async interrupt(context: AdapterSessionContext): Promise<void> {
     const owned = this.owned(context)
+    await this.cancelApprovals(owned)
     if (!owned.turnId) return
     await (
       await this.connect()
@@ -307,6 +453,7 @@ export class CodexAdapter implements AgentAdapter {
     if (!owned) return
     if (owned.session.binding.nativeSessionId !== session.binding.nativeSessionId)
       throw new Error("Session binding mismatch")
+    await this.cancelApprovals(owned)
     if (owned.turnId)
       await this.interrupt({ session: owned.session, admissionId: "close", leaseGeneration: owned.leaseGeneration })
     try {
@@ -319,6 +466,7 @@ export class CodexAdapter implements AgentAdapter {
 
   async dispose(): Promise<void> {
     this.disposed = true
+    await this.cancelApprovals()
     await this.transport?.close()
     for (const owned of this.sessions.values()) owned.stream.finish()
     this.sessions.clear()
@@ -341,9 +489,10 @@ export class CodexAdapter implements AgentAdapter {
         ...(this.options.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: this.options.requestTimeoutMs }),
         ...(this.options.maxMessageBytes === undefined ? {} : { maxMessageBytes: this.options.maxMessageBytes }),
         onNotification: (message) => this.notification(message),
-        onRequest: (message) => this.serverRequest(message),
+        onRequest: (message, signal, delivered) => this.serverRequest(message, signal, delivered),
         onClose: () => {
           this.disposed = true
+          void this.cancelApprovals()
           for (const owned of this.sessions.values()) owned.stream.finish()
         },
       }
@@ -383,7 +532,7 @@ export class CodexAdapter implements AgentAdapter {
     )
       throw new Error("Only explicit subscription selection with acknowledged provider settings is supported")
     if (
-      policy.approval !== "deny" ||
+      !["ask", "deny"].includes(policy.approval) ||
       policy.shell !== "sandboxed" ||
       policy.network !== "denied" ||
       policy.allowedMcpServers.length ||
@@ -489,7 +638,7 @@ export class CodexAdapter implements AgentAdapter {
       model: request.intent.selection.model.modelId,
       modelProvider: "openai",
       cwd: this.options.cwd,
-      approvalPolicy: "never",
+      approvalPolicy: request.intent.policy.approval === "ask" ? "on-request" : "never",
       approvalsReviewer: "user",
       sandbox: request.intent.policy.filesystem,
       serviceTier: "default",
@@ -520,7 +669,7 @@ export class CodexAdapter implements AgentAdapter {
       response.model !== params.model ||
       typeof response.cwd !== "string" ||
       !samePath(response.cwd, this.options.cwd) ||
-      response.approvalPolicy !== "never" ||
+      response.approvalPolicy !== params.approvalPolicy ||
       response.approvalsReviewer !== "user" ||
       !isRecord(response.sandbox) ||
       response.sandbox.networkAccess !== false ||
@@ -554,11 +703,14 @@ export class CodexAdapter implements AgentAdapter {
     this.sessions.set(session.id, {
       session: structuredClone(session),
       leaseGeneration: request.lease.generation,
+      leaseExpiresAt: request.lease.expiresAt,
       stream: new EventStream(),
       busy: false,
       seenCommands: new Set(),
       awaitingAck: false,
       buffered: [],
+      files: new Map(),
+      approvalEpoch: 0,
     })
     return session
   }
@@ -586,6 +738,7 @@ export class CodexAdapter implements AgentAdapter {
       if (message.method === "account/updated")
         this.accountMode = isRecord(message.params) ? message.params.authMode : null
       this.accountEpoch++
+      void this.cancelApprovals()
       for (const owned of this.sessions.values())
         if (owned.turnId)
           void this.transport
@@ -629,7 +782,12 @@ export class CodexAdapter implements AgentAdapter {
         return
       }
       if (owned.completedTurnId === id) return
-      if (!["completed", "failed", "interrupted"].includes(String(params.turn.status)))
+      void this.cancelApprovals(owned)
+      owned.files.clear()
+      if (
+        typeof params.turn.status !== "string" ||
+        !["completed", "failed", "interrupted"].includes(params.turn.status)
+      )
         throw new Error("Unknown terminal turn status")
       if (params.turn.status === "failed")
         this.emit(
@@ -667,6 +825,29 @@ export class CodexAdapter implements AgentAdapter {
       return
     }
     const turnId = typeof params.turnId === "string" ? nativeId(params.turnId) : undefined
+    const fileItem =
+      (message.method === "item/started" || message.method === "item/completed") &&
+      isRecord(params.item) &&
+      params.item.type === "fileChange"
+        ? params.item
+        : undefined
+    if (
+      (fileItem || message.method === "item/fileChange/patchUpdated") &&
+      typeof params.turnId === "string" &&
+      params.turnId === owned.turnId &&
+      owned.busy
+    ) {
+      const itemId = nativeId(fileItem ? fileItem.id : params.itemId)
+      for (const pending of this.approvals.values())
+        if (pending.owned === owned && pending.request.toolCallId === itemId)
+          void this.settleApproval(pending, "denied")
+      owned.files.delete(itemId)
+      const files =
+        message.method !== "item/completed" && (!fileItem || fileItem.status === "inProgress")
+          ? fileApprovalEvidence(fileItem ? fileItem.changes : params.changes)
+          : undefined
+      if (files && owned.files.size < 64) owned.files.set(itemId, files)
+    }
     if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") {
       const id = nativeId(params.itemId)
       this.emit(
@@ -700,10 +881,139 @@ export class CodexAdapter implements AgentAdapter {
     )
   }
 
-  private serverRequest(message: NativeRequest): NativeReply {
+  private async serverRequest(
+    message: NativeRequest,
+    signal: AbortSignal,
+    delivered: Promise<void>,
+  ): Promise<NativeReply> {
     // Never retain authentication exchanges, external tokens, command bodies or unknown request payloads.
     if (message.method.startsWith("account/"))
       return { error: { code: -32601, message: "External authentication is unsupported" } }
+    const denial = approvalDenial(message.method)
+    if (denial && isRecord(message.params)) {
+      const params = message.params
+      const owned = [...this.sessions.values()].find((item) => item.session.binding.nativeSessionId === params.threadId)
+      if (owned?.awaitingAck) await owned.ack?.promise
+      const id =
+        typeof message.id === "number"
+          ? `number:${message.id}`
+          : /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(message.id)
+            ? `string:${message.id}`
+            : undefined
+      if (
+        owned &&
+        !signal.aborted &&
+        id &&
+        owned.busy &&
+        params.turnId === owned.turnId &&
+        typeof params.itemId === "string" &&
+        /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(params.itemId) &&
+        typeof params.startedAtMs === "number" &&
+        Number.isSafeInteger(params.startedAtMs) &&
+        params.startedAtMs > 0 &&
+        params.startedAtMs <= Date.now() + 1000
+      ) {
+        const epoch = this.accountEpoch
+        const approvalEpoch = owned.approvalEpoch
+        const files = message.method === "item/fileChange/requestApproval" ? owned.files.get(params.itemId) : undefined
+        const plan = await approvalPlan(message, owned.session.intent.policy, this.options.cwd, files)
+        const expiresAt = new Date(
+          Math.min(
+            Date.now() + (this.options.approvalTimeoutMs ?? 60_000),
+            params.startedAtMs + (this.options.approvalTimeoutMs ?? 60_000),
+            Date.parse(owned.leaseExpiresAt),
+          ),
+        ).toISOString()
+        if (
+          signal.aborted ||
+          !owned.busy ||
+          owned.turnId !== params.turnId ||
+          epoch !== this.accountEpoch ||
+          approvalEpoch !== owned.approvalEpoch ||
+          Date.parse(expiresAt) <= Date.now() ||
+          (files && owned.files.get(params.itemId)?.sha256 !== files.sha256)
+        )
+          return denial
+        const request: PermissionRequest = {
+          requestId: randomUUID(),
+          sessionId: owned.session.id,
+          targetId: this.options.target.id,
+          runtimeId: this.runtimeId,
+          workspaceId: owned.session.workspaceId,
+          nativeSessionId: owned.session.binding.nativeSessionId,
+          nativeTurnId: nativeId(params.turnId),
+          nativeRequestId: id,
+          policyId: owned.session.intent.policy.id,
+          policyVersion: owned.session.intent.policy.version,
+          leaseGeneration: owned.leaseGeneration,
+          operationSha256: hash({
+            id: message.id,
+            method: message.method,
+            params,
+            files: files?.sha256,
+            binding: owned.session.binding,
+            policy: owned.session.intent.policy,
+            workspace: resolve(this.options.cwd),
+            generation: owned.leaseGeneration,
+            epoch,
+            approvalEpoch,
+            fingerprint: owned.session.effective.configurationFingerprint,
+          }),
+          toolCallId: params.itemId,
+          action:
+            message.method === "item/fileChange/requestApproval"
+              ? "file-change"
+              : message.method === "item/permissions/requestApproval"
+                ? "additional-permissions"
+                : "command-execution",
+          resources: plan.resources,
+          details: plan.details,
+          choices: [
+            ...(plan.allow
+              ? [
+                  {
+                    id: "allow-once",
+                    action: "allow" as const,
+                    scope: "once" as const,
+                    label: "Allow these file changes once",
+                  },
+                ]
+              : []),
+            { id: "deny-once", action: "deny", scope: "once", label: "Deny" },
+          ],
+          expiresAt,
+        }
+        const response = Promise.withResolvers<NativeReply>()
+        const pending: PendingApproval = {
+          owned,
+          message,
+          request,
+          ...(files ? { files } : {}),
+          epoch,
+          approvalEpoch,
+          delivered,
+          deciding: false,
+          timer: setTimeout(
+            () => {
+              void this.settleApproval(pending, "expired")
+            },
+            Math.max(1, Date.parse(expiresAt) - Date.now()),
+          ),
+          reply: response.resolve,
+        }
+        this.approvals.set(request.requestId, pending)
+        signal.addEventListener(
+          "abort",
+          () => {
+            void this.settleApproval(pending, "denied")
+          },
+          { once: true },
+        )
+        this.emit(owned, message, { type: "permission.requested", data: structuredClone(request) }, owned.turnId)
+        if (owned.session.intent.policy.approval === "deny") void this.settleApproval(pending, "denied")
+        return response.promise
+      }
+    }
     if (isRecord(message.params)) {
       const params = message.params
       const owned = [...this.sessions.values()].find((item) => item.session.binding.nativeSessionId === params.threadId)
@@ -715,17 +1025,44 @@ export class CodexAdapter implements AgentAdapter {
           typeof params.turnId === "string" ? nativeId(params.turnId) : undefined,
         )
     }
-    if (message.method === "item/commandExecution/requestApproval")
-      return { result: { decision: "decline" } satisfies CommandExecutionRequestApprovalResponse }
-    if (message.method === "item/fileChange/requestApproval")
-      return { result: { decision: "decline" } satisfies FileChangeRequestApprovalResponse }
-    if (message.method === "item/permissions/requestApproval")
-      return { result: { permissions: {}, scope: "turn" } satisfies PermissionsRequestApprovalResponse }
+    if (denial) return denial
     if (message.method === "mcpServer/elicitation/request")
       return { result: { action: "decline", content: null, _meta: null } satisfies McpServerElicitationRequestResponse }
     if (message.method === "applyPatchApproval" || message.method === "execCommandApproval")
       return { result: { decision: "abort" } }
     return { error: { code: -32601, message: "Native request is unsupported and was not approved" } }
+  }
+
+  private async settleApproval(pending: PendingApproval, outcome: "denied" | "expired"): Promise<void> {
+    if (this.approvals.get(pending.request.requestId) !== pending) return
+    this.approvals.delete(pending.request.requestId)
+    clearTimeout(pending.timer)
+    pending.reply(approvalDenial(pending.message.method)!)
+    // Autonomous outcomes are journaled even when the native process has already disconnected.
+    this.emit(
+      pending.owned,
+      pending.message,
+      {
+        type: "permission.resolved",
+        data: {
+          ...permissionBinding(pending.request),
+          outcome,
+          actorId: "codex-adapter",
+          decidedAt: new Date().toISOString(),
+        },
+      },
+      pending.request.nativeTurnId,
+    )
+    await pending.delivered.catch(() => undefined)
+  }
+
+  private async cancelApprovals(owned?: OwnedSession): Promise<void> {
+    for (const session of owned ? [owned] : this.sessions.values()) session.approvalEpoch++
+    await Promise.all(
+      [...this.approvals.values()]
+        .filter((pending) => !owned || pending.owned === owned)
+        .map((pending) => this.settleApproval(pending, "denied")),
+    )
   }
 
   private emit(
@@ -825,6 +1162,23 @@ function requireEnvironment(environment: Readonly<Record<string, string>>): void
     !samePath(normalized.HOME, normalized.USERPROFILE)
   )
     throw new Error("Conflicting native home directories")
+}
+
+function permissionBinding(request: PermissionRequest): PermissionBinding {
+  return {
+    requestId: request.requestId,
+    sessionId: request.sessionId,
+    targetId: request.targetId,
+    runtimeId: request.runtimeId,
+    workspaceId: request.workspaceId,
+    nativeSessionId: request.nativeSessionId,
+    nativeTurnId: request.nativeTurnId,
+    nativeRequestId: request.nativeRequestId,
+    policyId: request.policyId,
+    policyVersion: request.policyVersion,
+    leaseGeneration: request.leaseGeneration,
+    operationSha256: request.operationSha256,
+  }
 }
 
 function absolute(value: string): boolean {

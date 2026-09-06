@@ -1,13 +1,21 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
-import type { AgentEventDraft, AgentInput, AgentSession } from "@harness/protocol"
+import type {
+  AgentEventDraft,
+  AgentInput,
+  AgentSession,
+  NativeSessionInspection,
+  PermissionDecision,
+  PermissionRequest,
+  SessionIntent,
+} from "@harness/protocol"
 import { AdmissionController } from "../src/admission"
 import { hashConfiguration } from "../src/environment"
 import { LocalRuntimeManager } from "../src/runtime-manager"
 import { SQLiteJournal } from "../src/journal"
-import { admissionFixture, intent } from "./support"
+import { admissionFixture, intent, now } from "./support"
 
-async function fixture() {
+async function fixture(sessionIntent: SessionIntent = intent) {
   const base = await admissionFixture()
   const journal = new SQLiteJournal(join(base.directory, "journal.sqlite"))
   const streams = new Map<string, EventPeer>()
@@ -40,8 +48,10 @@ async function fixture() {
     journal,
     runtime: base.options.runtime,
     workspaces: base.workspaces,
+    actorId: "host:user-a",
+    now: () => now,
   })
-  const result = await admission.preflight({ operation: "create", intent })
+  const result = await admission.preflight({ operation: "create", intent: sessionIntent })
   if (result.status !== "ready") throw new Error("missing admission")
   return {
     ...base,
@@ -179,7 +189,11 @@ async function waitUntil(predicate: () => Promise<boolean>) {
 }
 
 async function send(state: Awaited<ReturnType<typeof fixture>>, session: AgentSession, commandId: string) {
-  const admission = await state.admission.preflight({ operation: "turn", sessionId: session.id, intent })
+  const admission = await state.admission.preflight({
+    operation: "turn",
+    sessionId: session.id,
+    intent: session.intent,
+  })
   if (admission.status !== "ready") throw new Error("Missing turn admission")
   return state.manager.send(session.id, admission.admissionId, {
     commandId,
@@ -563,3 +577,338 @@ test.each(["EOF", "error"] as const)(
     }
   },
 )
+
+const asking: SessionIntent = {
+  ...intent,
+  policy: { ...intent.policy, approval: "ask", filesystem: "workspace-write" },
+}
+
+async function permissionFixture() {
+  const state = await fixture(asking)
+  const session = await state.manager.createSession(state.admissionId, "create")
+  await send(state, session, "turn")
+  const lease = await state.workspaces.lease("workspace", session.id, "write")
+  const request: PermissionRequest = {
+    requestId: "permission-a",
+    sessionId: session.id,
+    runtimeId: "runtime",
+    targetId: "local",
+    workspaceId: "workspace",
+    nativeSessionId: session.binding.nativeSessionId,
+    nativeTurnId: "native-turn",
+    nativeRequestId: "number:7",
+    policyId: "policy",
+    policyVersion: "1",
+    leaseGeneration: lease.generation,
+    operationSha256: "a".repeat(64),
+    action: "file-change",
+    resources: [join(state.directory, "example.txt")],
+    details: { patch: "example" },
+    choices: [
+      { id: "allow-once", action: "allow", scope: "once", label: "Allow once" },
+      { id: "deny", action: "deny", scope: "once", label: "Deny" },
+    ],
+    expiresAt: new Date(now + 60_000).toISOString(),
+  }
+  const draft: AgentEventDraft = {
+    type: "permission.requested",
+    data: request,
+    scope: {
+      sessionId: session.id,
+      workspaceId: "workspace",
+      runtimeId: "runtime",
+      targetId: "local",
+      commandId: "turn",
+      turnId: "native-turn",
+    },
+    origin: {
+      streamId: session.binding.nativeSessionId,
+      epoch: "peer",
+      eventId: "permission-a",
+      identityStrategy: "native",
+    },
+    observedAt: new Date(now).toISOString(),
+  }
+  const decision: PermissionDecision = { ...request, choiceId: "allow-once" }
+  return { ...state, session, request, draft, decision, lease }
+}
+
+async function publishPermission(state: Awaited<ReturnType<typeof permissionFixture>>) {
+  state.streams.get(state.session.id)!.push(state.draft)
+  await waitUntil(async () => (await state.journal.permission(state.request.requestId)) !== undefined)
+}
+
+test("permission is durable before delivery and a trusted claim precedes the native reply", async () => {
+  const state = await permissionFixture()
+  try {
+    let calls = 0
+    Object.assign(state.adapter, {
+      resolvePermission: async () => {
+        calls++
+        const record = await state.journal.permission(state.request.requestId)
+        expect(record?.state).toBe("claimed")
+        expect(record?.intent?.actorId).toBe("host:user-a")
+        expect(record?.resolution).toBeUndefined()
+      },
+    })
+    await publishPermission(state)
+    expect((await state.journal.get(state.session.id))?.status).toBe("awaiting-permission")
+    await state.manager.resolvePermission({ ...state.decision, actorId: "renderer-forged" } as PermissionDecision)
+    await state.manager.resolvePermission(state.decision)
+    expect(calls).toBe(1)
+    expect((await state.journal.permission(state.request.requestId))?.resolution?.outcome).toBe("allowed")
+    expect((await state.journal.get(state.session.id))?.status).toBe("running")
+  } finally {
+    await state.close()
+  }
+})
+
+for (const change of ["account-swap", "fingerprint-swap", "api-auth", "overage", "advisory", "stale"] as const) {
+  test(`permission grant fails after ${change} and cannot be retried`, async () => {
+    const state = await permissionFixture()
+    try {
+      let calls = 0
+      Object.assign(state.adapter, {
+        resolvePermission: async () => {
+          calls++
+        },
+      })
+      await publishPermission(state)
+      state.change(change)
+      await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow()
+      await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow()
+      expect(calls).toBe(0)
+      expect((await state.journal.permission(state.request.requestId))?.state).toBe("uncertain")
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+test("revoked admission or released lease cannot authorize a pending permission", async () => {
+  for (const failure of ["revoke", "release"]) {
+    const state = await permissionFixture()
+    try {
+      let calls = 0
+      Object.assign(state.adapter, {
+        resolvePermission: async () => {
+          calls++
+        },
+      })
+      await publishPermission(state)
+      if (failure === "revoke") await state.admission.invalidate("runtime", "test")
+      else await state.workspaces.release(state.lease.id, state.lease.generation)
+      await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow()
+      expect(calls).toBe(0)
+    } finally {
+      await state.close()
+    }
+  }
+})
+
+test("lost permission reply stays uncertain across an exact retry", async () => {
+  const state = await permissionFixture()
+  try {
+    let calls = 0
+    Object.assign(state.adapter, {
+      resolvePermission: async () => {
+        calls++
+        throw new Error("private transport failure")
+      },
+    })
+    await publishPermission(state)
+    await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow("uncertain")
+    await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow("uncertain")
+    expect(calls).toBe(1)
+    expect((await state.journal.permission(state.request.requestId))?.state).toBe("uncertain")
+  } finally {
+    await state.close()
+  }
+})
+
+test("native autonomous denial has a host-assigned actor and can never grant permission", async () => {
+  const state = await permissionFixture()
+  try {
+    await publishPermission(state)
+    state.streams.get(state.session.id)!.push({
+      ...state.draft,
+      type: "permission.resolved",
+      data: {
+        ...state.request,
+        outcome: "denied",
+        actorId: "untrusted-native-actor",
+        decidedAt: new Date(now).toISOString(),
+      },
+      origin: { ...state.draft.origin, eventId: "denial" },
+    })
+    await waitUntil(async () => (await state.journal.permission(state.request.requestId))?.state === "resolved")
+    expect((await state.journal.permission(state.request.requestId))?.resolution?.actorId).toBe("host:native-policy")
+    await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow()
+  } finally {
+    await state.close()
+  }
+})
+
+test("permission with a foreign turn never enters the host ledger", async () => {
+  const state = await permissionFixture()
+  try {
+    state.streams
+      .get(state.session.id)!
+      .push({ ...state.draft, type: "permission.requested", data: { ...state.request, nativeTurnId: "foreign" } })
+    await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "uncertain")
+    expect(await state.journal.permission(state.request.requestId)).toBeUndefined()
+  } finally {
+    await state.close()
+  }
+})
+
+function inspection(session: AgentSession): NativeSessionInspection {
+  return {
+    sessionId: session.id,
+    binding: session.binding,
+    observedAt: new Date(now).toISOString(),
+    nativeState: "idle",
+    completeness: "complete",
+    turns: [{ nativeTurnId: "native-turn", status: "succeeded" }],
+  }
+}
+
+async function recoveryFixture() {
+  const state = await fixture()
+  const session = await state.manager.createSession(state.admissionId, "create")
+  await send(state, session, "turn")
+  state.streams.get(session.id)!.finish()
+  await waitUntil(async () => (await state.journal.get(session.id))?.status === "uncertain")
+  return { ...state, session }
+}
+
+test("read-only inspection changes no commands; reconciliation settles only the exact known completed native turn", async () => {
+  const state = await recoveryFixture()
+  try {
+    let calls = 0
+    Object.assign(state.adapter, {
+      inspect: async () => {
+        calls++
+        return inspection(state.session)
+      },
+    })
+    expect((await state.manager.inspectSession(state.session.id)).nativeState).toBe("idle")
+    expect((await state.journal.command("turn"))?.receipt.state).toBe("uncertain")
+    expect((await state.manager.reconcileSession(state.session.id)).status).toBe("idle")
+    expect(await state.journal.isComplete("turn")).toBe(true)
+    expect(calls).toBe(2)
+    await expect(send(state, state.session, "next")).rejects.toThrow("not attached")
+  } finally {
+    await state.close()
+  }
+})
+
+for (const mode of ["partial", "running", "missing", "unknown", "lost-ack"] as const) {
+  test(`recovery stays uncertain with ${mode} native evidence`, async () => {
+    const state = await recoveryFixture()
+    try {
+      const value = inspection(state.session)
+      if (mode === "lost-ack") {
+        const record = (await state.journal.command("turn"))!
+        await state.journal.reserve({
+          ...record,
+          id: "lost",
+          receipt: {
+            commandId: "lost",
+            sessionId: state.session.id,
+            state: "admitted",
+            recordedAt: new Date(now).toISOString(),
+          },
+        })
+        await state.journal.markDispatched("lost")
+        await state.journal.recoverPending()
+      }
+      Object.assign(state.adapter, {
+        inspect: async () => ({
+          ...value,
+          ...(mode === "partial"
+            ? { completeness: "partial", nativeState: "unknown" }
+            : mode === "running"
+              ? { nativeState: "running" }
+              : mode === "missing"
+                ? { turns: [] }
+                : mode === "unknown"
+                  ? { turns: [{ nativeTurnId: "native-turn", status: "unknown" }] }
+                  : {}),
+        }),
+      })
+      expect((await state.manager.reconcileSession(state.session.id)).status).toBe("uncertain")
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+for (const mode of ["binding", "stale", "duplicate"] as const) {
+  test(`invalid ${mode} inspection cannot reconcile a session`, async () => {
+    const state = await recoveryFixture()
+    try {
+      const value = inspection(state.session)
+      Object.assign(state.adapter, {
+        inspect: async () => ({
+          ...value,
+          ...(mode === "binding"
+            ? { binding: { ...value.binding, nativeSessionId: "other" } }
+            : mode === "stale"
+              ? { observedAt: new Date(now - 120_000).toISOString() }
+              : { turns: [...value.turns, ...value.turns] }),
+        }),
+      })
+      await expect(state.manager.reconcileSession(state.session.id)).rejects.toThrow()
+      expect(await state.journal.isComplete("turn")).toBe(false)
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+for (const failure of ["revoke", "release"] as const) {
+  test(`final permission write guard blocks ${failure} during adapter checks`, async () => {
+    const state = await permissionFixture()
+    try {
+      let writes = 0
+      Object.assign(state.adapter, {
+        resolvePermission: async (context: { authorizeReply: () => void }) => {
+          if (failure === "revoke") await state.admission.invalidate("runtime", "changed during native check")
+          else await state.workspaces.release(state.lease.id, state.lease.generation)
+          context.authorizeReply()
+          writes++
+        },
+      })
+      await publishPermission(state)
+      await expect(state.manager.resolvePermission(state.decision)).rejects.toThrow("uncertain")
+      expect(writes).toBe(0)
+    } finally {
+      await state.close()
+    }
+  })
+}
+
+test("replayed native denial and request preserve the durable audit and live stream", async () => {
+  const state = await permissionFixture()
+  try {
+    await publishPermission(state)
+    const denial: AgentEventDraft = {
+      ...state.draft,
+      type: "permission.resolved",
+      data: { ...state.request, outcome: "denied", actorId: "adapter", decidedAt: new Date(now).toISOString() },
+      origin: { ...state.draft.origin, eventId: "denial" },
+    }
+    state.streams.get(state.session.id)!.push(denial)
+    await waitUntil(async () => (await state.journal.permission(state.request.requestId))?.state === "resolved")
+    const first = await state.journal.permission(state.request.requestId)
+    state.streams.get(state.session.id)!.push(denial)
+    state.streams.get(state.session.id)!.push(state.draft)
+    state.streams.get(state.session.id)!.push(completion(state.session, "turn"))
+    await waitUntil(async () => (await state.journal.get(state.session.id))?.status === "idle")
+    expect(await state.journal.permission(state.request.requestId)).toEqual(first)
+    expect((await state.journal.cursor(state.session.id))?.sequence).toBe(3)
+  } finally {
+    await state.close()
+  }
+})

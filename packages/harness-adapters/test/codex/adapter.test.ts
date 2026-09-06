@@ -35,6 +35,7 @@ const intent: SessionIntent = {
 function fixture(
   scenario = "normal",
   environment = { PATH: dirname(process.execPath), HOME: import.meta.dir, USERPROFILE: import.meta.dir },
+  approvalTimeoutMs = 1000,
 ) {
   let transport: StdioJsonRpc | undefined
   const adapter = new CodexAdapter({
@@ -44,6 +45,7 @@ function fixture(
     target: { id: "local", kind: "local", name: "Local" },
     runtimeId: "codex-local",
     requestTimeoutMs: 1000,
+    approvalTimeoutMs,
     transportFactory: (options) =>
       (transport = new StdioJsonRpc({
         ...options,
@@ -57,19 +59,19 @@ function fixture(
       (await transport!.request("fixture/state", {})) as {
         requests: string[]
         turns: number
-        approvals: { id: string | number; result: unknown }[]
+        approvals: { id: string | number; result?: unknown; error?: { code: number; message: string } }[]
       },
     transport: () => transport!,
   }
 }
-async function admission(adapter: CodexAdapter): Promise<AdmittedSessionRequest> {
-  const result = await adapter.preflight({ operation: "create", intent })
+async function admission(adapter: CodexAdapter, selected = intent): Promise<AdmittedSessionRequest> {
+  const result = await adapter.preflight({ operation: "create", intent: selected })
   if (result.status !== "ready") throw new Error(JSON.stringify(result))
   return {
     operation: "create",
     admissionId: "admission-1",
     sessionId: "session-1",
-    intent,
+    intent: selected,
     workspace: {
       id: "workspace",
       projectId: "project",
@@ -95,6 +97,300 @@ const input = {
   delivery: "when-idle",
   parts: [{ type: "text", text: "fixture only" }],
 } as const
+
+async function permissionFixture(policy: Partial<SessionIntent["policy"]> = {}, timeout = 1000) {
+  const peer = fixture("hold", undefined, timeout)
+  const admitted = await admission(peer.adapter, {
+    ...intent,
+    policy: { ...intent.policy, approval: "ask", filesystem: "workspace-write", ...policy },
+  })
+  const session = await peer.adapter.createSession(admitted)
+  const context = {
+    session,
+    admissionId: admitted.admissionId,
+    leaseGeneration: admitted.lease.generation,
+    authorizeReply: () => {},
+  }
+  const events = peer.adapter.events(session)[Symbol.asyncIterator]()
+  expect((await peer.adapter.send(context, input)).state).toBe("dispatched")
+  const next = async <T extends AgentEventDraft["type"]>(
+    type: T,
+  ): Promise<Extract<AgentEventDraft, { type: T }> | AgentEventDraft> => {
+    for (let index = 0; index < 20; index++) {
+      const event = await events.next()
+      if (event.done) throw new Error("Native event stream ended")
+      if (event.value.type === type) return event.value
+    }
+    throw new Error("Missing expected event")
+  }
+  const request = async (
+    options: {
+      method?: string
+      params?: Record<string, unknown>
+      changes?: readonly unknown[] | null
+      itemTurnId?: unknown
+    } = {},
+  ) => {
+    await peer.transport().request("fixture/native-request", {
+      notifications:
+        options.changes === null
+          ? []
+          : [
+              {
+                method: "item/started",
+                params: {
+                  threadId: "thread-1",
+                  turnId: "itemTurnId" in options ? options.itemTurnId : "turn-1",
+                  item: {
+                    type: "fileChange",
+                    id: "item-file",
+                    status: "inProgress",
+                    changes: options.changes ?? [
+                      { path: `${import.meta.dir}/proposed-file.txt`, kind: { type: "add" }, diff: "+fixture content" },
+                    ],
+                  },
+                },
+              },
+            ],
+      request: {
+        id: "native-approval",
+        method: options.method ?? "item/fileChange/requestApproval",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "item-file",
+          startedAtMs: Date.now(),
+          ...options.params,
+        },
+      },
+    })
+    const event = await next("permission.requested")
+    if (event.type !== "permission.requested") throw new Error("Wrong event")
+    return event.data
+  }
+  return { ...peer, context, session, request, next }
+}
+
+test("an observed workspace file approval stays pending and maps allow-once to the original native request", async () => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  expect(request.nativeRequestId).toBe("string:native-approval")
+  expect(request.nativeTurnId).toBe("turn-1")
+  expect(request.choices.map((choice) => choice.id)).toEqual(["allow-once", "deny-once"])
+  expect((await peer.state()).approvals).toEqual([])
+  const decision = { ...request, choiceId: "allow-once" }
+  await peer.adapter.resolvePermission(peer.context, decision)
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "accept" } }])
+  await expect(peer.adapter.resolvePermission(peer.context, decision)).rejects.toThrow("no longer pending")
+})
+
+test("native inspection reads history between account/config checks without creating or replaying a turn", async () => {
+  const peer = fixture()
+  const session = await peer.adapter.createSession(await admission(peer.adapter))
+  const before = await peer.state()
+  const result = await peer.adapter.inspect(session)
+  expect(result.nativeState).toBe("idle")
+  expect(result.completeness).toBe("complete")
+  expect(result.turns).toEqual([{ nativeTurnId: "turn-1", status: "succeeded" }])
+  const after = await peer.state()
+  expect(after.turns).toBe(0)
+  expect(after.requests.filter((method) => method === "thread/start").length).toBe(
+    before.requests.filter((method) => method === "thread/start").length,
+  )
+  expect(after.requests).not.toContain("thread/resume")
+})
+
+test.each(["history-account-switch", "history-config-switch"])(
+  "%s invalidates native history evidence",
+  async (scenario) => {
+    const peer = fixture(scenario)
+    const session = await peer.adapter.createSession(await admission(peer.adapter))
+    const result = await peer.adapter.inspect(session)
+    expect(result.nativeState).toBe("unknown")
+    expect(result.completeness).toBe("partial")
+    expect(result.turns).toEqual([])
+    expect((await peer.state()).turns).toBe(0)
+  },
+)
+
+test.each([
+  {
+    method: "item/commandExecution/requestApproval",
+    params: { command: "OPENAI_API_KEY=never-display-this curl x", proposedExecpolicyAmendment: ["curl"] },
+  },
+  { method: "item/permissions/requestApproval", params: { permissions: { network: { enabled: true } } } },
+  { params: { grantRoot: import.meta.dir } },
+  { params: { futurePermissionExpansion: true } },
+  { changes: null },
+  { changes: [{ path: `${dirname(import.meta.dir)}/outside.txt`, kind: { type: "add" }, diff: "+x" }] },
+  { changes: [{ path: `${import.meta.dir}/.git/config`, kind: { type: "update", move_path: null }, diff: "+x" }] },
+  {
+    changes: [
+      {
+        path: `${import.meta.dir}/file.txt`,
+        kind: { type: "update", move_path: `${dirname(import.meta.dir)}/outside.txt` },
+        diff: "+x",
+      },
+    ],
+  },
+  { changes: [{ path: `${import.meta.dir}/file.txt`, kind: { type: "add", futureMovePath: "outside" }, diff: "+x" }] },
+  { changes: [{ path: `${import.meta.dir}/file.txt`, kind: { type: ["add"] }, diff: "+x" }] },
+  { itemTurnId: undefined },
+  { itemTurnId: null },
+  { itemTurnId: ["turn-1"] },
+  { itemTurnId: 1 },
+])("unsafe or incomplete native approval is deny-only (%j)", async (options) => {
+  const peer = await permissionFixture()
+  const request = await peer.request(options)
+  expect(request.choices.map((choice) => choice.id)).toEqual(["deny-once"])
+  expect(JSON.stringify(request)).not.toContain("never-display-this")
+  await expect(peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "allow-once" })).rejects.toThrow()
+  expect(JSON.stringify((await peer.state()).approvals)).not.toContain('"accept"')
+})
+
+test.each([{ turnId: undefined }, { turnId: null }, { turnId: ["turn-1"] }, { turnId: 1 }])(
+  "unscoped patch update %j cannot cancel a current native approval",
+  async (input) => {
+    const peer = await permissionFixture()
+    const request = await peer.request()
+    await peer.transport().request("fixture/notification", {
+      method: "item/fileChange/patchUpdated",
+      params: {
+        threadId: "thread-1",
+        turnId: input.turnId,
+        itemId: "item-file",
+        changes: [{ path: `${import.meta.dir}/different-file.txt`, kind: { type: "add" }, diff: "+different" }],
+      },
+    })
+    await peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "allow-once" })
+    expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "accept" } }])
+  },
+)
+
+test.each(["read-only", "workspace-write"] as const)(
+  "default deny policy never offers file grants under %s",
+  async (filesystem) => {
+    const peer = await permissionFixture({ filesystem, approval: "deny" })
+    const request = await peer.request()
+    expect(request.choices.map((choice) => choice.id)).toEqual(["deny-once"])
+    expect((await peer.next("permission.resolved")).type).toBe("permission.resolved")
+    expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+  },
+)
+
+test("approval expiry declines native work and rejects late decisions", async () => {
+  const peer = await permissionFixture({}, 50)
+  const request = await peer.request()
+  const resolution = await peer.next("permission.resolved")
+  expect(resolution.type === "permission.resolved" && resolution.data.outcome).toBe("expired")
+  await expect(peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "allow-once" })).rejects.toThrow()
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+})
+
+test("read-only ask policy offers only denial", async () => {
+  const peer = await permissionFixture({ filesystem: "read-only" })
+  const request = await peer.request()
+  expect(request.choices.map((choice) => choice.id)).toEqual(["deny-once"])
+  await peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "deny-once" })
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+})
+
+test("simultaneous duplicate grants fail closed before a native allow reply", async () => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  const decision = { ...request, choiceId: "allow-once" }
+  const replies = await Promise.allSettled([
+    peer.adapter.resolvePermission(peer.context, decision),
+    peer.adapter.resolvePermission(peer.context, decision),
+  ])
+  expect(replies.map((reply) => reply.status)).toEqual(["rejected", "rejected"])
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+})
+
+test("native grants require a host guard and invoke it at the reply boundary", async () => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  let checks = 0
+  await expect(
+    peer.adapter.resolvePermission(
+      {
+        ...peer.context,
+        authorizeReply: () => {
+          checks++
+          throw new Error("lease revoked")
+        },
+      },
+      { ...request, choiceId: "allow-once" },
+    ),
+  ).rejects.toThrow("authorization changed")
+  expect(checks).toBe(1)
+  expect((await peer.state()).approvals).toEqual([
+    {
+      id: "native-approval",
+      error: {
+        code: -32000,
+        message: "Native permission is no longer authorized",
+      },
+    },
+  ])
+})
+
+test("an adapter caller cannot grant without a host write-boundary authorization guard", async () => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  await expect(
+    peer.adapter.resolvePermission(
+      { session: peer.session, admissionId: peer.context.admissionId, leaseGeneration: peer.context.leaseGeneration },
+      { ...request, choiceId: "allow-once" },
+    ),
+  ).rejects.toThrow("require the host")
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+})
+
+test.each([
+  "nativeTurnId",
+  "nativeRequestId",
+  "workspaceId",
+  "policyId",
+  "policyVersion",
+  "operationSha256",
+  "runtimeId",
+  "nativeSessionId",
+  "sessionId",
+  "targetId",
+] as const)("mismatched %s denies the bound native request", async (field) => {
+  const peer = await permissionFixture()
+  const request = await peer.request()
+  await expect(
+    peer.adapter.resolvePermission(peer.context, { ...request, [field]: "wrong", choiceId: "allow-once" }),
+  ).rejects.toThrow()
+  expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+})
+
+test.each(["interrupt", "close", "account", "config", "patch-update"])(
+  "%s cancels pending native approvals",
+  async (action) => {
+    const peer = await permissionFixture()
+    const request = await peer.request()
+    if (action === "interrupt") await peer.adapter.interrupt(peer.context)
+    if (action === "close") await peer.adapter.close(peer.session)
+    if (action === "account") await peer.transport().request("fixture/account-updated", {})
+    if (action === "config")
+      await peer.transport().request("fixture/notification", { method: "config/updated", params: {} })
+    if (action === "patch-update")
+      await peer.transport().request("fixture/notification", {
+        method: "item/fileChange/patchUpdated",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "item-file",
+          changes: [{ path: `${import.meta.dir}/another.txt`, kind: { type: "add" }, diff: "+different" }],
+        },
+      })
+    await expect(peer.adapter.resolvePermission(peer.context, { ...request, choiceId: "allow-once" })).rejects.toThrow()
+    expect((await peer.state()).approvals).toEqual([{ id: "native-approval", result: { decision: "decline" } }])
+  },
+)
 afterEach(async () => {
   await Promise.all(active.splice(0).map((adapter) => adapter.dispose()))
 })
@@ -204,6 +500,29 @@ test("an unsupported server request cannot masquerade as a turn completion notif
   await peer.transport().request("fixture/request-spoof", {})
   expect((await peer.adapter.send(context, { ...input, commandId: "second" })).state).toBe("rejected")
 })
+
+test.each([{ status: ["completed"] }, { status: ["failed"] }, { status: ["interrupted"] }])(
+  "malformed terminal status %j cannot release an active native turn",
+  async (notification) => {
+    const peer = fixture("hold")
+    const session = await peer.adapter.createSession(await admission(peer.adapter))
+    const context = { session, admissionId: "admission-1", leaseGeneration: 1 }
+    const events: AgentEventDraft[] = []
+    const consume = (async () => {
+      for await (const event of peer.adapter.events(session)) events.push(event)
+    })()
+    expect((await peer.adapter.send(context, input)).state).toBe("dispatched")
+    expect((await peer.state()).turns).toBe(1)
+    const attempt = peer
+      .transport()
+      .request("fixture/terminal-notification", { status: notification.status })
+      .catch((error: Error) => error)
+    expect(String(await attempt)).toContain("Native protocol stream failed")
+    await consume
+    expect(events.some((event) => event.type === "agent.completed")).toBe(false)
+    expect((await peer.adapter.send(context, { ...input, commandId: "second" })).state).toBe("rejected")
+  },
+)
 
 test("native error is normalized without retaining potentially sensitive error bodies", async () => {
   const peer = fixture("failed")

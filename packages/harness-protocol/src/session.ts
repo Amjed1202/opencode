@@ -87,6 +87,21 @@ export interface AgentSession {
   readonly revision: number
 }
 
+export interface NativeTurnObservation {
+  readonly nativeTurnId: string
+  readonly status: "running" | "succeeded" | "failed" | "interrupted" | "unknown"
+}
+
+/** Read-only bounded observation; partial history can never establish an idle session. */
+export interface NativeSessionInspection {
+  readonly sessionId: string
+  readonly binding: NativeSessionBinding
+  readonly observedAt: Timestamp
+  readonly nativeState: "idle" | "running" | "unknown"
+  readonly completeness: "complete" | "partial"
+  readonly turns: readonly NativeTurnObservation[]
+}
+
 export interface AgentInput {
   readonly commandId: string
   readonly messageId: string

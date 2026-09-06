@@ -9,8 +9,8 @@ export interface NativeRequest extends NativeNotification {
   readonly id: RpcId
 }
 export type NativeReply =
-  | { readonly result: unknown }
-  | { readonly error: { readonly code: number; readonly message: string } }
+  | { readonly result: unknown; readonly beforeWrite?: () => void }
+  | { readonly error: { readonly code: number; readonly message: string }; readonly beforeWrite?: () => void }
 
 export interface StdioJsonRpcOptions {
   readonly command: readonly string[]
@@ -18,8 +18,13 @@ export interface StdioJsonRpcOptions {
   readonly environment: Readonly<Record<string, string>>
   readonly requestTimeoutMs?: number
   readonly maxMessageBytes?: number
+  readonly serverRequestTimeoutMs?: number
   readonly onNotification?: (message: NativeNotification) => void
-  readonly onRequest?: (message: NativeRequest) => NativeReply
+  readonly onRequest?: (
+    message: NativeRequest,
+    signal: AbortSignal,
+    delivered: Promise<void>,
+  ) => NativeReply | Promise<NativeReply>
   readonly onClose?: (error: Error) => void
 }
 
@@ -32,19 +37,34 @@ export class StdioJsonRpc {
   >()
   private readonly maxBytes: number
   private readonly timeout: number
+  private readonly serverTimeout: number
+  private readonly serverRequests = new Map<
+    RpcId,
+    {
+      controller: AbortController
+      timer: ReturnType<typeof setTimeout>
+      resolve: () => void
+      reject: (error: Error) => void
+    }
+  >()
+  private readonly seenServerIds = new Set<RpcId>()
   private nextId = 0
   private stopped = false
 
   constructor(private readonly options: StdioJsonRpcOptions) {
     this.maxBytes = options.maxMessageBytes ?? 1024 * 1024
     this.timeout = options.requestTimeoutMs ?? 15_000
+    this.serverTimeout = options.serverRequestTimeoutMs ?? 65_000
     if (
       !Number.isSafeInteger(this.maxBytes) ||
       this.maxBytes < 128 ||
       this.maxBytes > 16 * 1024 * 1024 ||
       !Number.isFinite(this.timeout) ||
       this.timeout <= 0 ||
-      this.timeout > 120_000
+      this.timeout > 120_000 ||
+      !Number.isFinite(this.serverTimeout) ||
+      this.serverTimeout <= 0 ||
+      this.serverTimeout > 120_000
     )
       throw new Error("Invalid transport limits")
     if (!options.command.length) throw new Error("Executable is required")
@@ -87,13 +107,17 @@ export class StdioJsonRpc {
     await this.process.exited
   }
 
-  private write(value: unknown): void {
+  private write(value: unknown): Promise<void> {
     if (this.stopped) throw new Error("Native transport is closed")
     const line = JSON.stringify(value) + "\n"
     if (Buffer.byteLength(line) > this.maxBytes) throw new Error("Native message exceeds limit")
-    void Promise.resolve(this.process.stdin.write(line))
+    const written = Promise.resolve(this.process.stdin.write(line))
       .then(() => this.process.stdin.flush())
-      .catch(() => this.stop(new Error("Native request write failed")))
+      .then(() => {
+        if (this.stopped) throw new Error("Native transport is closed")
+      })
+    void written.catch(() => this.stop(new Error("Native request write failed")))
+    return written
   }
 
   private async read(): Promise<void> {
@@ -127,10 +151,7 @@ export class StdioJsonRpc {
         return
       }
       if (!isRpcId(value.id)) throw new Error("Invalid request ID")
-      const reply = this.options.onRequest?.({ id: value.id, method: value.method, params: value.params }) ?? {
-        error: { code: -32601, message: "Unsupported native request" },
-      }
-      this.write({ id: value.id, ...reply })
+      this.serverRequest({ id: value.id, method: value.method, params: value.params })
       return
     }
     if (!isRpcId(value.id) || !("result" in value) === !("error" in value)) throw new Error("Invalid native response")
@@ -145,6 +166,59 @@ export class StdioJsonRpc {
     pending.resolve(value.result)
   }
 
+  private serverRequest(message: NativeRequest): void {
+    if (this.seenServerIds.has(message.id) || this.seenServerIds.size >= 4096 || this.serverRequests.size >= 32)
+      throw new Error("Duplicate or excessive native server requests")
+    this.seenServerIds.add(message.id)
+    const controller = new AbortController()
+    const delivered = Promise.withResolvers<void>()
+    void delivered.promise.catch(() => undefined)
+    const timer = setTimeout(() => {
+      const pending = this.serverRequests.get(message.id)
+      if (!pending) return
+      controller.abort()
+      void this.finishServerRequest(message.id, {
+        error: { code: -32000, message: "Native request expired and was not approved" },
+      })
+    }, this.serverTimeout)
+    this.serverRequests.set(message.id, { controller, timer, resolve: delivered.resolve, reject: delivered.reject })
+    try {
+      const result = this.options.onRequest?.(message, controller.signal, delivered.promise) ?? {
+        error: { code: -32601, message: "Unsupported native request" },
+      }
+      void Promise.resolve(result).then(
+        (reply) => {
+          if (!controller.signal.aborted) return this.finishServerRequest(message.id, reply)
+        },
+        () =>
+          this.finishServerRequest(message.id, { error: { code: -32000, message: "Native request was not approved" } }),
+      )
+    } catch {
+      void this.finishServerRequest(message.id, { error: { code: -32000, message: "Native request was not approved" } })
+    }
+  }
+
+  private async finishServerRequest(id: RpcId, reply: NativeReply): Promise<void> {
+    const pending = this.serverRequests.get(id)
+    if (!pending || this.stopped) return
+    this.serverRequests.delete(id)
+    clearTimeout(pending.timer)
+    try {
+      try {
+        // The host lease/revocation guard runs at the actual write boundary, after promise continuations.
+        reply.beforeWrite?.()
+      } catch {
+        await this.write({ id, error: { code: -32000, message: "Native permission is no longer authorized" } })
+        pending.reject(new Error("Native approval authorization changed before reply"))
+        return
+      }
+      await this.write({ id, ...("result" in reply ? { result: reply.result } : { error: reply.error }) })
+      pending.resolve()
+    } catch {
+      pending.reject(new Error("Native approval reply was not delivered"))
+    }
+  }
+
   private stop(error: Error): void {
     if (this.stopped) return
     this.stopped = true
@@ -154,6 +228,12 @@ export class StdioJsonRpc {
       pending.reject(error)
     }
     this.pending.clear()
+    for (const pending of this.serverRequests.values()) {
+      clearTimeout(pending.timer)
+      pending.controller.abort()
+      pending.reject(error)
+    }
+    this.serverRequests.clear()
     this.options.onClose?.(error)
   }
 }

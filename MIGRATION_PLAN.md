@@ -67,6 +67,8 @@ Then implement local process supervision and the SQLite command/event journal. V
 
 ## 5. Codex vertical slice — initial local protocol implementation delivered
 
+Implemented continuation: native deferred permission replies, host claim/audit journaling, bounded once-only file grants with a final host write guard, deny-only command/network expansions, readonly paginated history and exact-known-turn reconciliation. Native billing/OS/live-task gates, approval presentation and full transcript/artifact retention remain open. [Current scope](M1A_IMPLEMENTATION.md).
+
 Create `packages/harness-adapters/src/codex/adapter.ts` and versioned mapping fixtures. Generate official wire types from a pinned supported executable into an adapter-private generated directory, retaining provenance. Use App Server stdio, initialize, native account read/login UI, thread start/resume, turn start/interrupt and native server approval requests. Bind native request/turn/item IDs and preserve unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
 
 ## 6. Claude and OpenCode vertical slices

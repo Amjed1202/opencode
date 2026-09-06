@@ -50,6 +50,8 @@ export type {
   PreflightResult,
   AdmittedSessionRequest,
   NativeSessionBinding,
+  NativeTurnObservation,
+  NativeSessionInspection,
   AgentSession,
   AgentInput,
   CommandReceipt,

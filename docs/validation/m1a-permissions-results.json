@@ -1,0 +1,77 @@
+{
+  "date": "2026-09-06",
+  "baseCommit": "2309013ff3029ed61e004be1e8cb90ac9b2b1119",
+  "branch": "runtime-foundation",
+  "bun": "1.3.14",
+  "wireProtocol": "0.2",
+  "nativeCodexProtocol": "0.153.4",
+  "hostTests": {
+    "command": "bun run test",
+    "passed": 169,
+    "log": "m1a-permissions-control-plane-tests.log",
+    "failed": 0,
+    "cwd": "packages/harness-control-plane",
+    "exitCode": 0,
+    "assertions": 544
+  },
+  "adapterTests": {
+    "command": "bun run test",
+    "passed": 144,
+    "log": "m1a-permissions-adapter-tests.log",
+    "failed": 0,
+    "cwd": "packages/harness-adapters",
+    "exitCode": 0,
+    "assertions": 360
+  },
+  "typechecks": [
+    {
+      "exitCode": 0,
+      "log": "m1a-permissions-harness-protocol-typecheck.log",
+      "command": "bun run typecheck",
+      "cwd": "packages/harness-protocol"
+    },
+    {
+      "exitCode": 0,
+      "log": "m1a-permissions-harness-adapters-typecheck.log",
+      "command": "bun run typecheck",
+      "cwd": "packages/harness-adapters"
+    },
+    {
+      "exitCode": 0,
+      "log": "m1a-permissions-harness-control-plane-typecheck.log",
+      "command": "bun run typecheck",
+      "cwd": "packages/harness-control-plane"
+    }
+  ],
+  "authoredFormat": {
+    "log": "m1a-permissions-format.log",
+    "exitCode": 0
+  },
+  "authoredLint": {
+    "errors": 0,
+    "files": 41,
+    "exitCode": 0,
+    "log": "m1a-permissions-oxlint.json",
+    "warnings": 152
+  },
+  "generatedFiles": {
+    "formatted": false,
+    "count": 65,
+    "allMatchOfficialPinnedSource": true
+  },
+  "providerCalls": {
+    "nativeTurns": 0,
+    "refresh": 0,
+    "inference": 0,
+    "login": 0,
+    "nativeThreads": 0,
+    "accountOperations": 0
+  },
+  "limitations": [
+    "No OS sandbox attestation or live provider task",
+    "No desktop permission UI or full patch/transcript hydration",
+    "No cross-process host ownership or descendant supervision",
+    "Protocol 0.1 event journals require explicit migration; originals preserved",
+    "Existing provider overage remains unknown; no silent API fallback"
+  ]
+}

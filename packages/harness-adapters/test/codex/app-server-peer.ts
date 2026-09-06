@@ -7,6 +7,7 @@ let turns = 0
 let approvals: unknown[] = []
 let requests: string[] = []
 let initialized = false
+let historyRead = false
 const overrides: Record<string, unknown> = {}
 for (const argument of process.argv.slice(3)) {
   if (!argument.includes("=")) continue
@@ -92,7 +93,10 @@ for await (const line of createInterface({ input: process.stdin })) {
           ? { type: "apiKey" }
           : {
               type: "chatgpt",
-              email: scenario === "account-switch" && reads > 2 ? "second@example.invalid" : "first@example.invalid",
+              email:
+                (scenario === "account-switch" && reads > 2) || (scenario === "history-account-switch" && historyRead)
+                  ? "second@example.invalid"
+                  : "first@example.invalid",
               planType: "pro",
             },
       requiresOpenaiAuth: true,
@@ -121,6 +125,7 @@ for await (const line of createInterface({ input: process.stdin })) {
         ...(scenario === "helper" ? { api_key_helper: "do-not-run" } : {}),
         ...(scenario === "profile" ? { profile: "other" } : {}),
         ...(scenario === "config-switch" && reads > 2 ? { model: "gpt-other" } : {}),
+        ...(scenario === "history-config-switch" && historyRead ? { model: "gpt-other" } : {}),
         ...(scenario === "mcp" ? { mcp_servers: { hidden: { command: "must-not-start" } } } : {}),
         ...(scenario === "ignored-overrides" ? { features: {} } : {}),
         ...(scenario === "shell-injection"
@@ -133,7 +138,8 @@ for await (const line of createInterface({ input: process.stdin })) {
   }
   if (message.method === "thread/start" || message.method === "thread/resume") {
     cwd = message.params.cwd
-    if (message.params.approvalPolicy !== "never" || message.params.modelProvider !== "openai") process.exit(23)
+    if (!["never", "on-request"].includes(message.params.approvalPolicy) || message.params.modelProvider !== "openai")
+      process.exit(23)
     reply({
       thread: {
         ...thread(message.params.threadId ?? "thread-1"),
@@ -144,9 +150,18 @@ for await (const line of createInterface({ input: process.stdin })) {
       serviceTier: "default",
       cwd,
       instructionSources: [],
-      approvalPolicy: "never",
+      approvalPolicy: message.params.approvalPolicy,
       approvalsReviewer: "user",
-      sandbox: { type: "readOnly", networkAccess: scenario === "thread-network" },
+      sandbox:
+        message.params.sandbox === "workspace-write"
+          ? {
+              type: "workspaceWrite",
+              networkAccess: false,
+              writableRoots: [cwd],
+              excludeTmpdirEnvVar: true,
+              excludeSlashTmp: true,
+            }
+          : { type: "readOnly", networkAccess: scenario === "thread-network" },
       reasoningEffort: null,
       turnsBackwardsCursor: null,
       itemsBackwardsCursor: null,
@@ -156,7 +171,7 @@ for await (const line of createInterface({ input: process.stdin })) {
     turns++
     if (message.params.input[0].type !== "text" || message.params.threadId !== "thread-1") process.exit(24)
     if (
-      message.params.sandboxPolicy?.type !== "readOnly" ||
+      !["readOnly", "workspaceWrite"].includes(message.params.sandboxPolicy?.type) ||
       message.params.sandboxPolicy.networkAccess !== false ||
       message.params.approvalsReviewer !== "user"
     )
@@ -207,7 +222,26 @@ for await (const line of createInterface({ input: process.stdin })) {
     notification("turn/completed", { threadId: "thread-1", turn: turn("interrupted") })
   }
   if (message.method === "thread/unsubscribe") reply({ status: "unsubscribed" })
+  if (message.method === "thread/read") {
+    historyRead = true
+    reply({ thread: thread(message.params.threadId) })
+  }
+  if (message.method === "thread/turns/list")
+    reply({ data: [{ ...turn("completed"), itemsView: "summary" }], nextCursor: null, backwardsCursor: null })
   if (message.method === "fixture/state") reply({ requests, turns, approvals })
+  if (message.method === "fixture/native-request") {
+    for (const item of message.params.notifications ?? []) notification(item.method, item.params)
+    output(message.params.request)
+    reply({})
+  }
+  if (message.method === "fixture/notification") {
+    notification(message.params.method, message.params.params)
+    reply({})
+  }
+  if (message.method === "fixture/terminal-notification") {
+    notification("turn/completed", { threadId: "thread-1", turn: { ...turn(), status: message.params.status } })
+    reply({})
+  }
   if (message.method === "fixture/account-updated") {
     notification("account/updated", { authMode: "apiKey", planType: null, token: "never-retain-this" })
     reply({})

@@ -29,15 +29,19 @@ export interface PermissionChoice {
 export interface PermissionBinding {
   readonly requestId: string
   readonly sessionId: string
+  readonly runtimeId: string
+  readonly nativeSessionId: string
+  readonly nativeTurnId: string
+  readonly nativeRequestId: string
   readonly targetId: string
   readonly workspaceId: string
+  readonly policyId: string
   readonly policyVersion: string
   readonly leaseGeneration: number
   readonly operationSha256: string
 }
 
 export interface PermissionRequest extends PermissionBinding {
-  readonly nativeRequestId: string
   readonly toolCallId?: string
   readonly action: string
   readonly resources: readonly string[]
