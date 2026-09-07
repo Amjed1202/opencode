@@ -1,0 +1,134 @@
+{
+  "date": "2026-09-07",
+  "timezone": "Europe/Rome",
+  "baseCommit": "c4e146ea1083d8bf9e7ae560c60fab9e373e1ddc",
+  "branch": "runtime-foundation",
+  "bun": "1.3.14",
+  "node": "24.14.1",
+  "electron": "42.3.3",
+  "wireProtocol": "0.3",
+  "nativeCodexProtocol": "0.153.4",
+  "nativeClaudeVersion": "2.1.251",
+  "scope": "Bounded native Codex model catalog and explicit desktop model selection; independent subscription/policy admission remains required",
+  "hostTests": {
+    "cwd": "packages/harness-control-plane",
+    "command": "bun run test",
+    "exitCode": 0,
+    "passed": 281,
+    "skipped": 1,
+    "failed": 0,
+    "assertions": 1078,
+    "log": "m1c-models-control-plane-tests.log"
+  },
+  "adapterTests": {
+    "cwd": "packages/harness-adapters",
+    "command": "bun run test",
+    "exitCode": 0,
+    "passed": 313,
+    "skipped": 0,
+    "failed": 0,
+    "assertions": 985,
+    "log": "m1c-models-adapters-tests.log"
+  },
+  "desktopTests": {
+    "cwd": "packages/harness-desktop",
+    "command": "bun test test/unit",
+    "exitCode": 0,
+    "passed": 58,
+    "skipped": 1,
+    "failed": 0,
+    "assertions": 366,
+    "log": "m1c-models-unit-tests.log"
+  },
+  "browserTests": {
+    "cwd": "packages/harness-desktop",
+    "command": "bun run test:ui",
+    "exitCode": 0,
+    "passed": 12,
+    "log": "m1c-models-ui-tests.log"
+  },
+  "electronTests": {
+    "cwd": "packages/harness-desktop",
+    "command": "bun run test:electron",
+    "exitCode": 0,
+    "passed": 1,
+    "log": "m1c-models-electron-tests.log",
+    "environment": {
+      "HARNESS_SMOKE_BUN": "explicit local Bun 1.3.14",
+      "HARNESS_SMOKE_ROOT": "isolated task work/electron-smoke directory"
+    }
+  },
+  "typechecks": [
+    {
+      "cwd": "packages/harness-protocol",
+      "command": "bun run typecheck",
+      "exitCode": 0,
+      "log": "m1c-models-harness-protocol-typecheck.log"
+    },
+    {
+      "cwd": "packages/harness-adapters",
+      "command": "bun run typecheck",
+      "exitCode": 0,
+      "log": "m1c-models-harness-adapters-typecheck.log"
+    },
+    {
+      "cwd": "packages/harness-control-plane",
+      "command": "bun run typecheck",
+      "exitCode": 0,
+      "log": "m1c-models-harness-control-plane-typecheck.log"
+    },
+    {
+      "cwd": "packages/harness-desktop",
+      "command": "bun run typecheck",
+      "exitCode": 0,
+      "log": "m1c-models-harness-desktop-typecheck.log"
+    }
+  ],
+  "build": {
+    "cwd": "packages/harness-desktop",
+    "command": "bun run build",
+    "exitCode": 0,
+    "log": "m1c-models-build.log"
+  },
+  "dependencies": {
+    "changed": false,
+    "installRerun": false,
+    "reason": "No dependency or lockfile changes"
+  },
+  "format": {
+    "exitCode": 0,
+    "log": "m1c-models-format.log"
+  },
+  "lint": {
+    "exitCode": 0,
+    "authoredTypeScriptFiles": 91,
+    "errors": 0,
+    "warnings": 362,
+    "log": "m1c-models-oxlint.json"
+  },
+  "totals": {
+    "unitAndProcessTests": 652,
+    "platformSkips": 2,
+    "assertions": 2429,
+    "browserAndElectronTests": 13
+  },
+  "preservation": {
+    "generatedHashes": 81,
+    "existingGeneratedHashes": 72,
+    "addedGeneratedHashes": 9,
+    "modifiedUpstreamFiles": ["SECURITY.md", "bun.lock"],
+    "mitUnchanged": true,
+    "securitySuffixUnchanged": true,
+    "functionalUpstreamUnchanged": true
+  },
+  "nativeEvidence": "m1c-models-native-evidence.md",
+  "review": "m1c-models-review.md",
+  "screenshot": "m1c-models-desktop.png",
+  "providerActivity": "No installed native provider process, user account access, real model-list request, login, thread, turn or inference in this increment; all process scenarios used local peers.",
+  "limits": [
+    "Native catalog can use cache, fetch metadata and write native cache; pagination is not an atomic snapshot",
+    "Catalog membership is not billing, entitlement, quota or capability proof; admission remains separate",
+    "Claude execution and native Skills activation remain unsupported",
+    "One desktop session per launch; native history/recovery UI, OS execution attestation, live task acceptance, cross-process fencing and distribution remain open"
+  ]
+}

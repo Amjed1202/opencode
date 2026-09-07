@@ -71,6 +71,8 @@ Implemented continuation: native deferred permission/input replies, host claim/a
 
 Continue `packages/harness-adapters/src/codex/adapter.ts` and its versioned mapping fixtures. Keep official wire types in the adapter-private generated directory with provenance. The implemented route uses App Server stdio, initialize, native account/config reads, thread start/resume, turn start/interrupt and deferred approval/question callbacks; native login UI remains future work. `experimentalApi` stays false because the pinned source forwards fixed-choice input without opting in. Bind native request/turn/item IDs and retain only sanitized metadata for unknown native events. Test subscription/API conflicts and effective account updates before a separately authorized real task. Expose only verified model/capability fields.
 
+Native **Codex 0.153.4** `model/list` discovery is implemented with bounded pagination, strict picker-field validation and account/configuration observations before and after listing. The desktop requires an explicit reported model and repeats listing before its separate session admission. No automatic choice, manual ID or fallback is supplied. Native listing can fetch metadata and write Codex's cache, and a new request can return cached results. Catalog membership is neither entitlement/billing evidence nor an atomic availability guarantee through dispatch.
+
 ## 6. Claude and OpenCode vertical slices — Claude connection checks delivered
 
 Claude Skills cataloging is implemented with explicit roots, bounded metadata and disabled activation; [CLAUDE_SKILLS.md](CLAUDE_SKILLS.md) specifies native activation admission.
@@ -83,10 +85,12 @@ OpenCode: implement `opencode/adapter.ts` using pinned SDK/server APIs. Keep ver
 
 ## 7. Desktop integration and identity — initial application delivered
 
-`packages/harness-desktop` provides a separate Electron main, sandboxed preload, Solid conversation renderer and private Bun worker. This additive entry point preserves upstream desktop/app behavior and avoids loading its native engine into the universal control plane. Native pickers, Codex subscription status and conversation controls, explicit admission acknowledgements, patch/question review, Claude version/sign-in checks and read-only Claude Skills discovery are implemented. The selector supports Codex and status-only Claude; OpenCode remains unavailable. See [DESKTOP.md](DESKTOP.md) for exact setup and limits. Model discovery, session recovery/history UI, full Files/Diff/tool views and additional runtime execution remain work.
+`packages/harness-desktop` provides a separate Electron main, sandboxed preload, Solid conversation renderer and private Bun worker. This additive entry point preserves upstream desktop/app behavior and avoids loading its native engine into the universal control plane. Native pickers, Codex subscription status and model selection, conversation controls, explicit admission acknowledgements, patch/question review, Claude version/sign-in checks and read-only Claude Skills discovery are implemented. Configuration changes or a disappearing model clear the selection; unavailable catalogs keep Start disabled. The runtime selector offers Codex and Claude Code, with Claude limited to connection checks; OpenCode remains unavailable. See [DESKTOP.md](DESKTOP.md) for exact setup and limits. Session recovery/history UI, full Files/Diff/tool views and additional runtime execution remain work. This does not complete M1.
 
 Before packaging, wire `harness.product.json` into a distinct build profile affecting `electron-builder.config.ts`, main app/data IDs, scheme, assets, updater, telemetry and i18n. Keep upstream development as a separate profile. Verify two installations coexist and a Harness update can never install upstream OpenCode. Use existing performance baseline and accessibility/e2e workflows when timeline/UI code changes.
 
 ## 8. Follow-on work
+
+The immediate next increment is native history/recovery presentation and verification of a supported OS execution boundary, followed by a separately authorized Codex repository task with explicit subscription/overage settings.
 
 Implement the collaboration state machine in [COLLABORATION.md](COLLABORATION.md) only after both native slices pass; then implement [REMOTE_NODES.md](REMOTE_NODES.md) with the same host policy and protocol. Neither worktree creation nor private-network membership alone establishes a security boundary. Each task ends with independent behavior tests and a reviewable commit, never a broad monorepo relocation.

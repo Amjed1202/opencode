@@ -127,6 +127,10 @@ else {
               ...(lastState.session ? { session: { ...lastState.session, status: "uncertain" } } : {}),
               permissions: [],
               inputs: [],
+              models: {
+                status: lastState.configuration.runtime === "claude" ? "unsupported" : "unavailable",
+                items: [],
+              },
               notices: [nativeCopy.disconnected],
             })
         },

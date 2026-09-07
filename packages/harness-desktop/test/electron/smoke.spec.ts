@@ -61,6 +61,8 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
       expect(renderer.state.connection.billing).toBe("unknown")
       expect(renderer.state.connection.providerOverage).toBe("unknown")
       expect(renderer.state.session).toBeUndefined()
+      expect(renderer.state.models).toEqual({ status: "not-loaded", items: [] })
+      await expect(page.getByLabel("Codex model", { exact: true })).toBeDisabled()
       expect(renderer.state.messages).toEqual([])
       const isolation = await app.evaluate(({ app, BrowserWindow, safeStorage }) => {
         const window = BrowserWindow.getAllWindows()[0]
@@ -111,6 +113,7 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
       expect(selected.configuration.runtime).toBe("claude")
       expect(selected.configuration.executable).toBeUndefined()
       expect(selected.configuration.nativeHome).toBeUndefined()
+      expect(selected.models).toEqual({ status: "unsupported", items: [] })
       expect(selected.connection).toMatchObject({
         runtimeName: "Claude Code",
         authentication: "unknown",
@@ -133,7 +136,9 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
       })
       expect(blocked).toBe(true)
       expect((await page.evaluate(() => window.harness.getState())).session).toBeUndefined()
-      const screenshot = resolve(packageRoot, "../../docs/validation/m1b-claude-desktop.png")
+      await page.evaluate(() => window.harness.selectRuntime({ runtime: "codex" }))
+      await expect(page.getByLabel("Codex model", { exact: true })).toBeDisabled()
+      const screenshot = resolve(packageRoot, "../../docs/validation/m1c-models-desktop.png")
       await mkdir(resolve(screenshot, ".."), { recursive: true })
       await page.screenshot({ path: screenshot })
     } finally {

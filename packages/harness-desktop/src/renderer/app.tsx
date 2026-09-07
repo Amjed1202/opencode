@@ -12,6 +12,7 @@ export function App() {
   const [error, setError] = createSignal("")
   const [draft, setDraft] = createSignal("")
   const [modelId, setModelId] = createSignal("")
+  const [checkingModels, setCheckingModels] = createSignal(false)
   const [acknowledgeOverage, setAcknowledgeOverage] = createSignal(false)
   const [allowFileChanges, setAllowFileChanges] = createSignal(false)
   const [acknowledgeBoundary, setAcknowledgeBoundary] = createSignal(false)
@@ -34,13 +35,26 @@ export function App() {
     !!draft().trim()
   const pending = () => (state()?.permissions.length ?? 0) + (state()?.inputs.length ?? 0)
   const ready = () => state()?.connection.status === "ready"
+  const modelsReady = () => state()?.models.status === "ready" && !!state()?.models.items.length
+  const offeredModels = () => (modelsReady() ? state()!.models.items : [])
+  const selectedModelAvailable = () => offeredModels().some((model) => model.id === modelId())
+  const modelStatus = () =>
+    checkingModels()
+      ? copy.modelsLoading
+      : modelsReady()
+        ? copy.modelHint
+        : state()?.models.status === "unavailable" || state()?.models.status === "ready"
+          ? copy.modelsUnavailable
+          : state()?.models.status === "unsupported"
+            ? copy.modelsUnsupported
+            : copy.modelsNotLoaded
   const canStart = () =>
     !busy() &&
     executionAvailable() &&
     !session() &&
     ready() &&
     !!configuration()?.workspace &&
-    !!modelId().trim() &&
+    selectedModelAvailable() &&
     acknowledgeOverage() &&
     acknowledgeBoundary()
   const status = () =>
@@ -60,6 +74,16 @@ export function App() {
   function receive(next: DesktopState) {
     const current = state()
     if (current && next.revision < current.revision) return
+    if (
+      current?.configuration.workspace?.id !== next.configuration.workspace?.id ||
+      current?.configuration.workspace?.path !== next.configuration.workspace?.path ||
+      current?.configuration.executable !== next.configuration.executable ||
+      current?.configuration.nativeHome !== next.configuration.nativeHome ||
+      next.models.status !== "ready" ||
+      !next.models.items.some((model) => model.id === modelId())
+    ) {
+      setModelId("")
+    }
     if ((current?.configuration.runtime ?? "codex") !== (next.configuration.runtime ?? "codex")) {
       setModelId("")
       setAcknowledgeOverage(false)
@@ -135,6 +159,16 @@ export function App() {
       await perform(() => window.harness.selectRuntime({ runtime: selected }))
     }
     select.value = runtime()
+  }
+
+  async function refresh() {
+    if (busy()) return
+    setCheckingModels(executionAvailable() && !session())
+    try {
+      await perform(() => window.harness.refresh())
+    } finally {
+      setCheckingModels(false)
+    }
   }
 
   function openContext(next?: ContextTab) {
@@ -323,7 +357,7 @@ export function App() {
               title={copy.refresh}
               aria-label={copy.refresh}
               disabled={busy() || !state()}
-              onClick={() => void perform(() => window.harness.refresh())}
+              onClick={() => void refresh()}
             >
               <Icon name="refresh" size={16} />
             </button>
@@ -583,7 +617,7 @@ export function App() {
                 <button
                   class="secondary-button"
                   disabled={busy() || !configuration()?.executable || !configuration()?.nativeHome}
-                  onClick={() => void perform(() => window.harness.refresh())}
+                  onClick={() => void refresh()}
                 >
                   <Icon name="refresh" size={14} />
                   {copy.checkConnection}
@@ -596,18 +630,29 @@ export function App() {
                 <label class="model-label" for="model-id">
                   {copy.modelLabel}
                 </label>
-                <input
+                <select
                   id="model-id"
-                  class="model-input"
-                  type="text"
+                  class="model-select"
                   value={modelId()}
-                  maxLength={128}
-                  autocomplete="off"
-                  spellcheck={false}
-                  placeholder={copy.modelPlaceholder}
-                  onInput={(event) => setModelId(event.currentTarget.value)}
-                />
-                <p class="model-hint">{copy.modelHint}</p>
+                  disabled={busy() || !modelsReady()}
+                  aria-describedby="model-status"
+                  onChange={(event) => {
+                    const selected = event.currentTarget.value
+                    setModelId(offeredModels().some((model) => model.id === selected) ? selected : "")
+                  }}
+                >
+                  <option value="">{checkingModels() ? copy.modelsLoading : copy.modelPlaceholder}</option>
+                  <For each={offeredModels()}>
+                    {(model) => (
+                      <option value={model.id}>
+                        {model.name === model.id ? model.id : `${model.name} (${model.id})`}
+                      </option>
+                    )}
+                  </For>
+                </select>
+                <p class="model-hint" id="model-status" role="status" aria-live="polite">
+                  {modelStatus()}
+                </p>
                 <p class="attention">{copy.overageNotice}</p>
                 <label class="checkbox-label">
                   <input
@@ -637,16 +682,17 @@ export function App() {
               <button
                 class="primary-button full-width"
                 disabled={!canStart()}
-                onClick={() =>
+                onClick={() => {
+                  if (!canStart()) return
                   void perform(() =>
                     window.harness.start({
-                      modelId: modelId().trim(),
+                      modelId: modelId(),
                       acknowledgeOverage: acknowledgeOverage(),
                       allowFileChanges: allowFileChanges(),
                       acknowledgeUnverifiedBoundary: acknowledgeBoundary(),
                     }),
                   )
-                }
+                }}
               >
                 {copy.startConversation}
               </button>

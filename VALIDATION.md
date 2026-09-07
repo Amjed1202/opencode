@@ -1,8 +1,32 @@
 # Validation and known issues
 
-Executed 2026-09-07 (Europe/Rome) on Windows with Bun **1.3.14**, Node **24.14.1** and Electron **42.3.3**. This continuation adds **Claude 2.1.251 native connection checks** and desktop runtime selection. Claude execution and native Skills activation remain unsupported. [Claude scope](M1B_CLAUDE.md) and [desktop scope](DESKTOP.md) distinguish this delivery from native execution and billing acceptance.
+Executed 2026-09-07 (Europe/Rome) on Windows with Bun **1.3.14**, Node **24.14.1** and Electron **42.3.3**. The latest continuation adds native **Codex 0.153.4 model discovery and an explicit desktop picker**. Catalog metadata does not replace subscription, policy or effective native model checks. [Implemented scope](M1C_MODELS.md).
 
-## Claude native status continuation
+## Native model selection continuation
+
+| Final check                                         | Result                                                                  | Evidence                                                                                                                                |
+| --------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Complete host suite                                 | **281 pass, 1 platform skip, 0 fail**, 1078 assertions                  | [Log](docs/validation/m1c-models-control-plane-tests.log)                                                                               |
+| Complete adapter suite                              | **313 pass, 0 fail**, 985 assertions                                    | [Log](docs/validation/m1c-models-adapters-tests.log)                                                                                    |
+| Complete desktop unit/process suite                 | **58 pass, 1 platform skip, 0 fail**, 366 assertions                    | [Log](docs/validation/m1c-models-unit-tests.log)                                                                                        |
+| Chromium renderer tests                             | **12 pass**                                                             | [Log](docs/validation/m1c-models-ui-tests.log)                                                                                          |
+| Real built Electron smoke                           | **1 pass**                                                              | [Log](docs/validation/m1c-models-electron-tests.log), [screenshot](docs/validation/m1c-models-desktop.png)                              |
+| Four package typechecks and desktop build           | **Pass**                                                                | [Commands/logs](docs/validation/m1c-models-results.json), [build](docs/validation/m1c-models-build.log)                                 |
+| Authored-source format and lint                     | **Format pass; 0 lint errors, 362 warnings** across 91 TypeScript files | [Format](docs/validation/m1c-models-format.log), [lint](docs/validation/m1c-models-oxlint.json)                                         |
+| Native generated protocol preservation              | **81 hashes match; original 72 unchanged and nine added byte-for-byte** | [Provenance](packages/harness-adapters/src/codex/generated/0.153.4/provenance.json), [results](docs/validation/m1c-models-results.json) |
+| Independent native-source and implementation review | **No outstanding production findings**                                  | [Evidence](docs/validation/m1c-models-native-evidence.md), [review](docs/validation/m1c-models-review.md)                               |
+
+Total: **652 passing unit/process tests, 2 platform skips, 2429 assertions**, plus **13 browser/Electron tests**. The Windows skips remain the host's open-database directory-rename test and desktop's POSIX permission-mode test. Lint warnings remain recorded, primarily typed assertions and Bun test typings; this is not a warning-free result.
+
+The new adapter suite exercises native dispatch IDs, pagination, hidden entries, schema/count/byte limits, cursor cycles, duplicate IDs, runtime/account/configuration changes, timeout and disposal. Desktop tests prove that unavailable, arbitrary or disappeared model choices cannot create a native thread, and that an explicitly selected alternate model reaches native creation unchanged without sending a turn. Browser tests cover explicit keyboard selection, loading, empty/unavailable catalogs and configuration invalidation. The real Electron smoke verifies an empty catalog and disabled picker against the private host, runtime switching, sandboxing, asset/CSP restrictions and OS key wrapping across restart.
+
+Validation used spawned local protocol peers, isolated test directories and generated types from the previously inspected pinned CLI. No installed native provider process, user account, real catalog fetch, native login or inference was used in this increment. The pinned source shows that actual native catalog reads can use cached or bundled data and can fetch metadata/write native cache; pages do not share an atomic snapshot token. A repeated list observation before Start is therefore a membership check, not proof of current remote entitlement or zero charges. Existing admission and effective native provider/model/policy checks remain required. [Native evidence](docs/validation/m1c-models-native-evidence.md).
+
+Dependencies and bun.lock did not change. All four package typechecks and the desktop build were rerun. Child-process fixtures, compilers and Chromium/Electron needed execution outside the default process sandbox. The original MIT notice, upstream security-policy suffix and functional upstream sources remain unchanged; SECURITY.md and bun.lock remain the only modified preexisting upstream files across the cumulative fork.
+
+Claude execution and native Skills activation remain blocked; its catalog and connection checks are preserved. Native history/recovery presentation, OS execution boundary attestation, a separately authorized live repository task, cross-process fencing, OpenCode execution and signed distribution remain open. Historical records below retain their own delivery state.
+
+## Claude native status continuation (historical)
 
 | Final check                                           | Result                                                                                   | Evidence                                                                                                   |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |

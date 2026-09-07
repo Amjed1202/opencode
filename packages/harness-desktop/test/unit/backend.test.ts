@@ -110,6 +110,7 @@ async function fixture(scenario = "normal") {
         requests: string[]
         turns: number
         approvals: { id: string | number; result?: unknown }[]
+        startedModels: string[]
       }
     },
     async reopen() {
@@ -153,6 +154,7 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       expect(switched.configuration.runtime).toBe("claude")
       expect(switched.configuration.executable).toBeUndefined()
       expect(switched.configuration.nativeHome).toBeUndefined()
+      expect(switched.models).toEqual({ status: "unsupported", items: [] })
       expect(switched.connection).toEqual({
         runtimeName: "Claude Code",
         status: "not-checked",
@@ -189,6 +191,7 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       expect(back.configuration.executable).toBeUndefined()
       expect(back.configuration.nativeHome).toBeUndefined()
       expect(back.connection.status).toBe("not-checked")
+      expect(back.models).toEqual({ status: "not-loaded", items: [] })
       expect(back.connection.runtimeName).toBe("Codex")
     } finally {
       await state.close()
@@ -288,7 +291,7 @@ describe("desktop backend through the pinned local stdio fixture", () => {
     }
   })
 
-  test("catalog configuration starts no native process and refresh performs only native status reads", async () => {
+  test("configuration starts no native process and refresh reads status and models without a session", async () => {
     const state = await fixture()
     try {
       await mkdir(join(state.workspace, ".claude", "skills", "review"), { recursive: true })
@@ -298,6 +301,7 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       )
       const configured = await state.configure()
       expect(state.transports).toHaveLength(0)
+      expect(configured.models).toEqual({ status: "not-loaded", items: [] })
       expect(configured.skills?.skills[0]).toMatchObject({ commandName: "review", activation: { status: "disabled" } })
       expect(JSON.stringify(configured)).not.toContain("private body")
       const refreshed = (await state.backend().dispatch("refresh")) as DesktopState
@@ -308,13 +312,103 @@ describe("desktop backend through the pinned local stdio fixture", () => {
         providerOverage: "unknown",
       })
       const native = await state.nativeState()
+      expect(refreshed.models.status).toBe("ready")
+      expect(refreshed.models.items).toContainEqual({ id: "gpt-5.4", name: "GPT-5.4" })
+      expect(refreshed.models.checkedAt).toBeDefined()
+      expect(native.requests).toContain("model/list")
       expect(native.turns).toBe(0)
       expect(
         native.requests.filter(
-          (method) => !["initialize", "initialized", "account/read", "config/read", "fixture/state"].includes(method),
+          (method) =>
+            !["initialize", "initialized", "account/read", "config/read", "model/list", "fixture/state"].includes(
+              method,
+            ),
         ),
       ).toEqual([])
       expect(refreshed.session).toBeUndefined()
+    } finally {
+      await state.close()
+    }
+  })
+
+  test.each(["models-empty", "models-error", "models-malformed"])(
+    "unavailable model catalog %s never enables native thread creation",
+    async (scenario) => {
+      const state = await fixture(scenario)
+      try {
+        await state.configure()
+        const refreshed = (await state.backend().dispatch("refresh")) as DesktopState
+        expect(refreshed.models).toEqual({ status: "unavailable", items: [] })
+        await rejection(state.backend().dispatch("start", start))
+        expect((await state.nativeState()).requests).not.toContain("thread/start")
+        expect((await state.state()).session).toBeUndefined()
+      } finally {
+        await state.close()
+      }
+    },
+  )
+
+  test("an arbitrary model is rejected without another native catalog read", async () => {
+    const state = await fixture()
+    try {
+      await state.configure()
+      await state.backend().dispatch("refresh")
+      const before = (await state.nativeState()).requests.filter((method) => method === "model/list").length
+      await rejection(state.backend().dispatch("start", { ...start, modelId: "not-offered-by-codex" }))
+      const after = await state.nativeState()
+      expect(after.requests.filter((method) => method === "model/list")).toHaveLength(before)
+      expect(after.requests).not.toContain("thread/start")
+    } finally {
+      await state.close()
+    }
+  })
+
+  test("an explicitly chosen alternate catalog model reaches native creation unchanged", async () => {
+    const state = await fixture()
+    try {
+      await state.configure()
+      await state.backend().dispatch("refresh")
+      const selected = "gpt-5.4-mini"
+      expect((await state.state()).models.items.some((model) => model.id === selected)).toBe(true)
+      const started = (await state.backend().dispatch("start", { ...start, modelId: selected })) as DesktopState
+      expect(started.session?.modelId).toBe(selected)
+      expect((await state.nativeState()).startedModels).toEqual([selected])
+      expect((await state.nativeState()).turns).toBe(0)
+    } finally {
+      await state.close()
+    }
+  })
+
+  test("a disappeared model updates the desktop catalog and blocks native creation", async () => {
+    const state = await fixture("models-disappear")
+    try {
+      await state.configure()
+      await state.backend().dispatch("refresh")
+      expect((await state.state()).models.items.some((model) => model.id === start.modelId)).toBe(true)
+      await rejection(state.backend().dispatch("start", start))
+      expect((await state.state()).models.items.some((model) => model.id === start.modelId)).toBe(false)
+      expect(state.published.at(-1)?.models.items.some((model) => model.id === start.modelId)).toBe(false)
+      const native = await state.nativeState()
+      expect(native.requests.filter((method) => method === "model/list")).toHaveLength(2)
+      expect(native.requests).not.toContain("thread/start")
+      expect((await state.state()).session).toBeUndefined()
+    } finally {
+      await state.close()
+    }
+  })
+
+  test("changing account home or workspace clears model observations until another explicit check", async () => {
+    const state = await fixture()
+    try {
+      await state.configure()
+      await state.backend().dispatch("refresh")
+      const configured = (await state
+        .backend()
+        .dispatch("configure", { ...state.configuration, nativeHome: state.directory })) as DesktopState
+      expect(configured.models).toEqual({ status: "not-loaded", items: [] })
+      expect(configured.connection.status).toBe("not-checked")
+      expect(state.transports).toHaveLength(1)
+      await rejection(state.backend().dispatch("start", start))
     } finally {
       await state.close()
     }
@@ -333,6 +427,7 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       expect((await state.nativeState()).requests).not.toContain("thread/start")
       const started = (await state.backend().dispatch("start", start)) as DesktopState
       expect(started.session?.status).toBe("idle")
+      expect((await state.nativeState()).requests.filter((method) => method === "model/list")).toHaveLength(2)
       expect((await state.nativeState()).turns).toBe(0)
       await state.backend().dispatch("send", { text: "Fixture message only" })
       const completed = await until(

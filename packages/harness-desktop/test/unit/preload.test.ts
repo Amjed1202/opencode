@@ -21,6 +21,7 @@ function fixture() {
     permissions: [],
     inputs: [],
     skills: null,
+    models: { status: "not-loaded", items: [] },
     notices: [],
   }
   const ipc = {
@@ -108,6 +109,7 @@ describe("isolated desktop preload bridge", () => {
       permissions: [],
       inputs: [],
       skills: null,
+      models: { status: "not-loaded", items: [] },
       notices: [],
     }
     const privilegedEvent = { sender: { invoke: () => {} } }

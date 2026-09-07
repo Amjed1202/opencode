@@ -17,6 +17,7 @@ const initial: DesktopState = {
     billing: "subscription",
     providerOverage: "unknown",
   },
+  models: { status: "ready", items: [{ id: "fixture-model", name: "Fixture model" }] },
   messages: [],
   activity: [],
   permissions: [],
@@ -30,6 +31,8 @@ async function install(page: Page, state = initial) {
     let current = JSON.parse(serialized) as DesktopState
     const calls: { method: string; input?: unknown }[] = []
     const listeners = new Set<(value: DesktopState) => void>()
+    let refreshed: DesktopState | undefined
+    let finishRefresh: (() => void) | undefined
     const returnState = async () => current
     Object.defineProperty(window, "fixture", {
       value: {
@@ -37,6 +40,12 @@ async function install(page: Page, state = initial) {
         publish(value: DesktopState) {
           current = value
           listeners.forEach((listener) => listener(value))
+        },
+        deferRefresh(value: DesktopState) {
+          refreshed = value
+        },
+        finishRefresh() {
+          finishRefresh?.()
         },
       },
     })
@@ -62,12 +71,23 @@ async function install(page: Page, state = initial) {
             billing: "unknown",
             providerOverage: "unknown",
           },
+          models: { status: input.runtime === "claude" ? "unsupported" : "not-loaded", items: [] },
         }
         return current
       },
       chooseNativeHome: returnState,
       chooseSkillsRoot: returnState,
-      refresh: returnState,
+      async refresh() {
+        calls.push({ method: "refresh" })
+        if (refreshed) {
+          await new Promise<void>((resolve) => {
+            finishRefresh = resolve
+          })
+          current = refreshed
+          refreshed = undefined
+        }
+        return current
+      },
       async start(input) {
         calls.push({ method: "start", input })
         current = {
@@ -176,7 +196,9 @@ test("startup requires explicit native settings and never sends a prompt automat
   const start = page.getByRole("button", { name: "Start conversation", exact: true })
   await expect(start).toBeDisabled()
   await page.screenshot({ path: test.info().outputPath("desktop-startup.png") })
-  await page.getByLabel("Native model ID", { exact: true }).fill("fixture-model")
+  await expect(page.getByRole("combobox", { name: "Codex model", exact: true })).toHaveValue("")
+  await expect(page.getByRole("option", { name: "Fixture model (fixture-model)", exact: true })).toHaveCount(1)
+  await page.getByRole("combobox", { name: "Codex model", exact: true }).selectOption("fixture-model")
   await page.getByLabel("I have checked my provider’s spending settings").check()
   await expect(start).toBeDisabled()
   await page.getByLabel("I understand the operating-system execution boundary").check()
@@ -202,6 +224,150 @@ test("startup requires explicit native settings and never sends a prompt automat
     },
     { method: "send", input: { text: "Inspect the fixture repository" } },
   ])
+})
+
+test("connection checks load models without selecting or starting one automatically", async ({ page }) => {
+  await install(page, { ...initial, models: { status: "not-loaded", items: [] } })
+  await page.goto("/")
+  const model = page.getByRole("combobox", { name: "Codex model", exact: true })
+  const start = page.getByRole("button", { name: "Start conversation", exact: true })
+  await expect(model).toBeDisabled()
+  await expect(page.getByText("Check connection to load models from your selected Codex runtime.")).toBeVisible()
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  await expect(start).toBeDisabled()
+  await page.evaluate(
+    (serialized) => {
+      const fixture = (window as unknown as { fixture: { deferRefresh(value: DesktopState): void } }).fixture
+      fixture.deferRefresh(JSON.parse(serialized) as DesktopState)
+    },
+    JSON.stringify({ ...initial, revision: 2 }),
+  )
+  await page.getByRole("button", { name: "Check connection", exact: true }).click()
+  await expect(page.locator("#model-status")).toHaveText("Loading models from Codex…")
+  await expect(model).toBeDisabled()
+  await expect(start).toBeDisabled()
+  await page.evaluate(() => (window as unknown as { fixture: { finishRefresh(): void } }).fixture.finishRefresh())
+  await expect(model).toBeEnabled()
+  await expect(model).toHaveValue("")
+  await expect(page.locator("#model-status")).toHaveText(
+    "Models reported by Codex. Availability does not confirm plan access or billing.",
+  )
+  await expect(start).toBeDisabled()
+  await expect(page.getByRole("textbox", { name: "Codex model", exact: true })).toHaveCount(0)
+  await model.focus()
+  await page.keyboard.press("ArrowDown")
+  await expect(model).toHaveValue("fixture-model")
+  await expect(start).toBeEnabled()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    { method: "refresh" },
+  ])
+})
+
+test("a disappearing model clears the selection and requires another explicit choice", async ({ page }) => {
+  await install(page)
+  await page.goto("/")
+  const model = page.getByRole("combobox", { name: "Codex model", exact: true })
+  const start = page.getByRole("button", { name: "Start conversation", exact: true })
+  await model.selectOption("fixture-model")
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  await expect(start).toBeEnabled()
+  await page.evaluate(
+    (serialized) =>
+      (window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+        JSON.parse(serialized) as DesktopState,
+      ),
+    JSON.stringify({
+      ...initial,
+      revision: 2,
+      models: { status: "ready", items: [{ id: "second-model", name: "Second model" }] },
+    }),
+  )
+  await expect(model).toHaveValue("")
+  await expect(page.getByRole("option", { name: "Fixture model (fixture-model)", exact: true })).toHaveCount(0)
+  await expect(start).toBeDisabled()
+  await model.selectOption("second-model")
+  await expect(start).toBeEnabled()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
+test("unavailable and empty catalogs prevent starting and recovery never restores an old selection", async ({
+  page,
+}) => {
+  await install(page)
+  await page.goto("/")
+  const model = page.getByRole("combobox", { name: "Codex model", exact: true })
+  const start = page.getByRole("button", { name: "Start conversation", exact: true })
+  await model.selectOption("fixture-model")
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  await expect(start).toBeEnabled()
+  for (const [index, status] of ["unavailable", "ready"].entries()) {
+    await page.evaluate(
+      (serialized) =>
+        (window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+          JSON.parse(serialized) as DesktopState,
+        ),
+      JSON.stringify({ ...initial, revision: index + 2, models: { status, items: [] } }),
+    )
+    await expect(model).toBeDisabled()
+    await expect(model).toHaveValue("")
+    await expect(model.locator("option")).toHaveCount(1)
+    await expect(page.locator("#model-status")).toHaveText(
+      "No model catalog is available. Check connection again before starting.",
+    )
+    await expect(start).toBeDisabled()
+  }
+  await page.evaluate(
+    (serialized) =>
+      (window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+        JSON.parse(serialized) as DesktopState,
+      ),
+    JSON.stringify({ ...initial, revision: 4 }),
+  )
+  await expect(model).toBeEnabled()
+  await expect(model).toHaveValue("")
+  await expect(start).toBeDisabled()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
+test("workspace, executable and account-home changes clear an otherwise available model", async ({ page }) => {
+  await install(page)
+  await page.goto("/")
+  const model = page.getByRole("combobox", { name: "Codex model", exact: true })
+  const start = page.getByRole("button", { name: "Start conversation", exact: true })
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  const configurations = [
+    { ...initial.configuration, workspace: { id: "workspace-b", name: "Review fixture", path: "C:/fixture" } },
+    { ...initial.configuration, workspace: { id: "workspace-b", name: "Review fixture", path: "C:/another" } },
+    {
+      ...initial.configuration,
+      workspace: { id: "workspace-b", name: "Review fixture", path: "C:/another" },
+      executable: "C:/another/codex.exe",
+    },
+    {
+      ...initial.configuration,
+      workspace: { id: "workspace-b", name: "Review fixture", path: "C:/another" },
+      executable: "C:/another/codex.exe",
+      nativeHome: "C:/another/native",
+    },
+  ]
+  for (const [index, configuration] of configurations.entries()) {
+    await model.selectOption("fixture-model")
+    await expect(start).toBeEnabled()
+    await page.evaluate(
+      (serialized) =>
+        (window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+          JSON.parse(serialized) as DesktopState,
+        ),
+      JSON.stringify({ ...initial, revision: index + 2, configuration }),
+    )
+    await expect(model).toHaveValue("")
+    await expect(start).toBeDisabled()
+  }
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
 })
 
 test("patch approval requires opening protected text and never renders it as HTML", async ({ page }) => {
@@ -351,7 +517,7 @@ test("browser preview reports a missing desktop bridge and keeps execution disab
 test("switching runtime invalidates Codex readiness and clears execution acknowledgments", async ({ page }) => {
   await install(page)
   await page.goto("/")
-  await page.getByLabel("Native model ID", { exact: true }).fill("fixture-model")
+  await page.getByRole("combobox", { name: "Codex model", exact: true }).selectOption("fixture-model")
   await page.getByLabel("I have checked my provider’s spending settings").check()
   await page.getByLabel("I understand the operating-system execution boundary").check()
   await page.getByLabel("Allow file changes in this repository").check()
@@ -375,7 +541,7 @@ test("switching runtime invalidates Codex readiness and clears execution acknowl
       ),
     JSON.stringify({ ...initial, revision: 4 }),
   )
-  await expect(page.getByLabel("Native model ID", { exact: true })).toHaveValue("")
+  await expect(page.getByRole("combobox", { name: "Codex model", exact: true })).toHaveValue("")
   await expect(page.getByLabel("I have checked my provider’s spending settings")).not.toBeChecked()
   await expect(page.getByLabel("I understand the operating-system execution boundary")).not.toBeChecked()
   await expect(page.getByLabel("Allow file changes in this repository")).not.toBeChecked()
@@ -401,6 +567,7 @@ test("Claude sign-in status never enables execution or native Skills when billin
       providerOverage: "unknown",
       reason: "Native billing and managed policy evidence is unavailable. Execution is disabled.",
     },
+    models: { status: "unsupported", items: [] },
   })
   await page.goto("/")
   await expect(page.getByRole("combobox", { name: "Choose runtime" })).toHaveValue("claude")
@@ -414,6 +581,7 @@ test("Claude sign-in status never enables execution or native Skills when billin
   await expect(page.getByText(/home folder containing \.claude/)).toBeVisible()
   await expect(page.getByRole("button", { name: "Start conversation", exact: true })).toBeDisabled()
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
+  await expect(page.getByRole("combobox", { name: "Codex model", exact: true })).toHaveCount(0)
   await expect(page.getByRole("textbox", { name: "Message to Claude Code", exact: true })).toBeDisabled()
   await page.getByRole("tab", { name: "Skills", exact: true }).click()
   await expect(

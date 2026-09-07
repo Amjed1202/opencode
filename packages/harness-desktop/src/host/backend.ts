@@ -35,7 +35,7 @@ export interface BackendOptions {
   readonly claudeAdapterFactory?: (options: ConstructorParameters<typeof ClaudeAdapter>[0]) => NativeAdapter
 }
 
-/** Privileged Bun child. One session at a time; no provider work until explicit start/send requests. */
+/** Privileged Bun child. One session at a time; no native thread or turn before explicit start/send requests. */
 export class DesktopBackend {
   private readonly workspaces = new LocalWorkspaceRegistry({ leaseMilliseconds: 60 * 60 * 1000 })
   private readonly journal: SQLiteJournal
@@ -63,6 +63,7 @@ export class DesktopBackend {
     permissions: [],
     inputs: [],
     skills: null,
+    models: { status: "not-loaded", items: [] },
     notices: [],
   }
 
@@ -181,6 +182,7 @@ export class DesktopBackend {
         providerOverage: "unknown",
       },
       skills: null,
+      models: { status: selected.runtime === "claude" ? "unsupported" : "not-loaded", items: [] },
       notices: recovery
         ? ["Previous native work needs native inspection. Automatic recovery and new sessions are blocked."]
         : [],
@@ -210,6 +212,10 @@ export class DesktopBackend {
     if (!config.workspace || !config.executable || !config.nativeHome)
       throw new Error("Choose a repository, native runtime executable and account home")
     await this.detach()
+    this.state = {
+      ...this.state,
+      models: { status: config.runtime === "claude" ? "unsupported" : "not-loaded", items: [] },
+    }
     const target = { id: "local", kind: "local" as const, name: "This computer" }
     const claude = config.runtime === "claude"
     const runtimeName = claude ? "Claude Code" : "Codex"
@@ -273,8 +279,43 @@ export class DesktopBackend {
         },
       }
     }
+    if (this.state.connection.status === "ready") await this.loadModels()
     await this.scanSkills()
     return this.publish()
+  }
+
+  private async loadModels() {
+    if (this.state.configuration.runtime === "claude" || !this.adapter?.models || !this.descriptor) {
+      this.state = { ...this.state, models: { status: "unsupported", items: [] } }
+      return
+    }
+    try {
+      const models = await this.adapter.models(this.descriptor)
+      if (!Array.isArray(models) || models.length === 0 || models.length > 256) throw new Error("Invalid model list")
+      const ids = new Set<string>()
+      const items = models.map((model) => {
+        if (
+          !model ||
+          model.providerId !== "openai" ||
+          typeof model.id !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(model.id) ||
+          ids.has(model.id) ||
+          typeof model.name !== "string" ||
+          !model.name.length ||
+          model.name.trim() !== model.name ||
+          model.name.length > 256 ||
+          /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(model.name)
+        )
+          throw new Error("Invalid model list")
+        ids.add(model.id)
+        return { id: model.id, name: model.name }
+      })
+      if (Buffer.byteLength(JSON.stringify(items)) > 128 * 1024 || this.closed)
+        throw new Error("Model list is unavailable")
+      this.state = { ...this.state, models: { status: "ready", items, checkedAt: new Date().toISOString() } }
+    } catch {
+      this.state = { ...this.state, models: { status: "unavailable", items: [] } }
+    }
   }
 
   private intent(input: StartSessionInput): SessionIntent {
@@ -323,6 +364,14 @@ export class DesktopBackend {
     if (await this.needsRecovery(this.state.configuration.workspace.id))
       throw new Error("Previous work needs native inspection before a new session can start")
     const intent = this.intent(input)
+    if (this.state.models.status !== "ready" || !this.state.models.items.some((model) => model.id === input.modelId))
+      throw new Error("Choose a model from the current native catalog")
+    // A displayed choice can disappear or change accounts before Start is pressed.
+    // Recheck listing before the separate billing/policy admission and native thread creation.
+    await this.loadModels()
+    await this.publish()
+    if (this.state.models.status !== "ready" || !this.state.models.items.some((model) => model.id === input.modelId))
+      throw new Error("The selected model is no longer available; check the connection and choose again")
     const runtime = () =>
       this.adapter && this.descriptor ? { adapter: this.adapter, descriptor: this.descriptor } : undefined
     this.admission = new AdmissionController({

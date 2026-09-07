@@ -20,6 +20,7 @@ import type {
   PermissionBinding,
   PermissionRequest,
   NativeSessionInspection,
+  ModelDescriptor,
   RuntimeDescriptor,
   RuntimePreflight,
   SessionIntent,
@@ -30,6 +31,7 @@ import { approvalDenial, approvalPlan, fileApprovalEvidence } from "./permission
 import type { FileApprovalEvidence } from "./permissions"
 import { inspectCodexHistory } from "./history"
 import { decodeHumanInput } from "./human-input"
+import { readCodexModels } from "./models"
 import type { ToolRequestUserInputParams } from "./generated/0.153.4/v2/ToolRequestUserInputParams"
 import type { ToolRequestUserInputResponse } from "./generated/0.153.4/v2/ToolRequestUserInputResponse"
 import type { NativeNotification, NativeReply, NativeRequest, StdioJsonRpcOptions } from "./stdio"
@@ -223,6 +225,49 @@ export class CodexAdapter implements AgentAdapter {
     )
       throw new Error("Invalid native status binding")
     return structuredClone(await this.observe())
+  }
+
+  async models(runtime: RuntimeDescriptor): Promise<readonly ModelDescriptor[]> {
+    try {
+      if (
+        this.disposed ||
+        runtime.id !== this.runtimeId ||
+        runtime.adapterId !== this.id ||
+        runtime.kind !== "native-agent" ||
+        runtime.version !== "0.153.4" ||
+        runtime.nativeProtocolVersion !== "0.153.4" ||
+        typeof runtime.executable !== "string" ||
+        !absolute(runtime.executable) ||
+        !samePath(runtime.executable, this.options.executable) ||
+        runtime.target.id !== this.options.target.id ||
+        runtime.target.kind !== "local" ||
+        runtime.target.nodeId !== undefined ||
+        runtime.providers.length !== 1 ||
+        runtime.providers[0]?.id !== "openai"
+      )
+        throw new Error("Invalid native model binding")
+      const epoch = this.accountEpoch
+      const before = await this.observe()
+      const transport = await this.connect()
+      const models = await readCodexModels(async (params) => {
+        if (this.disposed || epoch !== this.accountEpoch) throw new Error("Native observation expired")
+        const result = await transport.request("model/list", params)
+        if (this.disposed || epoch !== this.accountEpoch) throw new Error("Native observation expired")
+        return result
+      })
+      const after = await this.observe()
+      if (
+        this.disposed ||
+        epoch !== this.accountEpoch ||
+        before.configurationFingerprint !== after.configurationFingerprint ||
+        before.auth.accountId !== after.auth.accountId
+      )
+        throw new Error("Native account or configuration changed during model discovery")
+      return models
+    } catch {
+      // Native errors, opaque cursors, account fields and unsupported metadata stay private.
+      throw new Error("Codex model discovery failed; no model selection is available")
+    }
   }
 
   async preflight(request: AdapterPreflightRequest): Promise<AdapterPreflight> {

@@ -1,10 +1,10 @@
 # Changed files
 
-The fork contains architecture, four additive Harness packages, the Codex host/adapter and an Electron/Solid desktop with OS-protected review keys, protected patch/question presentation, Claude Skills discovery and native Claude connection checks. Claude execution and Skills activation remain unsupported. See [Claude scope](M1B_CLAUDE.md), [desktop scope](DESKTOP.md) and [host scope](M1A_IMPLEMENTATION.md).
+The fork contains architecture, four additive Harness packages, the Codex host/adapter, native model discovery and an Electron/Solid desktop with explicit model selection, protected patch/question reviews, OS-protected keys, Claude Skills discovery and native Claude connection checks. Claude execution and Skills activation remain unsupported. See [model selection](M1C_MODELS.md), [desktop scope](DESKTOP.md) and [Claude scope](M1B_CLAUDE.md).
 
-Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md gains Harness policy while preserving the original suffix, and bun.lock adds Harness workspace records and existing-catalog type references. No upstream functional source, root workspace/build manifest, package resolution or MIT notice changes. Native generated types retain OpenAI Apache-2.0 attribution and all 72 recorded hashes. This Claude increment does not modify bun.lock or dependencies.
+Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md gains Harness policy while preserving its original suffix, and bun.lock adds Harness workspace records and existing-catalog type references. No upstream functional source, root workspace/build manifest, package resolution or MIT notice changes. Native generated types retain OpenAI Apache-2.0 attribution and all 81 recorded hashes; the original 72 are unchanged. This model-selection increment adds no dependencies or lockfile changes.
 
-There are **302 cumulative changed/added files** below. All others are additions relative to the pinned release. Validation artifacts are reviewable evidence. Runtime tools, installed binaries, caches, build output, browser test output and scratch state are excluded from the commit.
+There are **330 cumulative changed/added files** below. All others are additions relative to the pinned release. Validation artifacts are reviewable evidence. Runtime tools, installed binaries, caches, build output, browser test output and scratch state are excluded from the commit.
 
 ## Exact cumulative inventory
 
@@ -17,6 +17,7 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [HARNESS.md](HARNESS.md)
 - [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md)
 - [M1B_CLAUDE.md](M1B_CLAUDE.md)
+- [M1C_MODELS.md](M1C_MODELS.md)
 - [MIGRATION_PLAN.md](MIGRATION_PLAN.md)
 - [MILESTONES.md](MILESTONES.md)
 - [PROTOCOL.md](PROTOCOL.md)
@@ -111,6 +112,22 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [docs/validation/m1c-desktop-ui-tests.log](docs/validation/m1c-desktop-ui-tests.log)
 - [docs/validation/m1c-desktop-unit-tests.log](docs/validation/m1c-desktop-unit-tests.log)
 - [docs/validation/m1c-desktop.png](docs/validation/m1c-desktop.png)
+- [docs/validation/m1c-models-adapters-tests.log](docs/validation/m1c-models-adapters-tests.log)
+- [docs/validation/m1c-models-build.log](docs/validation/m1c-models-build.log)
+- [docs/validation/m1c-models-control-plane-tests.log](docs/validation/m1c-models-control-plane-tests.log)
+- [docs/validation/m1c-models-desktop.png](docs/validation/m1c-models-desktop.png)
+- [docs/validation/m1c-models-electron-tests.log](docs/validation/m1c-models-electron-tests.log)
+- [docs/validation/m1c-models-format.log](docs/validation/m1c-models-format.log)
+- [docs/validation/m1c-models-harness-adapters-typecheck.log](docs/validation/m1c-models-harness-adapters-typecheck.log)
+- [docs/validation/m1c-models-harness-control-plane-typecheck.log](docs/validation/m1c-models-harness-control-plane-typecheck.log)
+- [docs/validation/m1c-models-harness-desktop-typecheck.log](docs/validation/m1c-models-harness-desktop-typecheck.log)
+- [docs/validation/m1c-models-harness-protocol-typecheck.log](docs/validation/m1c-models-harness-protocol-typecheck.log)
+- [docs/validation/m1c-models-native-evidence.md](docs/validation/m1c-models-native-evidence.md)
+- [docs/validation/m1c-models-oxlint.json](docs/validation/m1c-models-oxlint.json)
+- [docs/validation/m1c-models-results.json](docs/validation/m1c-models-results.json)
+- [docs/validation/m1c-models-review.md](docs/validation/m1c-models-review.md)
+- [docs/validation/m1c-models-ui-tests.log](docs/validation/m1c-models-ui-tests.log)
+- [docs/validation/m1c-models-unit-tests.log](docs/validation/m1c-models-unit-tests.log)
 - [docs/validation/opencode-contract-tests.log](docs/validation/opencode-contract-tests.log)
 - [docs/validation/opencode-typecheck.log](docs/validation/opencode-typecheck.log)
 - [docs/validation/protocol-typecheck.log](docs/validation/protocol-typecheck.log)
@@ -142,6 +159,7 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/src/codex/generated/0.153.4/ImageDetail.ts](packages/harness-adapters/src/codex/generated/0.153.4/ImageDetail.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/InitializeCapabilities.ts](packages/harness-adapters/src/codex/generated/0.153.4/InitializeCapabilities.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/InitializeParams.ts](packages/harness-adapters/src/codex/generated/0.153.4/InitializeParams.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/InputModality.ts](packages/harness-adapters/src/codex/generated/0.153.4/InputModality.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/LICENSE](packages/harness-adapters/src/codex/generated/0.153.4/LICENSE)
 - [packages/harness-adapters/src/codex/generated/0.153.4/LegacyAppPathString.ts](packages/harness-adapters/src/codex/generated/0.153.4/LegacyAppPathString.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/NOTICE](packages/harness-adapters/src/codex/generated/0.153.4/NOTICE)
@@ -179,6 +197,13 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/GrantedPermissionProfile.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/GrantedPermissionProfile.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationAction.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationAction.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationRequestResponse.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationRequestResponse.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/Model.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/Model.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelAvailabilityNux.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelAvailabilityNux.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListParams.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListParams.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListResponse.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListResponse.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelServiceTier.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelServiceTier.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelUpgradeInfo.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelUpgradeInfo.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/MultiAgentVersion.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/MultiAgentVersion.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkAccess.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkAccess.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalContext.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalContext.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalProtocol.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalProtocol.ts)
@@ -188,6 +213,7 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionGrantScope.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionGrantScope.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalParams.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalParams.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalResponse.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalResponse.ts)
+- [packages/harness-adapters/src/codex/generated/0.153.4/v2/ReasoningEffortOption.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/ReasoningEffortOption.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/RequestPermissionProfile.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/RequestPermissionProfile.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxMode.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxMode.ts)
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxPolicy.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxPolicy.ts)
@@ -212,6 +238,7 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/src/codex/generated/0.153.4/v2/UserInput.ts](packages/harness-adapters/src/codex/generated/0.153.4/v2/UserInput.ts)
 - [packages/harness-adapters/src/codex/history.ts](packages/harness-adapters/src/codex/history.ts)
 - [packages/harness-adapters/src/codex/human-input.ts](packages/harness-adapters/src/codex/human-input.ts)
+- [packages/harness-adapters/src/codex/models.ts](packages/harness-adapters/src/codex/models.ts)
 - [packages/harness-adapters/src/codex/permissions.ts](packages/harness-adapters/src/codex/permissions.ts)
 - [packages/harness-adapters/src/codex/stdio.ts](packages/harness-adapters/src/codex/stdio.ts)
 - [packages/harness-adapters/src/generic/README.md](packages/harness-adapters/src/generic/README.md)
@@ -226,6 +253,7 @@ There are **302 cumulative changed/added files** below. All others are additions
 - [packages/harness-adapters/test/codex/environment-parent.ts](packages/harness-adapters/test/codex/environment-parent.ts)
 - [packages/harness-adapters/test/codex/history.test.ts](packages/harness-adapters/test/codex/history.test.ts)
 - [packages/harness-adapters/test/codex/human-input.test.ts](packages/harness-adapters/test/codex/human-input.test.ts)
+- [packages/harness-adapters/test/codex/models.test.ts](packages/harness-adapters/test/codex/models.test.ts)
 - [packages/harness-adapters/test/codex/peer.ts](packages/harness-adapters/test/codex/peer.ts)
 - [packages/harness-adapters/test/codex/permissions.test.ts](packages/harness-adapters/test/codex/permissions.test.ts)
 - [packages/harness-adapters/test/codex/stdio.test.ts](packages/harness-adapters/test/codex/stdio.test.ts)

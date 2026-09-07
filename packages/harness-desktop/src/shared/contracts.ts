@@ -38,6 +38,12 @@ export interface DesktopState {
     readonly reason?: string
   }
   readonly session?: { readonly id: string; readonly status: string; readonly modelId: string }
+  /** Native catalog observation only; never proof of entitlement or billing. */
+  readonly models: {
+    readonly status: "not-loaded" | "ready" | "unavailable" | "unsupported"
+    readonly items: readonly { readonly id: string; readonly name: string }[]
+    readonly checkedAt?: string
+  }
   readonly messages: readonly { readonly id: string; readonly role: "user" | "assistant"; readonly text: string }[]
   readonly activity: readonly { readonly id: string; readonly kind: string; readonly label: string }[]
   readonly permissions: readonly PermissionRequest[]

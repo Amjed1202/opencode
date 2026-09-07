@@ -1,0 +1,25 @@
+$ playwright test --config test/ui/playwright.config.ts
+[WebServer] $ vite --config vite.preview.config.ts
+[WebServer] (node:107348) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 12 tests using 1 worker
+
+(node:136796) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:136796) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 test\ui\renderer.spec.ts:193:1 › startup requires explicit native settings and never sends a prompt automatically (462ms)
+  ok  2 test\ui\renderer.spec.ts:229:1 › connection checks load models without selecting or starting one automatically (284ms)
+  ok  3 test\ui\renderer.spec.ts:267:1 › a disappearing model clears the selection and requires another explicit choice (258ms)
+  ok  4 test\ui\renderer.spec.ts:295:1 › unavailable and empty catalogs prevent starting and recovery never restores an old selection (293ms)
+  ok  5 test\ui\renderer.spec.ts:335:1 › workspace, executable and account-home changes clear an otherwise available model (278ms)
+  ok  6 test\ui\renderer.spec.ts:373:1 › patch approval requires opening protected text and never renders it as HTML (310ms)
+  ok  7 test\ui\renderer.spec.ts:411:1 › fixed-choice questions send offered IDs after review (291ms)
+  ok  8 test\ui\renderer.spec.ts:448:1 › expired protected content is removed and approval becomes unavailable (527ms)
+  ok  9 test\ui\renderer.spec.ts:482:1 › older snapshots cannot replace current state and mobile context remains accessible (216ms)
+  ok 10 test\ui\renderer.spec.ts:510:1 › browser preview reports a missing desktop bridge and keeps execution disabled (128ms)
+  ok 11 test\ui\renderer.spec.ts:517:1 › switching runtime invalidates Codex readiness and clears execution acknowledgments (275ms)
+  ok 12 test\ui\renderer.spec.ts:555:1 › Claude sign-in status never enables execution or native Skills when billing remains unknown (165ms)
+
+  12 passed (5.9s)

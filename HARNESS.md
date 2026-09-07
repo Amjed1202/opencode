@@ -1,10 +1,12 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: a development desktop with Codex conversations, Claude Code connection checks, protected patch/question review, OS-protected review keys and a Claude Skills catalog.** The host retains subscription admission, durable decisions and bounded history recovery. Harness is a provisional codename. See [desktop setup and limits](DESKTOP.md), [Codex host implementation](M1A_IMPLEMENTATION.md) and [Claude connection checks](M1B_CLAUDE.md). Claude **2.1.251** supports version and sign-in observations only; billing remains unknown, and Claude execution and native Skills activation remain blocked pending effective billing and managed policy evidence.
+**Delivered: a development desktop with Codex conversations and native model selection, Claude Code connection checks, protected patch/question review, OS-protected review keys and a Claude Skills catalog.** The host retains subscription admission, durable decisions and bounded history recovery. Harness is a provisional codename. See [desktop setup and limits](DESKTOP.md), [Codex host implementation](M1A_IMPLEMENTATION.md) and [Claude connection checks](M1B_CLAUDE.md). Claude **2.1.251** supports version and sign-in observations only; billing remains unknown, and Claude execution and native Skills activation remain blocked pending effective billing and managed policy evidence.
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 
 The sandboxed renderer calls our control plane through a restricted preload and private Bun child process. Independent Claude Code, Codex App Server, OpenCode and future runtime adapters translate native capabilities into a shared session/event model. Model, runtime, authentication, billing and execution target remain separate. Subscription runtimes are preferred; automatic API fallback defaults off. Current Claude rules provide a conditional unmodified-native-binary route, distinct from direct SDK subscription login. Provider overage and unknown billing remain explicit.
+
+The Codex **0.153.4** picker requires an explicit choice from its native `model/list` catalog and repeats listing before session admission. There is no default, manual-ID entry or fallback selection. Native listing can fetch metadata and update Codex's cache; a repeated request can return cached data and does not lock availability through dispatch. Catalog membership is separate from entitlement and billing checks.
 
 ## Read the architecture
 
@@ -65,18 +67,23 @@ Each added package has its own manifest and strict tsconfig. Existing `packages/
 
 ## Check the packages
 
-Use the repository's Bun **1.3.14**. From the repository root:
+Use the repository's Bun **1.3.14**. From the repository root in PowerShell:
 
-```sh
+```powershell
 bun install --frozen-lockfile --ignore-scripts --filter '@harness/*'
-bun --cwd packages/harness-protocol typecheck
-bun --cwd packages/harness-adapters typecheck
-bun --cwd packages/harness-control-plane typecheck
-bun --cwd packages/harness-desktop typecheck
+Set-Location packages/harness-protocol
+bun run typecheck
+Set-Location ../harness-adapters
+bun run typecheck
+Set-Location ../harness-control-plane
+bun run typecheck
+Set-Location ../harness-desktop
+bun run typecheck
+Set-Location ../..
 ```
 
 The filtered, script-disabled install prepares package dependencies. The new desktop also needs the pinned Electron binary; see [desktop setup](DESKTOP.md). This is separate from the upstream desktop dependency build. See the recorded Windows dependency issues before running upstream development scripts. Git must materialize tracked symlinks correctly on Windows; this checkout has `core.symlinks=true` and the tracked links restored without source changes.
 
 ## Next implementation step
 
-Complete supported-model discovery, native recovery presentation and OS boundary verification, then validate a separately authorized Codex repository task with explicit subscription/overage settings. Extend Claude beyond connection checks only after a supported native interface can establish effective billing and managed policy before startup side effects. Native Skills activation additionally requires verified source hashes, invocation rules and session policy. The current desktop is a development build with one attached session; installers, signing, update channels and the full M1 acceptance flow remain open.
+Complete native history/recovery presentation and OS boundary verification, then validate a separately authorized Codex repository task with explicit subscription/overage settings. Extend Claude beyond connection checks only after a supported native interface can establish effective billing and managed policy before startup side effects. Native Skills activation additionally requires verified source hashes, invocation rules and session policy. The current desktop is a development build with one attached session; installers, signing, update channels and the full M1 acceptance flow remain open.
