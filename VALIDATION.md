@@ -1,6 +1,22 @@
 # Validation and known issues
 
-## RC2 and live V1 continuation
+## RC3: Claude rate-limit reporting and final-event delivery
+
+On 2026-09-07, restored native Claude subscription admission passed, but the first acknowledged live Haiku input hit the provider's weekly limit before any tool call or Skill invocation. The reported reset is September 10 at 03:00 Europe/Rome. RC3 corrects the hidden error category and an independently reproduced host race that could drop the last committed event from the live subscription. The corrected path retains uncertainty, blocks replay and exposes only fixed error labels. [Live failure](docs/validation/v1-claude-live-rate-limit.json), [acceptance limits](V1_STATUS.md).
+
+| Check                      | Result                                                                                         | Evidence                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Control-plane suite        | 283 pass, 1 platform skip, 1092 assertions                                                     | [Log](docs/validation/v1-rc3-control-plane-tests.log)                                                               |
+| Adapter suite              | 397 pass, 1343 assertions                                                                      | [Log](docs/validation/v1-rc3-adapters-tests.log)                                                                    |
+| Desktop unit/process suite | 92 pass, 1 Windows skip, 604 assertions                                                        | [Log](docs/validation/v1-rc3-desktop-tests.log)                                                                     |
+| Browser fixtures           | 21 pass                                                                                        | [Log](docs/validation/v1-rc3-ui-tests.log)                                                                          |
+| Changed-package typechecks | Control plane, adapters and desktop pass                                                       | [Result record](docs/validation/v1-rc3-results.json), [package checks](docs/validation/v1-rc3-package-results.json) |
+| Windows package            | Build, package tests, development/portable smoke and full archive verification pass            | [Package evidence](docs/validation/v1-rc3-package-evidence.md)                                                      |
+| Source quality             | 129 files format clean; 0 lint errors / 502 warnings; generated/upstream preservation verified | [Quality](docs/validation/v1-rc3-quality.json)                                                                      |
+
+These are local checks, not a successful Claude provider task. The single rejected input remains reserved: Codex 4/4 and Claude 1/4. No more prompts were sent after the limit. RC1/RC2 outcomes, archives and historical evidence remain unchanged. Source through 889ec39 was pushed to origin/runtime-foundation at the user's request; application distribution is separate. [RC3 results](docs/validation/v1-rc3-results.json).
+
+## Historical RC2 validation before restored Claude sign-in
 
 On 2026-09-07, live acceptance exposed and corrected automatic Codex patch approval. The adapter now keeps native execution read-only, requests per-patch approval and disables native shell tools. The desktop explains that callers must supply file contents and run commands/tests separately. [Independent review](docs/validation/v1-codex-approval-review.md), [exact acceptance limits](V1_STATUS.md).
 

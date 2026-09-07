@@ -79,7 +79,7 @@ Claude Skills discovery and explicit standalone native activation are implemente
 
 Claude: the unmodified **2.1.251** binary runs through official SDK **0.3.251** with current native personal subscription and control evidence. The adapter supports text, guarded file tools, standalone Skills, tokens and clean exact resume. [Current scope](V1_CLAUDE.md).
 
-Live coding, protected permission, interruption, Skill invocation and exact resume acceptance remain pending explicit unknown-overage acknowledgment. Keep native login choices and provider-owned tokens; managed, API and cloud-provider paths remain unsupported by this candidate.
+The user authorized bounded live checks with unknown-overage and OS-boundary acknowledgments. Codex completed its four-prompt allowance. Claude's first acknowledged prompt hit a provider weekly limit; coding, protected permission, interruption, Skill invocation and exact resume acceptance remain pending, with three authorized prompts left. [Current acceptance](V1_STATUS.md). Keep native login choices and provider-owned tokens; managed, API and cloud-provider paths remain unsupported by this candidate.
 
 OpenCode: implement `opencode/adapter.ts` using pinned SDK/server APIs. Keep version/capability probing inside this folder. Use separate state/config/database roots; do not import core into the universal domain. Test one session generation end-to-end before considering current `/api` migration. Cover tool/permission and SSE disconnect behavior with real upstream server fixtures isolated from user data.
 

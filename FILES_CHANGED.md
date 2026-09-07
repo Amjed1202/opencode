@@ -4,7 +4,7 @@ The fork adds architecture and four Harness packages with independent Codex/Clau
 
 Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md retains the original policy suffix beneath Harness policy, and bun.lock adds Harness workspaces/dependencies with Bun hoisting changes. Prior locked resolution tuples, upstream functional source, root manifests and MIT notices remain preserved. All 84 native generated types match provenance; the prior 81 hashes are unchanged.
 
-There are **425 cumulative changed/added files** below. All other differences are additions relative to the pinned release. Runtime binaries, caches, build output, portable folders/archives and scratch data stay outside the source commit. Validation artifacts contain bounded fixture or sanitized diagnostic evidence.
+There are **457 cumulative changed/added files** below. All other differences are additions relative to the pinned release. Runtime binaries, caches, build output, portable folders/archives and scratch data stay outside the source commit. Validation artifacts contain bounded fixture or sanitized diagnostic evidence.
 
 ## Exact cumulative inventory
 
@@ -147,7 +147,9 @@ There are **425 cumulative changed/added files** below. All other differences ar
 - [docs/validation/upstream-results.json](docs/validation/upstream-results.json)
 - [docs/validation/v1-adapters-tests.log](docs/validation/v1-adapters-tests.log)
 - [docs/validation/v1-claude-desktop-diagnostic.json](docs/validation/v1-claude-desktop-diagnostic.json)
+- [docs/validation/v1-claude-live-rate-limit.json](docs/validation/v1-claude-live-rate-limit.json)
 - [docs/validation/v1-claude-native-evidence.md](docs/validation/v1-claude-native-evidence.md)
+- [docs/validation/v1-claude-restored-sign-in.json](docs/validation/v1-claude-restored-sign-in.json)
 - [docs/validation/v1-claude-signed-out.json](docs/validation/v1-claude-signed-out.json)
 - [docs/validation/v1-claude-staged-smoke.json](docs/validation/v1-claude-staged-smoke.json)
 - [docs/validation/v1-codex-approval-regression.log](docs/validation/v1-codex-approval-regression.log)
@@ -206,6 +208,35 @@ There are **425 cumulative changed/added files** below. All other differences ar
 - [docs/validation/v1-rc2-results.json](docs/validation/v1-rc2-results.json)
 - [docs/validation/v1-rc2-typecheck.log](docs/validation/v1-rc2-typecheck.log)
 - [docs/validation/v1-rc2-ui-tests.log](docs/validation/v1-rc2-ui-tests.log)
+- [docs/validation/v1-rc3-adapters-tests.log](docs/validation/v1-rc3-adapters-tests.log)
+- [docs/validation/v1-rc3-adapters-typecheck.log](docs/validation/v1-rc3-adapters-typecheck.log)
+- [docs/validation/v1-rc3-archive-verification.json](docs/validation/v1-rc3-archive-verification.json)
+- [docs/validation/v1-rc3-archive-verification.log](docs/validation/v1-rc3-archive-verification.log)
+- [docs/validation/v1-rc3-assembly.log](docs/validation/v1-rc3-assembly.log)
+- [docs/validation/v1-rc3-build-sources.json](docs/validation/v1-rc3-build-sources.json)
+- [docs/validation/v1-rc3-build.log](docs/validation/v1-rc3-build.log)
+- [docs/validation/v1-rc3-built-outputs.json](docs/validation/v1-rc3-built-outputs.json)
+- [docs/validation/v1-rc3-control-plane-tests.log](docs/validation/v1-rc3-control-plane-tests.log)
+- [docs/validation/v1-rc3-control-plane-typecheck.log](docs/validation/v1-rc3-control-plane-typecheck.log)
+- [docs/validation/v1-rc3-desktop-tests.log](docs/validation/v1-rc3-desktop-tests.log)
+- [docs/validation/v1-rc3-desktop.png](docs/validation/v1-rc3-desktop.png)
+- [docs/validation/v1-rc3-electron-development.log](docs/validation/v1-rc3-electron-development.log)
+- [docs/validation/v1-rc3-electron-portable.log](docs/validation/v1-rc3-electron-portable.log)
+- [docs/validation/v1-rc3-final-verification.json](docs/validation/v1-rc3-final-verification.json)
+- [docs/validation/v1-rc3-format.log](docs/validation/v1-rc3-format.log)
+- [docs/validation/v1-rc3-oxlint-stderr.log](docs/validation/v1-rc3-oxlint-stderr.log)
+- [docs/validation/v1-rc3-oxlint.json](docs/validation/v1-rc3-oxlint.json)
+- [docs/validation/v1-rc3-package-evidence.md](docs/validation/v1-rc3-package-evidence.md)
+- [docs/validation/v1-rc3-package-results.json](docs/validation/v1-rc3-package-results.json)
+- [docs/validation/v1-rc3-package-unit.log](docs/validation/v1-rc3-package-unit.log)
+- [docs/validation/v1-rc3-portable-start.png](docs/validation/v1-rc3-portable-start.png)
+- [docs/validation/v1-rc3-preserved-packages.json](docs/validation/v1-rc3-preserved-packages.json)
+- [docs/validation/v1-rc3-quality.json](docs/validation/v1-rc3-quality.json)
+- [docs/validation/v1-rc3-results.json](docs/validation/v1-rc3-results.json)
+- [docs/validation/v1-rc3-review.md](docs/validation/v1-rc3-review.md)
+- [docs/validation/v1-rc3-typecheck.log](docs/validation/v1-rc3-typecheck.log)
+- [docs/validation/v1-rc3-ui-tests.log](docs/validation/v1-rc3-ui-tests.log)
+- [docs/validation/v1-rc3-workflow-sources.json](docs/validation/v1-rc3-workflow-sources.json)
 - [docs/validation/v1-results.json](docs/validation/v1-results.json)
 - [docs/validation/v1-review.md](docs/validation/v1-review.md)
 - [docs/validation/v1-ui-tests.log](docs/validation/v1-ui-tests.log)
@@ -398,6 +429,7 @@ There are **425 cumulative changed/added files** below. All other differences ar
 - [packages/harness-desktop/src/renderer/styles.css](packages/harness-desktop/src/renderer/styles.css)
 - [packages/harness-desktop/src/shared/contracts.ts](packages/harness-desktop/src/shared/contracts.ts)
 - [packages/harness-desktop/src/shared/requests.ts](packages/harness-desktop/src/shared/requests.ts)
+- [packages/harness-desktop/src/shared/runtime-errors.ts](packages/harness-desktop/src/shared/runtime-errors.ts)
 - [packages/harness-desktop/test/electron/packaged.config.ts](packages/harness-desktop/test/electron/packaged.config.ts)
 - [packages/harness-desktop/test/electron/packaged.spec.ts](packages/harness-desktop/test/electron/packaged.spec.ts)
 - [packages/harness-desktop/test/electron/playwright.config.ts](packages/harness-desktop/test/electron/playwright.config.ts)

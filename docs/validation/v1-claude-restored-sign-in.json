@@ -1,0 +1,241 @@
+{
+  "checkedAt": "2026-09-07T14:59:34.738Z",
+  "originalDiagnosticEnvironment": false,
+  "providerPromptsSubmitted": 0,
+  "rawAccountRetained": false,
+  "rawNativeOutputRetained": false,
+  "events": [
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 41
+    },
+    {
+      "stage": "adapter.discover",
+      "ok": true,
+      "ms": 42
+    },
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 34
+    },
+    {
+      "stage": "policy.absence",
+      "ok": true,
+      "ms": 173
+    },
+    {
+      "stage": "inspector.subscription.predicates",
+      "code": 0,
+      "loggedIn": true,
+      "nativeOAuth": true,
+      "firstParty": true,
+      "personalPlan": true,
+      "apiKeySourceAbsent": true,
+      "apiKeySourceNone": false,
+      "emailPresent": true,
+      "orgPresent": true
+    },
+    {
+      "stage": "inspector.subscription",
+      "ok": true,
+      "ms": 281
+    },
+    {
+      "stage": "runtime.1.initialize",
+      "ok": true,
+      "ms": 416
+    },
+    {
+      "stage": "runtime.1.model-projection",
+      "models": [
+        {
+          "id": "default",
+          "nameLength": 21,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "opus[1m]",
+          "nameLength": 17,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "claude-fable-5[1m]",
+          "nameLength": 5,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "sonnet",
+          "nameLength": 6,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "haiku",
+          "nameLength": 5,
+          "trimmed": true,
+          "hasControl": false
+        }
+      ]
+    },
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 37
+    },
+    {
+      "stage": "policy.absence",
+      "ok": true,
+      "ms": 172
+    },
+    {
+      "stage": "inspector.subscription.predicates",
+      "code": 0,
+      "loggedIn": true,
+      "nativeOAuth": true,
+      "firstParty": true,
+      "personalPlan": true,
+      "apiKeySourceAbsent": true,
+      "apiKeySourceNone": false,
+      "emailPresent": true,
+      "orgPresent": true
+    },
+    {
+      "stage": "inspector.subscription",
+      "ok": true,
+      "ms": 275
+    },
+    {
+      "stage": "runtime.1.close",
+      "ok": true,
+      "ms": 33
+    },
+    {
+      "stage": "adapter.status",
+      "ok": true,
+      "ms": 1433
+    },
+    {
+      "stage": "status.summary",
+      "subscription": true,
+      "overage": "unknown"
+    },
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 37
+    },
+    {
+      "stage": "policy.absence",
+      "ok": true,
+      "ms": 170
+    },
+    {
+      "stage": "inspector.subscription.predicates",
+      "code": 0,
+      "loggedIn": true,
+      "nativeOAuth": true,
+      "firstParty": true,
+      "personalPlan": true,
+      "apiKeySourceAbsent": true,
+      "apiKeySourceNone": false,
+      "emailPresent": true,
+      "orgPresent": true
+    },
+    {
+      "stage": "inspector.subscription",
+      "ok": true,
+      "ms": 269
+    },
+    {
+      "stage": "runtime.2.initialize",
+      "ok": true,
+      "ms": 429
+    },
+    {
+      "stage": "runtime.2.model-projection",
+      "models": [
+        {
+          "id": "default",
+          "nameLength": 21,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "opus[1m]",
+          "nameLength": 17,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "claude-fable-5[1m]",
+          "nameLength": 5,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "sonnet",
+          "nameLength": 6,
+          "trimmed": true,
+          "hasControl": false
+        },
+        {
+          "id": "haiku",
+          "nameLength": 5,
+          "trimmed": true,
+          "hasControl": false
+        }
+      ]
+    },
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 43
+    },
+    {
+      "stage": "policy.absence",
+      "ok": true,
+      "ms": 198
+    },
+    {
+      "stage": "inspector.subscription.predicates",
+      "code": 0,
+      "loggedIn": true,
+      "nativeOAuth": true,
+      "firstParty": true,
+      "personalPlan": true,
+      "apiKeySourceAbsent": true,
+      "apiKeySourceNone": false,
+      "emailPresent": true,
+      "orgPresent": true
+    },
+    {
+      "stage": "inspector.subscription",
+      "ok": true,
+      "ms": 265
+    },
+    {
+      "stage": "runtime.2.close",
+      "ok": true,
+      "ms": 31
+    },
+    {
+      "stage": "adapter.models",
+      "ok": true,
+      "ms": 1447
+    },
+    {
+      "stage": "models.summary",
+      "ids": ["sonnet", "haiku"]
+    },
+    {
+      "stage": "inspector.dispose",
+      "ok": true,
+      "ms": 0
+    }
+  ]
+}

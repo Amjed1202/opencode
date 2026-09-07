@@ -1,0 +1,10 @@
+[
+  {
+    "path": "v1-rc3-package.ts",
+    "sha256": "e4dcb73412c53a221a19e1cde8dcabb749488281ba6b1f283cea0f9d8c2c7e29"
+  },
+  {
+    "path": "v1-rc3-verify-archive.ps1",
+    "sha256": "10bffa7313e98973abe34e7bb59958ccf24a16e278b6c1279c6f8525e455de57"
+  }
+]

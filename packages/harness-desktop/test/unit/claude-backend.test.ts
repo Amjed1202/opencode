@@ -375,6 +375,69 @@ test("Claude desktop: selected Skill/model, guarded file changes, streaming toke
   }
 }, 15000)
 
+test("Claude desktop retains a safe rate-limit explanation through uncertainty and saved history", async () => {
+  const state = await fixture()
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const started = (await state.backend().dispatch("start", {
+      modelId: "sonnet",
+      acknowledgeOverage: true,
+      acknowledgeUnverifiedBoundary: true,
+      allowFileChanges: false,
+    })) as DesktopState
+    const sessionId = started.session!.id
+    await state.backend().dispatch("send", { text: "Explain addition without tools." })
+    const peer = state.peers.find((peer) => peer.options.sessionId)!
+    peer.emit({
+      type: "assistant",
+      session_id: peer.id(),
+      uuid: randomUUID(),
+      parent_tool_use_id: null,
+      user_message_uuid: peer.messages[0]!.uuid,
+      error: "rate_limit",
+      message: {
+        id: "synthetic-limit",
+        role: "assistant",
+        model: "<synthetic>",
+        content: [{ type: "text", text: "Private account secret@example.invalid <script>secret</script>" }],
+        stop_reason: "stop_sequence",
+      },
+    })
+    const label = "Native usage limit reached. Check the provider's reset time."
+    const stopped = await until(
+      state.state,
+      (value) => value.session?.status === "uncertain" && value.activity.some((entry) => entry.label === label),
+    )
+    expect(stopped.notices).toContain(label)
+    expect(stopped.messages.map((message) => message.role)).toEqual(["user"])
+    expect(stopped.usage).toBeUndefined()
+    expect(stopped.permissions).toEqual([])
+    expect(peer.closed).toBe(true)
+    await expect(state.backend().dispatch("send", { text: "Do not actually resend." })).rejects.toThrow()
+    expect(peer.messages).toHaveLength(1)
+    await state.backend().dispatch("detachConversation")
+    await state.reopen()
+    await state.configure()
+    const history = (await state.backend().dispatch("viewConversation", { sessionId })) as DesktopState
+    expect(history.activity.some((entry) => entry.kind === "agent.error" && entry.label === label)).toBe(true)
+    expect(history.messages.map((message) => message.role)).toEqual(["user"])
+    expect(JSON.stringify([...state.published, history])).not.toContain("secret@example.invalid")
+    expect(JSON.stringify([...state.published, history])).not.toContain("<script>")
+    await state.backend().dispatch("refresh")
+    await expect(
+      state.backend().dispatch("resumeConversation", {
+        sessionId,
+        acknowledgeOverage: true,
+        acknowledgeUnverifiedBoundary: true,
+      }),
+    ).rejects.toThrow()
+    expect(state.peers.reduce((total, entry) => total + entry.messages.length, 0)).toBe(1)
+  } finally {
+    await state.close()
+  }
+}, 15000)
+
 async function until(read: () => Promise<DesktopState>, accept: (state: DesktopState) => boolean) {
   const deadline = Date.now() + 4000
   while (Date.now() < deadline) {

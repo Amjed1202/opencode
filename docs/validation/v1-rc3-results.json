@@ -1,0 +1,146 @@
+{
+  "recordedAt": "2026-09-07T15:24:27.108Z",
+  "baseCommit": "889ec39c3f52d801c22280f659980361f8165bdd",
+  "changes": [
+    "Project allowlisted Claude synthetic error categories without exposing raw provider text or implying turn completion.",
+    "Deliver newly committed final events before ending a host event subscription.",
+    "Show fixed native error labels in live notices, activity and saved history."
+  ],
+  "checks": [
+    {
+      "phase": "control-plane-tests",
+      "recordedAt": "2026-09-07T15:19:52.2483556Z",
+      "completedAt": "2026-09-07T15:20:11.5656650Z",
+      "exitCode": 0,
+      "log": "v1-rc3-control-plane-tests.log",
+      "logSha256": "e3a9185bcb161f7c76775406d95fd61908a9474f96a34d446fdcd98c912df0b1",
+      "providerPromptsSubmitted": 0,
+      "passed": 283,
+      "skipped": 1,
+      "failed": 0,
+      "assertions": 1092
+    },
+    {
+      "phase": "control-plane-typecheck",
+      "recordedAt": "2026-09-07T15:20:23.2604192Z",
+      "completedAt": "2026-09-07T15:20:23.9323153Z",
+      "exitCode": 0,
+      "log": "v1-rc3-control-plane-typecheck.log",
+      "logSha256": "b87e65da9b27ca3bf63162dc8617a0e7d3c7bdf0c5a77e1bbf1ec1f490b2ccd3",
+      "providerPromptsSubmitted": 0
+    },
+    {
+      "recordedAt": "2026-09-07T15:14:52.934Z",
+      "completedAt": "2026-09-07T15:15:25.196Z",
+      "phase": "adapters-tests",
+      "command": ["test", "test"],
+      "cwd": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-adapters",
+      "exitCode": 0,
+      "log": "v1-rc3-adapters-tests.log",
+      "logSha256": "4bf1b1a73eea34dd9f982d504fbef9f0f34c8c13fb837ae42792ddb0278b063a",
+      "providerPromptsSubmitted": 0,
+      "passed": 397,
+      "skipped": 0,
+      "failed": 0,
+      "assertions": 1343
+    },
+    {
+      "recordedAt": "2026-09-07T15:14:55.071Z",
+      "completedAt": "2026-09-07T15:14:55.327Z",
+      "phase": "adapters-typecheck",
+      "command": ["run", "typecheck"],
+      "cwd": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-adapters",
+      "exitCode": 0,
+      "log": "v1-rc3-adapters-typecheck.log",
+      "logSha256": "ae47736bb2a9401aa9743893f2f64b9a605e65a99d78cd991a8021e0f7722d87",
+      "providerPromptsSubmitted": 0
+    },
+    {
+      "recordedAt": "2026-09-07T15:19:13.544Z",
+      "completedAt": "2026-09-07T15:19:31.695Z",
+      "phase": "desktop-tests",
+      "command": ["test", "test/unit"],
+      "cwd": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-desktop",
+      "exitCode": 0,
+      "log": "v1-rc3-desktop-tests.log",
+      "logSha256": "629b944d471e9d528c907d98fc01dd4a58b9ccf828c91342ee145874d19298d8",
+      "providerPromptsSubmitted": 0,
+      "passed": 92,
+      "skipped": 1,
+      "failed": 0,
+      "assertions": 604
+    },
+    {
+      "recordedAt": "2026-09-07T15:18:30.917Z",
+      "completedAt": "2026-09-07T15:18:42.667Z",
+      "phase": "ui-tests",
+      "command": [
+        "x",
+        "--no-install",
+        "playwright",
+        "test",
+        "--config",
+        "test/ui/playwright.config.ts",
+        "--output",
+        "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\work\\v1-rc3-ui-results"
+      ],
+      "cwd": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\packages\\harness-desktop",
+      "exitCode": 0,
+      "log": "v1-rc3-ui-tests.log",
+      "logSha256": "a235c8501386d083d50044b7eddb074d7de15509d9f2bd298a388107665ef41e",
+      "providerPromptsSubmitted": 0,
+      "passed": 21,
+      "skipped": 0,
+      "failed": 0
+    }
+  ],
+  "quality": {
+    "format": {
+      "exitCode": 0,
+      "files": 129
+    },
+    "lint": {
+      "exitCode": 0,
+      "files": 112,
+      "errors": 0,
+      "warnings": 502
+    },
+    "preservation": {
+      "modifiedUpstreamFiles": ["SECURITY.md", "bun.lock"],
+      "mitUnchanged": true,
+      "securitySuffixUnchanged": true,
+      "generatedHashes": 84,
+      "preservedPriorHashes": 81,
+      "priorLockResolutionsMissing": []
+    }
+  },
+  "windowsPackage": {
+    "evidence": "v1-rc3-package-results.json",
+    "archive": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc3-59a991f7.zip",
+    "archiveSha256": "4b9a1838a0ce11ce66b4438c3d31a4cddcc28faead7d09df8efd62e3e9c11812",
+    "archiveBytes": 186545461
+  },
+  "live": {
+    "evidence": "v1-live-results.json",
+    "claudeFailure": "v1-claude-live-rate-limit.json",
+    "restoredSignIn": "v1-claude-restored-sign-in.json",
+    "codexReserved": 4,
+    "claudeReserved": 1,
+    "perRuntimeLimit": 4,
+    "newPromptsAfterRateLimit": 0,
+    "rc3ValidatedAgainstLiveProvider": false,
+    "reportedClaudeReset": "2026-09-10T01:00:00Z",
+    "generatedSkillInvoked": false,
+    "fixturePreserved": true,
+    "uncertainInputReplayed": false,
+    "apiFallbackEnabled": false,
+    "providerOverage": "unknown"
+  },
+  "limitations": [
+    "Claude live denial, approval, Skill, interruption and resume acceptance remain pending provider capacity and a prompt schedule within authorization.",
+    "Three Claude prompts remain; the unchanged four-input acceptance runner cannot complete every remaining phase within that allowance.",
+    "Native-completeness inspection for uncertain Claude sessions remains unsupported; direct-child termination does not settle a turn.",
+    "Codex requires supplied file context and disables native browsing/shell/test commands.",
+    "Unsigned portable Windows candidate; no installer, signing or updater."
+  ]
+}

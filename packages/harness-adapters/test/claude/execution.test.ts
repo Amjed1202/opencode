@@ -140,13 +140,13 @@ class FixtureRuntime implements ClaudeRuntime {
     }
     return result
   }
-  finish() {
+  finish(error = false) {
     this.emit({
       type: "result",
       subtype: "success",
       session_id: this.id(),
       uuid: randomUUID(),
-      is_error: false,
+      is_error: error,
       duration_ms: 1,
       duration_api_ms: 1,
       num_turns: 1,
@@ -271,6 +271,95 @@ async function dispatch(adapter: ClaudeAdapter, session: AgentSession) {
     },
   )
 }
+
+function syntheticError(native: FixtureRuntime): SDKMessage {
+  return {
+    type: "assistant",
+    session_id: native.id(),
+    uuid: randomUUID(),
+    user_message_uuid: native.messages.at(-1)!.uuid,
+    parent_tool_use_id: null,
+    error: "rate_limit",
+    message: {
+      id: "synthetic-error",
+      type: "message",
+      role: "assistant",
+      model: "<synthetic>",
+      content: [{ type: "text", text: "RAW NATIVE ACCOUNT ERROR MUST NOT LEAVE ADAPTER", citations: null }],
+      stop_reason: "stop_sequence",
+      stop_sequence: null,
+      usage: { input_tokens: 0, output_tokens: 0 },
+    },
+    isApiErrorMessage: true,
+  } as unknown as SDKMessage
+}
+
+test("a bound synthetic rate limit exposes only its safe category and never implies terminal completion", async () => {
+  const item = await fixture()
+  const current = await item.create()
+  expect((await dispatch(item.adapter, current.session)).state).toBe("dispatched")
+  current.native.emit(syntheticError(current.native))
+  const seen: AgentEventDraft[] = []
+  for await (const event of item.adapter.events(current.session)) seen.push(event)
+  expect(seen.map((event) => event.type)).toEqual(["agent.started", "agent.error"])
+  expect(seen.find((event) => event.type === "agent.error")?.data.error).toMatchObject({
+    code: "capacity-limited",
+    nativeCode: "rate_limit",
+    retryable: false,
+  })
+  expect(JSON.stringify(seen)).not.toContain("RAW NATIVE")
+  expect(JSON.stringify(seen)).not.toContain("<synthetic>")
+  expect(await item.adapter.usage(current.session)).toEqual([])
+  expect(current.native.closed).toBe(true)
+  expect(current.native.messages).toHaveLength(1)
+  await expect(dispatch(item.adapter, current.session)).rejects.toThrow()
+})
+
+test("synthetic error classification preserves native session, input, parent, role and error-enum checks", async () => {
+  for (const changed of [
+    { session_id: randomUUID() },
+    { user_message_uuid: randomUUID() },
+    { parent_tool_use_id: "foreign-agent" },
+    { parent_tool_use_id: undefined },
+    { error: "raw-untrusted-error-value" },
+    { error: undefined },
+    { message: { role: "user", model: "<synthetic>" } },
+    { message: { role: "assistant", model: "claude-foreign-1" } },
+  ]) {
+    const item = await fixture()
+    const current = await item.create()
+    await dispatch(item.adapter, current.session)
+    const frame: Record<string, unknown> = { ...syntheticError(current.native), ...changed }
+    if (Object.hasOwn(changed, "parent_tool_use_id") && changed.parent_tool_use_id === undefined)
+      delete frame.parent_tool_use_id
+    current.native.emit(frame as SDKMessage)
+    const seen: AgentEventDraft[] = []
+    for await (const event of item.adapter.events(current.session)) seen.push(event)
+    expect(seen.map((event) => event.type)).toEqual(["agent.started", "agent.error"])
+    expect(seen.find((event) => event.type === "agent.error")?.data.error).toMatchObject({
+      code: "native-error",
+      retryable: false,
+    })
+    expect(seen.find((event) => event.type === "agent.error")?.data.error.nativeCode).toBeUndefined()
+    expect(JSON.stringify(seen)).not.toContain("raw-untrusted-error-value")
+    expect(JSON.stringify(seen)).not.toContain("RAW NATIVE")
+  }
+})
+
+test("a valid native error result is the evidence that settles a turn as failed", async () => {
+  const item = await fixture()
+  const current = await item.create()
+  await dispatch(item.adapter, current.session)
+  current.native.finish(true)
+  const seen: AgentEventDraft[] = []
+  for await (const event of item.adapter.events(current.session)) {
+    seen.push(event)
+    if (event.type === "agent.completed") break
+  }
+  expect(seen.find((event) => event.type === "agent.completed")?.data.outcome).toBe("failed")
+  expect(seen.some((event) => event.type === "agent.error")).toBe(false)
+  expect(current.native.closed).toBe(false)
+})
 
 test("personal SDK evidence exposes explicit models and preserves unknown overage without account fields", async () => {
   const item = await fixture()

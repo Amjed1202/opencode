@@ -1,0 +1,33 @@
+[2m[WebServer] [22m[0m[2m[35m$[0m [2m[1mvite --config vite.preview.config.ts[0m
+[2m[WebServer] [22m(node:90892) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 21 tests using 1 worker
+
+(node:130916) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:130916) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 test\ui\renderer.spec.ts:271:1 › startup requires explicit native settings and never sends a prompt automatically (374ms)
+  ok  2 test\ui\renderer.spec.ts:307:1 › connection checks load models without selecting or starting one automatically (281ms)
+  ok  3 test\ui\renderer.spec.ts:345:1 › a disappearing model clears the selection and requires another explicit choice (228ms)
+  ok  4 test\ui\renderer.spec.ts:373:1 › unavailable and empty catalogs prevent starting and recovery never restores an old selection (238ms)
+  ok  5 test\ui\renderer.spec.ts:413:1 › workspace, executable and account-home changes clear an otherwise available model (461ms)
+  ok  6 test\ui\renderer.spec.ts:453:1 › patch approval requires opening protected text and never renders it as HTML (276ms)
+  ok  7 test\ui\renderer.spec.ts:491:1 › fixed-choice questions send offered IDs after review (280ms)
+  ok  8 test\ui\renderer.spec.ts:528:1 › expired protected content is removed and approval becomes unavailable (535ms)
+  ok  9 test\ui\renderer.spec.ts:562:1 › older snapshots cannot replace current state and mobile context remains accessible (206ms)
+  ok 10 test\ui\renderer.spec.ts:590:1 › browser preview reports a missing desktop bridge and keeps execution disabled (147ms)
+  ok 11 test\ui\renderer.spec.ts:597:1 › switching runtime invalidates Codex readiness and clears execution acknowledgments (295ms)
+  ok 12 test\ui\renderer.spec.ts:635:1 › Claude rate-limit notice remains visible while uncertain input cannot be resent (154ms)
+  ok 13 test\ui\renderer.spec.ts:654:1 › Claude sign-in status never enables execution or native Skills when billing remains unknown (196ms)
+  ok 14 test\ui\renderer.spec.ts:708:3 › Claude closed history respects native resume and inspection support (292ms)
+  ok 15 test\ui\renderer.spec.ts:708:3 › Claude uncertain history respects native resume and inspection support (267ms)
+  ok 16 test\ui\renderer.spec.ts:736:1 › saved history requires explicit inspection, reconciliation and fresh consent before resume (459ms)
+  ok 17 test\ui\renderer.spec.ts:772:1 › incompatible conversations stay readable while native recovery controls remain disabled (212ms)
+  ok 18 test\ui\renderer.spec.ts:787:1 › file browsing is explicit, previews remain inert and workspace changes clear cached content (328ms)
+  ok 19 test\ui\renderer.spec.ts:825:1 › usage shows reported cumulative tokens and native context without inventing unknown charges or counts (193ms)
+  ok 20 test\ui\renderer.spec.ts:879:1 › Claude skill permissions are explicit, bounded, and cleared when the selected repository changes (777ms)
+  ok 21 test\ui\renderer.spec.ts:944:1 › verified Claude connection starts only with explicit model, billing and skill choices and sends separately (405ms)
+
+  21 passed (10.2s)

@@ -1,0 +1,93 @@
+{
+  "checkedAt": "2026-09-07T15:08:12.976Z",
+  "runtime": "claude",
+  "run": "work/v1-native-acceptance-runs/live-claude-8cec5de2-fb45-46fa-9558-8a5d6bbf0007",
+  "originalOutcome": "blocked-or-failed",
+  "failedPhase": "denial",
+  "providerPromptsAcknowledged": 1,
+  "hostSendAttempts": 1,
+  "allowance": {
+    "limit": 4,
+    "reserved": 1,
+    "remaining": 3
+  },
+  "journal": {
+    "counts": {
+      "agent.started": 1,
+      "agent.error": 1
+    },
+    "permissionCount": 0,
+    "inputCount": 0,
+    "unsettledCommands": 1,
+    "acknowledgedTurnReceipts": 1,
+    "sessionStatuses": ["uncertain"]
+  },
+  "nativeFailure": {
+    "source": "Exact derived task-owned native session transcript; metadata only retained",
+    "category": "rate_limit",
+    "httpStatus": 429,
+    "syntheticModel": true,
+    "reportedLimitType": "seven_day",
+    "reportedStatus": "rejected",
+    "reportedResetUtc": "2026-09-10T01:00:00.000Z",
+    "reportedResetLocal": "2026-09-10 03:00 Europe/Rome",
+    "extraUsageState": "Not inferred from rate-limit rejection",
+    "explicitUpgradeOrExtraUsageAction": false
+  },
+  "cleanup": {
+    "confirmedByRunner": true,
+    "interpretation": "Direct-child stop confirmation does not settle the acknowledged native turn or make uncertain history resumable."
+  },
+  "fixture": {
+    "allExpectedBytesPreserved": true,
+    "files": [
+      {
+        "path": ".harness-acceptance",
+        "sha256": "c363cd1859ae4b278dcb380e0a984e3a6f448da9590cbe8d2a7d24212617e918",
+        "expectedSha256": "c363cd1859ae4b278dcb380e0a984e3a6f448da9590cbe8d2a7d24212617e918",
+        "exactBytes": true,
+        "regularSingleLink": true
+      },
+      {
+        "path": "sum.ts",
+        "sha256": "c1e5a064d0bddc503e7f41d2768cfe0abab381b06201548441d0e20e4d6330a6",
+        "expectedSha256": "c1e5a064d0bddc503e7f41d2768cfe0abab381b06201548441d0e20e4d6330a6",
+        "exactBytes": true,
+        "regularSingleLink": true
+      },
+      {
+        "path": "sum.test.ts",
+        "sha256": "2768d0f4a6cc321bc1c8d6681d0fcc84f39b99b6d4959a335f426a0c49b11215",
+        "expectedSha256": "2768d0f4a6cc321bc1c8d6681d0fcc84f39b99b6d4959a335f426a0c49b11215",
+        "exactBytes": true,
+        "regularSingleLink": true
+      },
+      {
+        "path": "package.json",
+        "sha256": "c360aa630deca1bf4999fc919aa770bc62ef88506962ee97b25460fd51ee7e19",
+        "expectedSha256": "c360aa630deca1bf4999fc919aa770bc62ef88506962ee97b25460fd51ee7e19",
+        "exactBytes": true,
+        "regularSingleLink": true
+      },
+      {
+        "path": "README.md",
+        "sha256": "b6a8ea55266dd6b4dbada1581213b96fdd059b5666dab8f8278ac9902aa8075b",
+        "expectedSha256": "b6a8ea55266dd6b4dbada1581213b96fdd059b5666dab8f8278ac9902aa8075b",
+        "exactBytes": true,
+        "regularSingleLink": true
+      },
+      {
+        "path": ".claude/skills/acceptance-proof/SKILL.md",
+        "sha256": "93278007a2975c236e7fa0e86d81579ec6349f58b0e25815cf4d420d4248d698",
+        "expectedSha256": "93278007a2975c236e7fa0e86d81579ec6349f58b0e25815cf4d420d4248d698",
+        "exactBytes": true,
+        "regularSingleLink": true
+      }
+    ],
+    "unexpectedEntries": [],
+    "excludedMetadataDirectory": ".git"
+  },
+  "reviewFinding": "Adapter model validation currently rejects SDK assistant error frames using model <synthetic>, hiding the native rate-limit category behind generic uncertainty. Production correction is reviewed separately.",
+  "recovery": "Do not replay the acknowledged uncertain input. The native provider reports a weekly reset; no further prompt is justified by current evidence alone.",
+  "reviewerProviderCalls": 0
+}

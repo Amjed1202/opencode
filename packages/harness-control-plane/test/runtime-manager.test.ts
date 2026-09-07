@@ -391,6 +391,52 @@ test("live event consumers finish when their attachment closes", async () => {
   }
 })
 
+test("a paused event consumer receives a final persisted error after the native pump ends", async () => {
+  const state = await fixture()
+  try {
+    const session = await state.manager.createSession(state.admissionId, "create")
+    await send(state, session, "turn")
+    const peer = state.streams.get(session.id)!
+    peer.push({
+      ...completion(session, "turn", "started"),
+      type: "agent.started",
+      data: { nativeTurnId: "native-turn" },
+    })
+    const events = state.manager.events(session.id)[Symbol.asyncIterator]()
+    const started = await events.next()
+    expect(started.value).toMatchObject({ kind: "event", event: { type: "agent.started", sequence: 1 } })
+
+    // Leave the consumer suspended at its first yield until the final event is durable
+    // and the native pump has been removed. The journal replay is a finite snapshot.
+    peer.push({
+      ...completion(session, "turn", "error"),
+      type: "agent.error",
+      data: {
+        nativeTurnId: "native-turn",
+        error: {
+          code: "capacity-limited",
+          message: "Native usage limit reached",
+          nativeCode: "rate_limit",
+          retryable: false,
+        },
+      },
+    })
+    peer.finish()
+    await peer.returned.promise
+    expect((await state.journal.cursor(session.id))?.sequence).toBe(2)
+    expect((await state.journal.get(session.id))?.status).toBe("uncertain")
+
+    const error = await events.next()
+    expect(error.value).toMatchObject({
+      kind: "event",
+      event: { type: "agent.error", sequence: 2, data: { error: { nativeCode: "rate_limit" } } },
+    })
+    expect(await events.next()).toEqual({ done: true, value: undefined })
+  } finally {
+    await state.close()
+  }
+})
+
 test("a native session reporting changed intent or effective billing is not persisted as admitted", async () => {
   const state = await fixture()
   try {

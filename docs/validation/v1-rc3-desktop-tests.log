@@ -1,0 +1,127 @@
+bun test v1.3.14 (0d9b296a)
+
+test\unit\backend.test.ts:
+(pass) closing and viewing history invalidate file baselines and stale file handles [232.54ms]
+(pass) same-launch shutdown and exact reconciliation release the old writer for a new conversation [334.48ms]
+(pass) a failed native close still disposes the adapter and detaches the uncertain conversation [206.65ms]
+(pass) an assistant message cannot overwrite a user message with the same native item identity [202.96ms]
+(pass) a failed resume remains uncertain after shutdown and native inspection without another model dispatch [375.52ms]
+(pass) V1 history survives restart, opens without replay, and explicitly resumes the same native thread [354.30ms]
+(pass) V1 native inspection and reconciliation are explicit and cannot resend uncertain input [314.17ms]
+(pass) V1 displays bounded workspace files and native cumulative telemetry without inventing charges or context occupancy [316.44ms]
+(pass) desktop backend through the pinned local stdio fixture > runtime switching clears native roots and an unverified Claude account profile cannot enable execution or expose native status fields [354.33ms]
+(pass) desktop backend through the pinned local stdio fixture > recovery failure closes both storage databases before rejecting startup [90.14ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final text replaces the preview after initial text "" [208.13ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final text replaces the preview after initial text "Incomplete streamed answer" [217.84ms]
+(pass) desktop backend through the pinned local stdio fixture > authoritative final-only content respects serialized preview bounds [229.45ms]
+(pass) desktop backend through the pinned local stdio fixture > configuration starts no native process and refresh reads status and models without a session [187.65ms]
+(pass) desktop backend through the pinned local stdio fixture > unavailable model catalog models-empty never enables native thread creation [159.47ms]
+(pass) desktop backend through the pinned local stdio fixture > unavailable model catalog models-error never enables native thread creation [160.49ms]
+(pass) desktop backend through the pinned local stdio fixture > unavailable model catalog models-malformed never enables native thread creation [156.99ms]
+(pass) desktop backend through the pinned local stdio fixture > an arbitrary model is rejected without another native catalog read [154.20ms]
+(pass) desktop backend through the pinned local stdio fixture > an explicitly chosen alternate catalog model reaches native creation unchanged [208.34ms]
+(pass) desktop backend through the pinned local stdio fixture > a disappeared model updates the desktop catalog and blocks native creation [178.34ms]
+(pass) desktop backend through the pinned local stdio fixture > changing account home or workspace clears model observations until another explicit check [174.47ms]
+(pass) desktop backend through the pinned local stdio fixture > starts only after both acknowledgements and streams one explicitly sent message [218.69ms]
+(pass) desktop backend through the pinned local stdio fixture > requires protected patch review before one native file approval [269.39ms]
+(pass) desktop backend through the pinned local stdio fixture > keeps native question labels protected and maps reviewed opaque options once [272.88ms]
+(pass) desktop backend through the pinned local stdio fixture > interrupt reaches the native session and cannot change native roots while attached [229.08ms]
+(pass) desktop backend through the pinned local stdio fixture > recovery does not automatically resume or replay a turn with an uncertain outcome [346.88ms]
+(pass) desktop backend through the pinned local stdio fixture > a fresh display workspace identity cannot bypass uncertain work in the same directory [333.20ms]
+(pass) desktop backend through the pinned local stdio fixture > lost native send acknowledgement keeps one uncertain message and rejects automatic continuation [226.27ms]
+(pass) desktop backend through the pinned local stdio fixture > an uncertain native create with no saved session blocks other workspaces across restarts [387.80ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-wal before opening the database [81.02ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-shm before opening the database [76.71ms]
+(pass) desktop backend through the pinned local stdio fixture > rejects linked SQLite sidecar journal.sqlite-journal before opening the database [81.73ms]
+(pass) desktop backend through the pinned local stdio fixture > bounds serialized UTF-8 and escaped previews beneath private IPC limits without dropping native work [2851.11ms]
+(pass) desktop backend through the pinned local stdio fixture > concurrent state reads do not replace newly streamed deltas with older snapshots [334.36ms]
+
+test\unit\claude-backend.test.ts:
+(pass) Claude desktop: selected Skill/model, guarded file changes, streaming tokens and exact clean resume [582.87ms]
+(pass) Claude desktop retains a safe rate-limit explanation through uncertainty and saved history [206.60ms]
+
+test\unit\conversations.test.ts:
+(pass) bounded local history survives restart, preserves separate conversations and never discovers native history [307.03ms]
+(pass) native actions require immutable original host selections while incompatible history remains readable [177.94ms]
+(pass) detached exact acknowledged work can reconcile, then only explicit fresh admission resumes its native thread [277.71ms]
+(pass) missing native acknowledgements remain uncertain and an unmatched create still blocks every workspace [244.13ms]
+(pass) changed native account or configuration inspection remains partial and cannot settle uncertain work [494.54ms]
+(pass) history budgets and pruning are explicit and raw tool or thinking content is omitted [174.75ms]
+
+test\unit\host-client.test.ts:
+(pass) private desktop host process transport > correlates concurrent requests over inherited private pipes [51.22ms]
+(pass) private desktop host process transport > reassembles UTF-8 characters split across native stdout chunks [74.40ms]
+(pass) private desktop host process transport > rejects every pending promise if a correlated response omits its result and error [47.96ms]
+(pass) private desktop host process transport > rejects unknown response IDs and child exit without automatically replaying [102.81ms]
+(pass) private desktop host process transport > fails closed for oversized unterminated output and malformed UTF-8 [101.25ms]
+(pass) private desktop host process transport > rejects ambiguous result/error frames as protocol failures [51.36ms]
+(pass) private desktop host process transport > ignores state output already buffered after the transport has failed [117.83ms]
+(pass) private desktop host process transport > bounds outgoing frames before writing to the child [51.02ms]
+
+test\unit\package-windows.test.ts:
+Creating portable archive: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\harness\packages\harness-desktop\test-results\package-unit-Cq2mwa\zip-build-a6f28cab.zip
+Creating portable archive: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\harness\packages\harness-desktop\test-results\package-unit-Cq2mwa\zip-build-d4eac2b7.zip
+(pass) portable package boundaries > creates a unique ZIP preserving the package folder and writes its SHA-256 [737.92ms]
+(pass) portable package boundaries > rejects equal, sibling, relative and escaping destinations [0.42ms]
+(pass) portable package boundaries > copies only the built application, then hashes all assembled files deterministically [21.96ms]
+(pass) portable package boundaries > copies a hard-linked dependency notice into an independent package file [3.28ms]
+(pass) portable package boundaries > refuses credential/cache files, incomplete builds and unresolved external dependencies [23.96ms]
+(pass) portable package boundaries > rejects directory links and escaping copy plans [2.27ms]
+
+test\unit\preload.test.ts:
+(pass) isolated desktop preload bridge > exposes only fixed application operations and preserves their arguments and results [0.52ms]
+(pass) isolated desktop preload bridge > forwards only state data and unsubscribes exactly its own callback [0.19ms]
+(pass) isolated desktop preload bridge > bounds subscriptions while allowing unsubscribed capacity to be reused [0.17ms]
+
+test\unit\requests.test.ts:
+(pass) desktop request decoder > V1 accepts only opaque file/history IDs and explicit bounded native skill activations [0.46ms]
+(pass) desktop request decoder > accepts only a named runtime selection without paths or account overrides [0.09ms]
+(pass) desktop request decoder > accepts bounded operation-specific requests and detaches nested caller state [0.42ms]
+(pass) desktop request decoder > requires explicit booleans and rejects unknown or missing start fields [0.28ms]
+(pass) desktop request decoder > bounds text by UTF-8 bytes and rejects empty or NUL input [0.52ms]
+(pass) desktop request decoder > rejects unsupported operations, scalar requests and unrecognized privilege fields [0.13ms]
+(pass) desktop request decoder > accepts only explicit review kinds and safe bounded opaque identities [0.17ms]
+(pass) desktop request decoder > requires one to three distinct question selections for answers and none for cancellation [0.14ms]
+(pass) desktop request decoder > rejects accessors at each object boundary without executing them [0.10ms]
+
+test\unit\security.test.ts:
+(pass) desktop IPC sender boundary > only accepts the registered live web contents and its exact top-level document [0.31ms]
+(pass) desktop IPC sender boundary > rejects navigation, fragments, subframes, destroyed windows, and malformed document URLs [0.23ms]
+(pass) desktop IPC sender boundary > guard rechecks the live document after an asynchronous privileged operation [0.12ms]
+
+test\unit\vault.test.ts:
+(pass) desktop OS-wrapped artifact key > persists only the wrapped key, reloads across instances, and returns independent key buffers [44.02ms]
+(pass) desktop OS-wrapped artifact key > fails closed without safeStorage and rejects the Linux plaintext backend before creating files [8.73ms]
+(pass) desktop OS-wrapped artifact key > preserves corrupt, unsupported, oversized and foreign wrapped keys without rotation [29.78ms]
+(pass) desktop OS-wrapped artifact key > rejects noncanonical decrypted keys, file hard links, and relative roots [22.97ms]
+(pass) desktop OS-wrapped artifact key > rejects directory aliases before reading or creating a key [2.56ms]
+(skip) desktop OS-wrapped artifact key > rejects group/world accessible POSIX key directories and files
+
+test\unit\worker.test.ts:
+(pass) real Bun desktop private worker > initializes empty local state without provider configuration and shuts down cleanly [243.83ms]
+(pass) real Bun desktop private worker > preserves multibyte configure values split between stdin chunks [271.56ms]
+(pass) real Bun desktop private worker > rejects malformed, invalid-UTF8, oversized and truncated frames without creating storage [949.44ms]
+(pass) real Bun desktop private worker > fails closed after initialization when the final frame is truncated [231.69ms]
+(pass) real Bun desktop private worker > rejects invalid key/environment initialization and duplicate initialization [240.09ms]
+
+test\unit\workspace-files.test.ts:
+(pass) excluded runtime and environment paths cannot bypass filters with mixed case [4.74ms]
+(pass) lists opaque IDs and unknown baselines without accepting renderer paths [5.57ms]
+(pass) tracks added, modified, deleted and unchanged text against the explicit session baseline [19.50ms]
+(pass) requires refresh after text changes, file replacement, deletion or reappearance [20.29ms]
+(pass) does not scan excluded accounts, environment files, dependencies or Git metadata [9.69ms]
+(pass) rejects binary, invalid UTF-8, oversize and hard-linked files and preserves UTF-8 BOM bytes [14.59ms]
+(pass) a skipped junction cannot invent deletion or read its target [11.88ms]
+(pass) hitting the file cap with a pending directory cannot invent deletion [452.66ms]
+(pass) marks the depth limit partial and avoids claiming additions outside a partial baseline [31.43ms]
+(pass) enforces the total text budget and the combined current/deleted metadata cap [806.71ms]
+(pass) rejects replacement of the selected repository directory [7.08ms]
+
+1 tests skipped:
+(skip) desktop OS-wrapped artifact key > rejects group/world accessible POSIX key directories and files
+
+ 92 pass
+ 1 skip
+ 0 fail
+ 604 expect() calls
+Ran 93 tests across 11 files. [18.10s]

@@ -632,6 +632,25 @@ test("switching runtime invalidates Codex readiness and clears execution acknowl
   ])
 })
 
+test("Claude rate-limit notice remains visible while uncertain input cannot be resent", async ({ page }) => {
+  const label = "Native usage limit reached. Check the provider's reset time."
+  await install(page, {
+    ...initial,
+    configuration: { ...initial.configuration, runtime: "claude", executable: "C:/fixture/claude.exe" },
+    connection: { ...initial.connection, runtimeName: "Claude Code", runtimeVersion: "2.1.251" },
+    session: { id: "limited-session", modelId: "fixture-model", status: "uncertain" },
+    activity: [{ id: "limited-event", kind: "agent.error", label }],
+    notices: [label, "The native stream detached. Automatic replay is disabled."],
+    messages: [{ id: "attempted-input", role: "user", text: "Explain addition." }],
+  })
+  await page.goto("/")
+  await expect(page.getByRole("status").filter({ hasText: label })).toBeVisible()
+  await expect(page.getByRole("tabpanel", { name: "Activity" }).getByText(label)).toBeVisible()
+  await page.getByRole("textbox", { name: "Message to Claude Code", exact: true }).fill("Try again")
+  await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
 test("Claude sign-in status never enables execution or native Skills when billing remains unknown", async ({
   page,
 }) => {

@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-07T15:24:03.359Z",
+  "sourceInputsMatch": 174,
+  "compiledOutputsMatch": 6,
+  "archiveSha256": "4b9a1838a0ce11ce66b4438c3d31a4cddcc28faead7d09df8efd62e3e9c11812",
+  "archiveBytes": 186545461,
+  "manifestSha256": "4c17e13b8ca3fb64ed083b560992cd75475b70658926c4fcd4b896bc605c0493",
+  "budgets": [
+    {
+      "runtime": "codex",
+      "reserved": 4,
+      "limit": 4
+    },
+    {
+      "runtime": "claude",
+      "reserved": 1,
+      "limit": 4
+    }
+  ],
+  "providerPromptsSubmitted": 0
+}

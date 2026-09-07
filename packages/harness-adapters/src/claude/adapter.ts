@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { isAbsolute } from "node:path"
-import type { CanUseTool, PermissionResult, SDKMessage } from "@anthropic-ai/claude-agent-sdk"
+import type { CanUseTool, PermissionResult, SDKAssistantMessageError, SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import type {
   AdapterPreflight,
   AdapterPreflightRequest,
@@ -16,6 +16,7 @@ import type {
   PermissionDecision,
   PermissionRequest,
   PermissionReviewContent,
+  ProtocolError,
   RuntimeDescriptor,
   RuntimePreflight,
   SessionIntent,
@@ -709,6 +710,15 @@ export class ClaudeAdapter implements AgentAdapter {
         })
       }
     } else if (message.type === "assistant") {
+      if (message.message.model === "<synthetic>") {
+        const error = knownClaudeError(message.error)
+        if (message.parent_tool_use_id !== null || message.message.role !== "assistant" || !error)
+          throw new Error("Unknown Claude synthetic message")
+        // Native API failures are diagnostics, not responses from the selected model.
+        // Their stop_reason is not a result: close conservatively without declaring completion.
+        this.fail(owned, error)
+        return
+      }
       this.requireModel(owned, message.message.model)
       const text = message.message.content
         .filter((block) => block.type === "text")
@@ -801,7 +811,14 @@ export class ClaudeAdapter implements AgentAdapter {
       )
     }
   }
-  private fail(owned: Owned) {
+  private fail(
+    owned: Owned,
+    error: ProtocolError = {
+      code: "native-error",
+      message: "Claude native execution stopped; unacknowledged input is never replayed.",
+      retryable: false,
+    },
+  ) {
     if (owned.closed) return
     this.denyAll(owned)
     owned.closed = true
@@ -809,11 +826,7 @@ export class ClaudeAdapter implements AgentAdapter {
     this.emit(owned, {
       type: "agent.error",
       data: {
-        error: {
-          code: "native-error",
-          message: "Claude native execution stopped; unacknowledged input is never replayed.",
-          retryable: false,
-        },
+        error,
         ...(owned.turn ? { nativeTurnId: owned.turn } : {}),
       },
     })
@@ -1080,6 +1093,29 @@ function now() {
 }
 function denial(): PermissionResult {
   return { behavior: "deny", message: "This operation is outside the current Harness authorization." }
+}
+function knownClaudeError(value: unknown): ProtocolError | undefined {
+  const errors = {
+    authentication_failed: { code: "auth-required", message: "Claude authentication failed." },
+    oauth_org_not_allowed: { code: "auth-required", message: "Claude rejected the native account organization." },
+    account_on_hold: { code: "billing-conflict", message: "Claude reported that the account is on hold." },
+    billing_error: { code: "billing-conflict", message: "Claude reported a billing error." },
+    rate_limit: { code: "capacity-limited", message: "Claude reported a native rate limit." },
+    overloaded: { code: "capacity-limited", message: "Claude reported provider overload." },
+    invalid_request: { code: "invalid-input", message: "Claude rejected the native request." },
+    model_not_found: { code: "unavailable", message: "Claude reported that the selected model is unavailable." },
+    server_error: { code: "unavailable", message: "Claude reported a provider server error." },
+    unknown: { code: "native-error", message: "Claude reported an unclassified native error." },
+    max_output_tokens: { code: "capacity-limited", message: "Claude reached the native output-token limit." },
+  } as const satisfies Record<SDKAssistantMessageError, Pick<ProtocolError, "code" | "message">>
+  if (typeof value !== "string" || !Object.hasOwn(errors, value)) return undefined
+  const error = errors[value as SDKAssistantMessageError]
+  return {
+    ...error,
+    message: `${error.message} Native execution stopped without automatic retry.`,
+    nativeCode: value,
+    retryable: false,
+  }
 }
 function uuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)

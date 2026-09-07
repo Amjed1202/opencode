@@ -238,8 +238,10 @@ export class LocalRuntimeManager {
         }
         yield delivery
       }
-      if (!this.pumps.has(sessionId) || this.pumps.get(sessionId)!.stopping) return
+      // A consumer can pause at a yield while the pump commits its final event and exits.
+      // Drain any newer journal snapshot before treating that attachment as finished.
       if (version !== (this.versions.get(sessionId) ?? 0)) continue
+      if (!this.pumps.has(sessionId) || this.pumps.get(sessionId)!.stopping) return
       await new Promise<void>((resolve) => {
         const listeners = this.listeners.get(sessionId) ?? new Set<() => void>()
         const wake = () => {

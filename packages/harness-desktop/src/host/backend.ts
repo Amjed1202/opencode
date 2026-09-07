@@ -3,6 +3,7 @@ import { lstat, mkdir, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { CodexAdapter } from "@harness/adapters/codex"
 import { ClaudeAdapter } from "@harness/adapters/claude"
+import { runtimeErrorLabel } from "../shared/runtime-errors"
 import type { AgentAdapter } from "@harness/adapters"
 import type { AgentEvent, AgentSession, RuntimeDescriptor, SessionIntent, EventCursor } from "@harness/protocol"
 import {
@@ -547,7 +548,10 @@ export class DesktopBackend {
         await this.publish()
       }
       if (!signal.aborted && !this.closed) {
-        this.state = { ...this.state, notices: ["The native stream detached. Automatic replay is disabled."] }
+        this.state = {
+          ...this.state,
+          notices: [...this.state.notices, "The native stream detached. Automatic replay is disabled."],
+        }
         await this.publish()
       }
     } catch {
@@ -562,6 +566,7 @@ export class DesktopBackend {
   }
 
   private project(event: AgentEvent) {
+    if (event.type === "agent.error") this.state = { ...this.state, notices: [runtimeErrorLabel(event.data.error)] }
     if (event.type === "usage.updated") this.state = { ...this.state, usage: event.data }
     if (event.type === "context.updated") this.state = { ...this.state, context: event.data }
     if (event.type === "assistant.text.delta" || event.type === "assistant.text.completed") {
@@ -588,11 +593,13 @@ export class DesktopBackend {
             id: event.id,
             kind: event.type,
             label:
-              event.type === "tool.started"
-                ? `Started ${event.data.name}`
-                : event.type === "tool.completed"
-                  ? `Tool ${event.data.outcome}`
-                  : event.type,
+              event.type === "agent.error"
+                ? runtimeErrorLabel(event.data.error)
+                : event.type === "tool.started"
+                  ? `Started ${event.data.name}`
+                  : event.type === "tool.completed"
+                    ? `Tool ${event.data.outcome}`
+                    : event.type,
           },
         ].slice(-100),
       }

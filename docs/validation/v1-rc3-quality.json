@@ -1,0 +1,23 @@
+{
+  "format": {
+    "exitCode": 0,
+    "files": 129
+  },
+  "lint": {
+    "exitCode": 0,
+    "files": 112,
+    "errors": 0,
+    "warnings": 502
+  },
+  "preservation": {
+    "modifiedUpstreamFiles": [
+      "SECURITY.md",
+      "bun.lock"
+    ],
+    "mitUnchanged": true,
+    "securitySuffixUnchanged": true,
+    "generatedHashes": 84,
+    "preservedPriorHashes": 81,
+    "priorLockResolutionsMissing": []
+  }
+}

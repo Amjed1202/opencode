@@ -3,6 +3,7 @@ import { realpath } from "node:fs/promises"
 import type { AgentSession } from "@harness/protocol"
 import type { LocalRuntimeManager, SQLiteJournal } from "@harness/control-plane/host"
 import type { DesktopConfiguration } from "../shared/contracts"
+import { runtimeErrorLabel } from "../shared/runtime-errors"
 
 export interface ConversationSummary {
   readonly id: string
@@ -96,12 +97,16 @@ export class DesktopConversations {
     const messages = [...projected.values()]
       .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt) || left.order - right.order)
       .map((message) => ({ id: message.id, role: message.role, text: message.text }))
-    // Return only event names and durable IDs. Patches, question labels, tool inputs, errors,
+    // Return only event names, fixed error categories and durable IDs. Patches, question labels, tool inputs, raw errors,
     // thinking, account metadata and artifact references never cross this history projection.
     const activity = preview.events
       .filter((event) => event.scope.sessionId === sessionId && event.type !== "assistant.text.delta")
       .slice(-100)
-      .map((event) => ({ id: identity(event.id), kind: identity(event.type), label: identity(event.type) }))
+      .map((event) => ({
+        id: identity(event.id),
+        kind: identity(event.type),
+        label: event.type === "agent.error" ? runtimeErrorLabel(event.data.error) : identity(event.type),
+      }))
     return {
       messages,
       activity,

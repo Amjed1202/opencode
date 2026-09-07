@@ -1,0 +1,186 @@
+{
+  "packages": [
+    {
+      "packageDirectory": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1",
+      "archive": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1-c3e223c4.zip",
+      "archiveSha256": "4b96c0e88a153995ddcdef789f516e608f1646519cddf6658eafc7323a956940",
+      "manifestSha256": "c0451ff093c18cebd19d4e84e2275f800252ccd2d9cf76358e77324596bd40f0",
+      "manifestFiles": 96,
+      "everyFileMatches": true
+    },
+    {
+      "packageDirectory": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc2",
+      "archive": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc2-44d4bf45.zip",
+      "archiveSha256": "24e4127f90c2634dcde02c3afe56f73fcc9ebc1eee7ab7882c8d1c4abd5630f1",
+      "manifestSha256": "95b54c3cfd61c8b5681d58e7ac0195d262e8d3f7300b9f077bd237a3372c8ebe",
+      "manifestFiles": 96,
+      "everyFileMatches": true
+    }
+  ],
+  "evidence": [
+    {
+      "path": "m1c-models-desktop.png",
+      "sha256": "eecb0a14503d05e69bc0a912f4a885cfa3ff65a077294914509010531153c716"
+    },
+    {
+      "path": "v1-desktop.png",
+      "sha256": "b545eac31ce8a73c242fdc813aaeeae7317ff0bf0dba0536d9cad6396e2c10f8"
+    },
+    {
+      "path": "v1-package-archive-verification.json",
+      "sha256": "c44a18a72ea0016d98f0e341f4f52b363d77c13515bbf336640cd50d3811a87a"
+    },
+    {
+      "path": "v1-package-assembly.log",
+      "sha256": "be912597a1f8b54d6f2511ce2b583da2814dcc0daf1aed23db7924572c0262e8"
+    },
+    {
+      "path": "v1-package-build-sources.json",
+      "sha256": "51d001b64d85092262ff4c5927e9e6e34a94dfb5bf4f24907b2771633ff6ba91"
+    },
+    {
+      "path": "v1-package-build.log",
+      "sha256": "351d271e9aeb49ff0be61ff7d141de08998aad91b72f06ec98c02757d2fb5e10"
+    },
+    {
+      "path": "v1-package-electron-development.log",
+      "sha256": "f27d1711317bc77ed46cfc48eab727f5e2cd86528581287eba732e1992f30a15"
+    },
+    {
+      "path": "v1-package-electron-portable.log",
+      "sha256": "129557a1d561a5424569d046ec62605673fa7832253342b7597ca7ee3920eb52"
+    },
+    {
+      "path": "v1-package-portable-start.png",
+      "sha256": "9e61123dbcabcae4c187709b353d8c3b1a0489b3e1274fd1048048dbd49d1deb"
+    },
+    {
+      "path": "v1-package-results.json",
+      "sha256": "25d24a30ee4df20b5450598ced631da692a811ef37391d4096a9a056828f5123"
+    },
+    {
+      "path": "v1-package-unit.log",
+      "sha256": "b3e2079134bd63c972029b1fa2d5b772546c16f4f769b5cada8769b262b96cbb"
+    },
+    {
+      "path": "v1-rc2-adapters-typecheck.log",
+      "sha256": "b87e65da9b27ca3bf63162dc8617a0e7d3c7bdf0c5a77e1bbf1ec1f490b2ccd3"
+    },
+    {
+      "path": "v1-rc2-archive-verification-confirmed-result.json",
+      "sha256": "527d38f2f1e378844533aa47191c51dbf5f378959931cce15809e3e944007143"
+    },
+    {
+      "path": "v1-rc2-archive-verification-confirmed.log",
+      "sha256": "4de6fa8ff2d07fdb1160d896875cacfc60c29c15a5d9de3eff8dd699a655c35a"
+    },
+    {
+      "path": "v1-rc2-archive-verification-final.json",
+      "sha256": "62c3c5e2816e4fae9e892715b2a08afb1a6c5fd31280812d735d5483e52daf6a"
+    },
+    {
+      "path": "v1-rc2-archive-verification-final.log",
+      "sha256": "b6ee34483e5cc9a7902fb149d100ce45425a4117982f919d3f6e4e31fee1d4ae"
+    },
+    {
+      "path": "v1-rc2-archive-verification-result.json",
+      "sha256": "0178844ec469c3007580df1a89595c9ec17f75cdb3c55b12626236d32d50592c"
+    },
+    {
+      "path": "v1-rc2-archive-verification.json",
+      "sha256": "47aaa07cccb8cd2a4b413a950740785ca7e66a83728d0edcbff78e29b96b3dff"
+    },
+    {
+      "path": "v1-rc2-archive-verification.log",
+      "sha256": "c75dc60c8e62b12815c1352285283d217a8612f0b3be312924fe1e91fcad53e4"
+    },
+    {
+      "path": "v1-rc2-assembly.log",
+      "sha256": "353e77fa8143627c49996049ee8a4a1d2f341dbe56f35d9b3b54ecaa2526aeb0"
+    },
+    {
+      "path": "v1-rc2-build-sources.json",
+      "sha256": "50d8bb60304fd9854d52fe34e185a93e092cabfc52f2dee2b9656c4b79351698"
+    },
+    {
+      "path": "v1-rc2-build.log",
+      "sha256": "c43f7dbcefe31ba6933529775455d411979b6b40f3fef0aae207de95339dec02"
+    },
+    {
+      "path": "v1-rc2-built-outputs.json",
+      "sha256": "bd2804eac6991b8feaf11fb4aa408e57a690fae5796be00d729c6434d3e79fbe"
+    },
+    {
+      "path": "v1-rc2-desktop-bound.png",
+      "sha256": "772733e00cbd2a7e77abe8a2ca101a809420e1c9c28135849bbf9db2f1fb1c6c"
+    },
+    {
+      "path": "v1-rc2-desktop-tests.log",
+      "sha256": "118a6c0ba3929c43873c40d2a5db61beb290b7dda66803dd146cb282abeea181"
+    },
+    {
+      "path": "v1-rc2-desktop-typecheck.log",
+      "sha256": "b87e65da9b27ca3bf63162dc8617a0e7d3c7bdf0c5a77e1bbf1ec1f490b2ccd3"
+    },
+    {
+      "path": "v1-rc2-desktop.png",
+      "sha256": "772733e00cbd2a7e77abe8a2ca101a809420e1c9c28135849bbf9db2f1fb1c6c"
+    },
+    {
+      "path": "v1-rc2-electron-development-bound.log",
+      "sha256": "1dba22ae4e687164158b2f5ada5e0bbd4bedb73809adf8d4bdad68cbae32c519"
+    },
+    {
+      "path": "v1-rc2-electron-development.log",
+      "sha256": "4b23b0c3e5855cc66f367c0e4b42d920d6b97e40a4f6a5d302e08190088c9e30"
+    },
+    {
+      "path": "v1-rc2-electron-portable.log",
+      "sha256": "401dcd1303f1e169fa23496514b7a691e8d483f6dc2af002aea2c7c8fbcf39c3"
+    },
+    {
+      "path": "v1-rc2-format.log",
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "v1-rc2-oxlint.json",
+      "sha256": "b433981a4114d32d8edf20c4258a7da47bc45d18fcbc41b19b59a2340644457f"
+    },
+    {
+      "path": "v1-rc2-package-evidence.md",
+      "sha256": "9b846a6a27442ff7cc0c8e7c34995113fe3e4b17650ac57ad50929eab3b7d94a"
+    },
+    {
+      "path": "v1-rc2-package-results.json",
+      "sha256": "afdc53afc993a0b0cc84d674e2f307ab80efcb9c854557207d4b8b94669b8152"
+    },
+    {
+      "path": "v1-rc2-package-unit.log",
+      "sha256": "acd1283504eaee0c83b13a4596cbf4bfcfa105f7867f48bfbb22727f5cbae46b"
+    },
+    {
+      "path": "v1-rc2-portable-start.png",
+      "sha256": "e57f66d677ea229eedef16f78eff750d243747d51e5f9fd17baa965419cb11a2"
+    },
+    {
+      "path": "v1-rc2-quality.json",
+      "sha256": "4e435db9c793d0a8674064b31ab05cbba826aaa735a0bb5c7a82a725a577bed4"
+    },
+    {
+      "path": "v1-rc2-rc1-preservation.json",
+      "sha256": "93297d8f80966bc7a0817f82644b3572ae230024ab839f2085bdc2a5841569d1"
+    },
+    {
+      "path": "v1-rc2-results.json",
+      "sha256": "f0172b285c417dd0dd0b61d697abdfb97d82a4b8183b5790488fd20669495286"
+    },
+    {
+      "path": "v1-rc2-typecheck.log",
+      "sha256": "ae47736bb2a9401aa9743893f2f64b9a605e65a99d78cd991a8021e0f7722d87"
+    },
+    {
+      "path": "v1-rc2-ui-tests.log",
+      "sha256": "6875cda7ddbdf69a3d2ec3d63e2efc36a495b9b5b1c1603102be4931a9cfe13a"
+    }
+  ]
+}

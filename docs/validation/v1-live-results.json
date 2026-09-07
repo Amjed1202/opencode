@@ -1,6 +1,7 @@
 {
-  "recordedAt": "2026-09-07T09:49:08.533Z",
+  "recordedAt": "2026-09-07T15:12:02.760Z",
   "baseSourceCommit": "569e426",
+  "sourceEvidence": "Historical runs span RC1 and RC2. Claude's first acknowledged live run used pushed RC2 source 889ec39; no provider prompt tested the subsequent RC3 error-reporting fix.",
   "authorization": "User approved at most four prompts per runtime across retries, unknown provider extra usage, unverified OS boundary, exact sum.ts fixture write and harmless prepared standalone Skill.",
   "budgets": [
     {
@@ -11,7 +12,7 @@
     {
       "runtime": "claude",
       "limit": 4,
-      "reservedAttempts": 0
+      "reservedAttempts": 1
     }
   ],
   "rawProviderTranscriptsIncluded": false,
@@ -125,7 +126,8 @@
       "skill": {
         "prepared": true,
         "invoked": false,
-        "liveValidation": "pending-explicit-live-authorization"
+        "liveValidation": "not-invoked",
+        "originalRunnerLabel": "pending-explicit-live-authorization"
       },
       "eventCounts": {},
       "permissionRecords": 0,
@@ -251,6 +253,43 @@
       "fixture": {
         "name": "codex-b3ed5c57-81a9-48d1-883e-a1533f7b36a2",
         "sumSha256": "bb6cf6e358f15b2c5153fd7d94f9c9c9b0ae6722a1efe721d6445d49a2b0cab5"
+      }
+    },
+    {
+      "run": "live-claude-8cec5de2-fb45-46fa-9558-8a5d6bbf0007",
+      "checkedAt": "2026-09-07T15:00:22.851Z",
+      "completedAt": "2026-09-07T15:00:36.542Z",
+      "runtime": "claude",
+      "runtimeVersion": "2.1.251",
+      "authentication": "subscription",
+      "billing": "subscription",
+      "providerOverage": "unknown",
+      "hostSendAttempts": 1,
+      "acknowledgedPrompts": 1,
+      "outcome": "blocked-or-failed",
+      "failedPhase": "denial",
+      "checks": {
+        "noSessionDuringDiagnostic": true,
+        "generatedSkillCatalog": true,
+        "subscriptionAdmission": true,
+        "nativeInputAcknowledgments": true,
+        "cleanupConfirmed": true
+      },
+      "skill": {
+        "prepared": true,
+        "invoked": false,
+        "liveValidation": "not-invoked",
+        "originalRunnerLabel": "pending-explicit-live-authorization"
+      },
+      "eventCounts": {
+        "agent.started": 1,
+        "agent.error": 1
+      },
+      "permissionRecords": 0,
+      "usage": [],
+      "fixture": {
+        "name": "claude-f7f3d6c3-641e-4c2a-97d4-11aed36dfd60",
+        "sumSha256": "c1e5a064d0bddc503e7f41d2768cfe0abab381b06201548441d0e20e4d6330a6"
       }
     }
   ],
