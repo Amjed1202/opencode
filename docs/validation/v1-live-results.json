@@ -1,0 +1,372 @@
+{
+  "recordedAt": "2026-09-07T09:49:08.533Z",
+  "baseSourceCommit": "569e426",
+  "authorization": "User approved at most four prompts per runtime across retries, unknown provider extra usage, unverified OS boundary, exact sum.ts fixture write and harmless prepared standalone Skill.",
+  "budgets": [
+    {
+      "runtime": "codex",
+      "limit": 4,
+      "reservedAttempts": 4
+    },
+    {
+      "runtime": "claude",
+      "limit": 4,
+      "reservedAttempts": 0
+    }
+  ],
+  "rawProviderTranscriptsIncluded": false,
+  "credentialsImported": false,
+  "apiFallbackEnabled": false,
+  "nativeConfiguration": {
+    "firstCodexRunAddedFixtureTrust": true,
+    "taskCreatedTrustStanzaRemoved": true,
+    "unrelatedConfigurationPreserved": true,
+    "correctedFixtureTrustEntryAbsent": true,
+    "detail": "Native workspace-write thread/start persisted trust for the first disposable fixture. The coordinator removed only that exact two-line stanza (178 bytes) under an exclusive file handle and verified readback. No authentication settings changed."
+  },
+  "runs": [
+    {
+      "run": "live-codex-0ff1919d-712f-47cc-81ad-d5b9920a5b09",
+      "checkedAt": "2026-09-07T09:11:03.280Z",
+      "completedAt": "2026-09-07T09:11:15.271Z",
+      "runtime": "codex",
+      "runtimeVersion": "0.153.4",
+      "authentication": "subscription",
+      "billing": "subscription",
+      "providerOverage": "unknown",
+      "hostSendAttempts": 1,
+      "acknowledgedPrompts": 1,
+      "outcome": "blocked-or-failed",
+      "failedPhase": "denial",
+      "checks": {
+        "noSessionDuringDiagnostic": true,
+        "subscriptionAdmission": true,
+        "permissionDenial": false
+      },
+      "skill": {
+        "prepared": false,
+        "invoked": false,
+        "liveValidation": "deferred-not-selected"
+      },
+      "eventCounts": {
+        "native.event": 14,
+        "agent.started": 1,
+        "assistant.text.delta": 98,
+        "assistant.text.completed": 2,
+        "tool.started": 1,
+        "tool.completed": 1,
+        "usage.updated": 2,
+        "context.updated": 2,
+        "agent.completed": 1
+      },
+      "permissionRecords": 0,
+      "usage": [
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 9066,
+            "output": 248,
+            "cacheRead": 2304,
+            "cacheWrite": 0,
+            "reasoning": 155,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 18419,
+            "output": 431,
+            "cacheRead": 10752,
+            "cacheWrite": 0,
+            "reasoning": 252,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        }
+      ],
+      "context": {
+        "usedTokens": null,
+        "capacityTokens": 258400,
+        "basis": "native-context"
+      },
+      "fixture": {
+        "name": "codex-00bf393b-667b-4d61-ae60-66257e7be963",
+        "sumSha256": "bb6cf6e358f15b2c5153fd7d94f9c9c9b0ae6722a1efe721d6445d49a2b0cab5"
+      }
+    },
+    {
+      "run": "live-claude-588bb564-a63f-4cac-a481-b393e12d9da2",
+      "checkedAt": "2026-09-07T09:21:15.406Z",
+      "completedAt": "2026-09-07T09:21:18.974Z",
+      "runtime": "claude",
+      "runtimeVersion": "2.1.251",
+      "authentication": "subscription",
+      "billing": "subscription",
+      "providerOverage": "unknown",
+      "hostSendAttempts": 0,
+      "acknowledgedPrompts": 0,
+      "outcome": "blocked-or-failed",
+      "failedPhase": "connection",
+      "checks": {
+        "noSessionDuringDiagnostic": true,
+        "generatedSkillCatalog": true,
+        "cleanupConfirmed": true
+      },
+      "skill": {
+        "prepared": true,
+        "invoked": false,
+        "liveValidation": "pending-explicit-live-authorization"
+      },
+      "eventCounts": {},
+      "permissionRecords": 0,
+      "usage": [],
+      "fixture": {
+        "name": "claude-428f3b12-2382-4436-9351-00d5910d4a47",
+        "sumSha256": "c1e5a064d0bddc503e7f41d2768cfe0abab381b06201548441d0e20e4d6330a6"
+      }
+    },
+    {
+      "run": "live-codex-5d4e994e-e1f5-43a3-b431-ea10f9780ffa",
+      "checkedAt": "2026-09-07T09:31:08.600Z",
+      "completedAt": "2026-09-07T09:31:31.984Z",
+      "runtime": "codex",
+      "runtimeVersion": "0.153.4",
+      "authentication": "subscription",
+      "billing": "subscription",
+      "providerOverage": "unknown",
+      "hostSendAttempts": 2,
+      "acknowledgedPrompts": 2,
+      "outcome": "blocked-or-failed",
+      "failedPhase": "fixture-tests",
+      "checks": {
+        "noSessionDuringDiagnostic": true,
+        "subscriptionAdmission": true,
+        "nativeInputAcknowledgments": true,
+        "permissionDenial": true,
+        "protectedApproval": true,
+        "fixtureTestsPassed": false,
+        "cleanupConfirmed": true
+      },
+      "skill": {
+        "prepared": false,
+        "invoked": false,
+        "liveValidation": "deferred-not-selected"
+      },
+      "eventCounts": {
+        "native.event": 34,
+        "agent.started": 3,
+        "assistant.text.delta": 118,
+        "assistant.text.completed": 4,
+        "tool.started": 2,
+        "permission.requested": 2,
+        "interaction.reviewed": 2,
+        "permission.resolved": 2,
+        "tool.completed": 2,
+        "usage.updated": 4,
+        "context.updated": 4,
+        "agent.completed": 3
+      },
+      "permissionRecords": 2,
+      "usage": [
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 7400,
+            "output": 320,
+            "cacheRead": 2304,
+            "cacheWrite": 0,
+            "reasoning": 209,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 15135,
+            "output": 444,
+            "cacheRead": 9216,
+            "cacheWrite": 0,
+            "reasoning": 306,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 22838,
+            "output": 874,
+            "cacheRead": 15616,
+            "cacheWrite": 0,
+            "reasoning": 623,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "basis": "cumulative",
+          "accountingScope": "session",
+          "tokens": {
+            "input": 31010,
+            "output": 896,
+            "cacheRead": 23040,
+            "cacheWrite": 0,
+            "reasoning": 623,
+            "cacheRelation": "unknown",
+            "reasoningRelation": "unknown"
+          },
+          "billingRoute": "subscription",
+          "providerOverage": "unknown"
+        }
+      ],
+      "context": {
+        "usedTokens": null,
+        "capacityTokens": 258400,
+        "basis": "native-context"
+      },
+      "fixture": {
+        "name": "codex-b3ed5c57-81a9-48d1-883e-a1533f7b36a2",
+        "sumSha256": "bb6cf6e358f15b2c5153fd7d94f9c9c9b0ae6722a1efe721d6445d49a2b0cab5"
+      }
+    }
+  ],
+  "journalCountersReflectCurrentSharedJournal": true,
+  "continuations": [
+    {
+      "run": "continuation-codex-9da7257e-9a59-4adb-bc6f-abc0dcd36ad9",
+      "checkedAt": "2026-09-07T09:41:00.071Z",
+      "completedAt": "2026-09-07T09:41:00.433Z",
+      "sourceRun": "live-codex-5d4e994e-e1f5-43a3-b431-ea10f9780ffa",
+      "outcome": "blocked-or-failed",
+      "failedPhase": "restore-history",
+      "hostSendAttempts": 0,
+      "acknowledgedPrompts": 0,
+      "checks": {
+        "fixtureTestsPassed": true,
+        "cleanupConfirmed": true,
+        "oldArtifactCiphertextPreserved": true,
+        "originalOutcomePreserved": true,
+        "cleanupFixturePreserved": true
+      },
+      "originalFailureCause": "The earlier child test failure did not retain diagnostics; its cause remains unknown.",
+      "artifactKeyBoundary": "Fresh in-memory key for new interactions only; old ciphertext is neither decrypted nor reset."
+    },
+    {
+      "run": "continuation-codex-ed427ad8-64d1-4326-9333-23f6691a8872",
+      "checkedAt": "2026-09-07T09:45:25.879Z",
+      "completedAt": "2026-09-07T09:45:26.270Z",
+      "sourceRun": "live-codex-5d4e994e-e1f5-43a3-b431-ea10f9780ffa",
+      "outcome": "blocked-or-failed",
+      "failedPhase": "native-control-inspection",
+      "hostSendAttempts": 0,
+      "acknowledgedPrompts": 0,
+      "checks": {
+        "cleanupConfirmed": true,
+        "oldArtifactCiphertextPreserved": true,
+        "originalOutcomePreserved": true,
+        "cleanupFixturePreserved": true
+      },
+      "controlObservation": {
+        "status": "ready",
+        "billing": "subscription",
+        "runtimeVersion": "0.153.4",
+        "modelsStatus": "ready",
+        "selectedModelAvailable": true,
+        "runtimeFeatures": {
+          "resume": true,
+          "inspection": true
+        }
+      },
+      "inspectionObservation": {
+        "nativeState": "unknown",
+        "completeness": "complete",
+        "turnCount": 2,
+        "runningTurns": 0,
+        "terminalTurns": 2,
+        "unknownTurns": 0
+      },
+      "originalFailureCause": "The earlier child test failure did not retain diagnostics; its cause remains unknown.",
+      "artifactKeyBoundary": "Fresh in-memory key for new interactions only; old ciphertext is neither decrypted nor reset."
+    },
+    {
+      "run": "continuation-codex-650797b2-e7d3-447f-9650-fb9a747c9820",
+      "checkedAt": "2026-09-07T09:46:41.390Z",
+      "completedAt": "2026-09-07T09:46:49.694Z",
+      "sourceRun": "live-codex-5d4e994e-e1f5-43a3-b431-ea10f9780ffa",
+      "outcome": "passed",
+      "hostSendAttempts": 1,
+      "acknowledgedPrompts": 1,
+      "checks": {
+        "fixtureTestsPassed": true,
+        "initialExactResume": true,
+        "initialNoHostReplay": true,
+        "nativeInputAcknowledgment": true,
+        "generationObserved": true,
+        "interruptConfirmed": true,
+        "postInterruptFixturePreserved": true,
+        "historyRestored": true,
+        "oneAdditionalNativeTurn": true,
+        "finalExactResume": true,
+        "noHostReplay": true,
+        "noNativeReplay": true,
+        "finalFixturePreserved": true,
+        "cleanupConfirmed": true,
+        "oldArtifactCiphertextPreserved": true,
+        "originalOutcomePreserved": true,
+        "cleanupFixturePreserved": true
+      },
+      "nativeTurnCounts": {
+        "before": 2,
+        "afterInterrupt": 3,
+        "afterResume": 3
+      },
+      "controlObservation": {
+        "status": "ready",
+        "billing": "subscription",
+        "runtimeVersion": "0.153.4",
+        "modelsStatus": "ready",
+        "selectedModelAvailable": true,
+        "runtimeFeatures": {
+          "resume": true,
+          "inspection": true
+        }
+      },
+      "inspectionObservation": {
+        "nativeState": "unknown",
+        "completeness": "complete",
+        "turnCount": 3,
+        "runningTurns": 0,
+        "terminalTurns": 3,
+        "unknownTurns": 0
+      },
+      "nativeInspectionLimitation": "The detached native loaded state is unknown. Complete terminal turn counts support comparison only; the exact native resume must separately return idle before any send.",
+      "deniedToolRequests": 0,
+      "originalFailureCause": "The earlier child test failure did not retain diagnostics; its cause remains unknown.",
+      "artifactKeyBoundary": "Fresh in-memory key for new interactions only; old ciphertext is neither decrypted nor reset."
+    }
+  ]
+}

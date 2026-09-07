@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline"
+import { basename, resolve } from "node:path"
 import type { Model } from "../../src/codex/generated/0.153.4/v2/Model"
 import { isRecord } from "../../src/codex/stdio"
 const scenario = process.argv[2] ?? "normal"
@@ -13,6 +14,8 @@ let historyRead = false
 let modelLists = 0
 const modelRequests: unknown[] = []
 const startedModels: string[] = []
+const executionSettings: { method: string; approval: string; sandbox: string }[] = []
+const pendingWrites = new Map<string, { path: string; content: string }>()
 function merge(left: Record<string, unknown>, right: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     [...new Set([...Object.keys(left), ...Object.keys(right)])].map((key) => {
@@ -109,6 +112,9 @@ for await (const line of createInterface({ input: process.stdin })) {
   const message = JSON.parse(line)
   if (!message.method) {
     approvals.push(message)
+    const pending = pendingWrites.get(message.id)
+    pendingWrites.delete(message.id)
+    if (pending && message.result?.decision === "accept") await Bun.write(pending.path, pending.content)
     continue
   }
   requests.push(message.method)
@@ -199,6 +205,11 @@ for await (const line of createInterface({ input: process.stdin })) {
     if (scenario === "isolation-mcp-addition" && changed && isRecord(effective.mcp_servers))
       effective.mcp_servers.NEW_ENTRY = { command: "fixture-must-not-start", enabled: false }
     if (scenario === "isolation-notify-change" && changed) effective.notify = ["fixture-must-not-start"]
+    if (
+      (scenario === "shell-tool-ignored" || (scenario === "shell-tool-change" && changed)) &&
+      isRecord(effective.features)
+    )
+      effective.features.shell_tool = true
     if (scenario === "isolation-delay-config") await new Promise((resolve) => setTimeout(resolve, 100))
     reply({
       config: {
@@ -328,8 +339,16 @@ for await (const line of createInterface({ input: process.stdin })) {
   }
   if (message.method === "thread/start" || message.method === "thread/resume") {
     cwd = message.params.cwd
-    if (!["never", "on-request"].includes(message.params.approvalPolicy) || message.params.modelProvider !== "openai")
+    if (
+      !["never", "on-request", "untrusted"].includes(message.params.approvalPolicy) ||
+      message.params.modelProvider !== "openai"
+    )
       process.exit(23)
+    executionSettings.push({
+      method: message.method,
+      approval: message.params.approvalPolicy,
+      sandbox: message.params.sandbox,
+    })
     if (typeof message.params.model !== "string") process.exit(29)
     startedModels.push(message.params.model)
     reply({
@@ -343,10 +362,10 @@ for await (const line of createInterface({ input: process.stdin })) {
       serviceTier: "default",
       cwd,
       instructionSources: [],
-      approvalPolicy: message.params.approvalPolicy,
-      approvalsReviewer: "user",
+      approvalPolicy: scenario === "thread-approval-fallback" ? "on-request" : message.params.approvalPolicy,
+      approvalsReviewer: scenario === "thread-reviewer" ? "auto_review" : "user",
       sandbox:
-        message.params.sandbox === "workspace-write"
+        message.params.sandbox === "workspace-write" || scenario === "thread-writable"
           ? {
               type: "workspaceWrite",
               networkAccess: false,
@@ -354,7 +373,11 @@ for await (const line of createInterface({ input: process.stdin })) {
               excludeTmpdirEnvVar: true,
               excludeSlashTmp: true,
             }
-          : { type: "readOnly", networkAccess: scenario === "thread-network" },
+          : {
+              type: "readOnly",
+              networkAccess: scenario === "thread-network",
+              ...(scenario === "thread-extra-root" ? { writableRoots: [cwd] } : {}),
+            },
       reasoningEffort: null,
       turnsBackwardsCursor: null,
       itemsBackwardsCursor: null,
@@ -362,6 +385,11 @@ for await (const line of createInterface({ input: process.stdin })) {
   }
   if (message.method === "turn/start") {
     turns++
+    executionSettings.push({
+      method: message.method,
+      approval: message.params.approvalPolicy,
+      sandbox: message.params.sandboxPolicy?.type,
+    })
     if (message.params.input[0].type !== "text" || message.params.threadId !== "thread-1") process.exit(24)
     if (
       !["readOnly", "workspaceWrite"].includes(message.params.sandboxPolicy?.type) ||
@@ -372,7 +400,7 @@ for await (const line of createInterface({ input: process.stdin })) {
     if (scenario === "lost-dispatch") process.exit(25)
     notification("turn/started", { threadId: "thread-1", turn: turn() })
     reply({ turn: turn() })
-    if (scenario === "hold") continue
+    if (scenario === "hold" || scenario === "write-gate") continue
     if (scenario === "approval") {
       output({
         id: 42,
@@ -421,7 +449,56 @@ for await (const line of createInterface({ input: process.stdin })) {
   }
   if (message.method === "thread/turns/list")
     reply({ data: [{ ...turn("completed"), itemsView: "summary" }], nextCursor: null, backwardsCursor: null })
-  if (message.method === "fixture/state") reply({ requests, turns, approvals, modelRequests, startedModels })
+  if (message.method === "fixture/state")
+    reply({ requests, turns, approvals, modelRequests, startedModels, executionSettings })
+  if (message.method === "fixture/propose-write") {
+    // A deterministic tool peer follows pinned native safety.rs routing, then performs a real fixture write.
+    // This deliberately auto-applies on-request/workspaceWrite: unconditional approval mocks hid that defect.
+    const { id, path, content, shell } = message.params
+    if (
+      scenario !== "write-gate" ||
+      !/^gate-[a-f0-9-]+\.txt$/.test(basename(path)) ||
+      resolve(path) !== resolve(cwd, basename(path))
+    )
+      process.exit(30)
+    const settings = executionSettings.at(-1)!
+    if (settings.sandbox === "workspaceWrite" && (shell || settings.approval !== "untrusted")) {
+      await Bun.write(path, content)
+      reply({ outcome: "auto-applied" })
+      continue
+    }
+    if (settings.approval === "never") {
+      reply({ outcome: "blocked" })
+      continue
+    }
+    if (!shell) {
+      notification("item/started", {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: {
+          type: "fileChange",
+          id,
+          status: "inProgress",
+          changes: [
+            { path, kind: { type: "update", move_path: null }, diff: `@@ -1 +1 @@\n-before\n+${content.trim()}\n` },
+          ],
+        },
+      })
+    }
+    pendingWrites.set(id, { path, content })
+    output({
+      id,
+      method: shell ? "item/commandExecution/requestApproval" : "item/fileChange/requestApproval",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: id,
+        startedAtMs: Date.now(),
+        ...(shell ? { command: "fixture-write", cwd } : {}),
+      },
+    })
+    reply({ outcome: "pending" })
+  }
   if (message.method === "fixture/native-request") {
     for (const item of message.params.notifications ?? []) notification(item.method, item.params)
     output(message.params.request)

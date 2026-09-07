@@ -1,0 +1,8 @@
+{
+  "phase": "archive-verification",
+  "startedAt": "2026-09-07T09:36:37.859Z",
+  "completedAt": "2026-09-07T09:36:38.208Z",
+  "exitCode": 1,
+  "log": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\work\\v1-rc2-archive-verification.log",
+  "logSha256": "c75dc60c8e62b12815c1352285283d217a8612f0b3be312924fe1e91fcad53e4"
+}

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
+import { unlink } from "node:fs/promises"
 import { dirname } from "node:path"
 import type { AdmittedSessionRequest, AgentEventDraft, SessionIntent } from "@harness/protocol"
 import { CodexAdapter } from "../../src/codex/adapter"
@@ -137,6 +138,7 @@ function fixture(
         requests: string[]
         turns: number
         approvals: { id: string | number; result?: unknown; error?: { code: number; message: string } }[]
+        executionSettings: { method: string; approval: string; sandbox: string }[]
       },
     transport: () => transport!,
   }
@@ -179,8 +181,9 @@ async function permissionFixture(
   policy: Partial<SessionIntent["policy"]> = {},
   timeout = 1000,
   beforeNativeReply?: () => Promise<void>,
+  scenario = "hold",
 ) {
-  const peer = fixture("hold", undefined, timeout, beforeNativeReply)
+  const peer = fixture(scenario, undefined, timeout, beforeNativeReply)
   const admitted = await admission(peer.adapter, {
     ...intent,
     policy: { ...intent.policy, approval: "ask", filesystem: "workspace-write", ...policy },
@@ -251,6 +254,61 @@ async function permissionFixture(
   }
   return { ...peer, context, session, request, next, events }
 }
+
+test("native file writes wait for host review; denial preserves bytes and allow-once cannot authorize the next write", async () => {
+  const path = `${import.meta.dir}/gate-${crypto.randomUUID()}.txt`
+  await Bun.write(path, "before\n")
+  try {
+    const peer = await permissionFixture({}, 1000, undefined, "write-gate")
+    for (const [id, content, choiceId, expected] of [
+      ["denied-patch", "denied\n", "deny-once", "before\n"],
+      ["accepted-patch", "accepted\n", "allow-once", "accepted\n"],
+      ["next-patch", "not-authorized\n", "deny-once", "accepted\n"],
+      ["shell-write", "shell-not-authorized\n", "deny-once", "accepted\n"],
+    ] as const) {
+      const before = await Bun.file(path).text()
+      const proposed = await peer
+        .transport()
+        .request("fixture/propose-write", { id, path, content, shell: id === "shell-write" })
+      expect(await Bun.file(path).text()).toBe(before)
+      expect(proposed).toEqual({ outcome: "pending" })
+      const event = await peer.next("permission.requested")
+      if (event.type !== "permission.requested") throw new Error("Missing host permission")
+      if (id === "shell-write") expect(event.data.choices.map((choice) => choice.id)).toEqual(["deny-once"])
+      await peer.adapter.resolvePermission(peer.context, { ...event.data, choiceId })
+      const state = await peer.state()
+      expect(state.approvals.at(-1)).toMatchObject({
+        id,
+        result: { decision: choiceId === "allow-once" ? "accept" : "decline" },
+      })
+      expect(await Bun.file(path).text()).toBe(expected)
+    }
+    expect((await peer.state()).executionSettings).toEqual([
+      { method: "thread/start", approval: "untrusted", sandbox: "read-only" },
+      { method: "turn/start", approval: "untrusted", sandbox: "readOnly" },
+    ])
+  } finally {
+    await unlink(path)
+  }
+})
+
+test("deny policy never grants a broad native writable workspace", async () => {
+  const path = `${import.meta.dir}/gate-${crypto.randomUUID()}.txt`
+  await Bun.write(path, "before\n")
+  try {
+    const peer = await permissionFixture({ approval: "deny" }, 1000, undefined, "write-gate")
+    expect(
+      await peer.transport().request("fixture/propose-write", { id: "blocked-patch", path, content: "unauthorized\n" }),
+    ).toEqual({ outcome: "blocked" })
+    expect(await Bun.file(path).text()).toBe("before\n")
+    expect((await peer.state()).executionSettings).toEqual([
+      { method: "thread/start", approval: "never", sandbox: "read-only" },
+      { method: "turn/start", approval: "never", sandbox: "readOnly" },
+    ])
+  } finally {
+    await unlink(path)
+  }
+})
 
 const nativeChoices = {
   threadId: "thread-1",
@@ -1237,16 +1295,23 @@ test("included-only policy blocks unknown provider overage", async () => {
   ).toBe("blocked")
 })
 
-test.each(["account-switch", "config-switch", "thread-provider", "thread-network", "active-thread"])(
-  "create revalidates %s before allowing turns",
-  async (scenario) => {
-    const peer = fixture(scenario)
-    const admitted = await admission(peer.adapter)
-    const result = await peer.adapter.createSession(admitted).catch((error: Error) => error)
-    expect(result).toBeInstanceOf(Error)
-    expect((await peer.state()).turns).toBe(0)
-  },
-)
+test.each([
+  "account-switch",
+  "config-switch",
+  "thread-provider",
+  "thread-network",
+  "thread-writable",
+  "thread-extra-root",
+  "thread-reviewer",
+  "thread-approval-fallback",
+  "active-thread",
+])("create revalidates %s before allowing turns", async (scenario) => {
+  const peer = fixture(scenario)
+  const admitted = await admission(peer.adapter)
+  const result = await peer.adapter.createSession(admitted).catch((error: Error) => error)
+  expect(result).toBeInstanceOf(Error)
+  expect((await peer.state()).turns).toBe(0)
+})
 
 test("native text/completion mapping preserves correlation and omits unknown sensitive bodies", async () => {
   const peer = fixture()
@@ -1319,11 +1384,30 @@ test("concurrent sends cannot accidentally steer a running turn", async () => {
 
 test("resume uses an existing native thread ID and close only unsubscribes", async () => {
   const peer = fixture()
-  const admitted = await admission(peer.adapter)
+  const admitted = await admission(peer.adapter, {
+    ...intent,
+    policy: { ...intent.policy, approval: "ask", filesystem: "workspace-write" },
+  })
   const session = await peer.adapter.createSession(admitted)
   await peer.adapter.close(session)
   const resumed = await peer.adapter.resume({ ...admitted, operation: "resume" }, session)
   expect(resumed.binding.nativeSessionId).toBe("thread-1")
   expect((await peer.state()).requests).toContain("thread/unsubscribe")
   expect((await peer.state()).requests).toContain("thread/resume")
+  expect((await peer.state()).executionSettings).toEqual([
+    { method: "thread/start", approval: "untrusted", sandbox: "read-only" },
+    { method: "thread/resume", approval: "untrusted", sandbox: "read-only" },
+  ])
+})
+
+test("ignored native shell isolation blocks admission and later changes block dispatch", async () => {
+  const ignored = fixture("shell-tool-ignored")
+  expect((await ignored.adapter.preflight({ operation: "create", intent })).status).toBe("blocked")
+  expect((await ignored.state()).requests).not.toContain("thread/start")
+  const changed = fixture("shell-tool-change")
+  const session = await changed.adapter.createSession(await admission(changed.adapter))
+  expect((await changed.adapter.send({ session, admissionId: "admission-1", leaseGeneration: 1 }, input)).state).toBe(
+    "rejected",
+  )
+  expect((await changed.state()).turns).toBe(0)
 })

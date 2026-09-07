@@ -1,0 +1,7 @@
+{
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "stdout": "bun test v1.3.14 (0d9b296a)\n",
+  "stderr": "\nsum.test.ts:\n(pass) sum handles empty, positive and negative values [0.19ms]\n\n 1 pass\n 0 fail\n 3 expect() calls\nRan 1 test across 1 file. [21.00ms]\n"
+}

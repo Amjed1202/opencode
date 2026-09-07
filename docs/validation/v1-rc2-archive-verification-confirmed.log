@@ -1,0 +1,7 @@
+Archive byte verification failed
+At C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\work\v1-rc2-verify-archive.ps1:45 char:67
++ ... 0 -or $mismatches -ne 0) { throw 'Archive byte verification failed' }
++                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Archive byte verification failed:String) [], RuntimeException
+    + FullyQualifiedErrorId : Archive byte verification failed
+ 

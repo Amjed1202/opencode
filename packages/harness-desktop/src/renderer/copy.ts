@@ -40,6 +40,8 @@ export const copy = {
     "Check your installed runtime and sign-in status. Conversations and native Skills activation remain unavailable while billing and managed policy checks are incomplete.",
   openCodePending: "OpenCode · coming next",
   nativeSubscription: "Native subscription",
+  codexExecutionScope:
+    "Include the file contents in your prompt. Codex can propose reviewed patches; repository browsing, shell commands and tests are unavailable in this version.",
   localWorkspace: "Local workspace",
   conversation: "Conversation",
   noRepository: "No repository selected",

@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-09-07T09:25:02.831Z",
+  "originalDiagnosticEnvironment": true,
+  "providerPromptsSubmitted": 0,
+  "rawAccountRetained": false,
+  "rawNativeOutputRetained": false,
+  "events": [
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 38
+    },
+    {
+      "stage": "adapter.discover",
+      "ok": true,
+      "ms": 40
+    },
+    {
+      "stage": "inspector.version",
+      "ok": true,
+      "ms": 33
+    },
+    {
+      "stage": "policy.absence",
+      "ok": true,
+      "ms": 167
+    },
+    {
+      "stage": "inspector.subscription.predicates",
+      "code": 1,
+      "loggedIn": false,
+      "nativeOAuth": false,
+      "firstParty": true,
+      "personalPlan": false,
+      "apiKeySourceAbsent": true,
+      "apiKeySourceNone": false,
+      "emailPresent": false,
+      "orgPresent": false
+    },
+    {
+      "stage": "inspector.subscription",
+      "ok": false,
+      "ms": 281,
+      "error": "Claude personal subscription route is unavailable"
+    },
+    {
+      "stage": "adapter.status",
+      "ok": false,
+      "ms": 482,
+      "error": "unclassified-sanitized-error"
+    },
+    {
+      "stage": "inspector.dispose",
+      "ok": true,
+      "ms": 0
+    }
+  ]
+}

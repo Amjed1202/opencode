@@ -1,0 +1,32 @@
+[
+  {
+    "path": "host/index.js",
+    "bytes": 2009654,
+    "sha256": "9b424c8cbbb91985d8aab3a77217b4a31c3d039068c0bf782caa69479bfc9f7f"
+  },
+  {
+    "path": "main/index.js",
+    "bytes": 29870,
+    "sha256": "8e119f4501df3d03f702a77656b8c921fa510ae52d40c5ed4359791d0c5f779a"
+  },
+  {
+    "path": "preload/index.cjs",
+    "bytes": 3076,
+    "sha256": "53fc4376d743bf7c73517e606ded76510ed58c0d3ae882e16659cfde2be4ab3d"
+  },
+  {
+    "path": "renderer/assets/index-CMg-UiGz.js",
+    "bytes": 116720,
+    "sha256": "f6b162ac1911dcf4cb7ec78fdf199d8b4c2ed4b17826a9f0c3870e56f4adf5e0"
+  },
+  {
+    "path": "renderer/assets/index-DogKkt4L.css",
+    "bytes": 20423,
+    "sha256": "e28e8207b8f81f19adc8565fd1bba8d3e66a23592ce7b8bae6df0c54828ee342"
+  },
+  {
+    "path": "renderer/index.html",
+    "bytes": 443,
+    "sha256": "97d83e0a2c445e8ff2771c2e4d2f99f91e6b4c4f1977c034a9ef7b111a333c8e"
+  }
+]

@@ -1,0 +1,674 @@
+[
+  {
+    "path": "LICENSE",
+    "sha256": "b5c625d157735f04e1b2b7ceccee849130b554bdb23cd58db55a38a257efbbdd"
+  },
+  {
+    "path": "bun.lock",
+    "sha256": "537b176a3dde18ba5555c701a00c8af6e095720ef857c5395415baf6d3ca3afd"
+  },
+  {
+    "path": "package.json",
+    "sha256": "f6265a3bb9f224ffea7c0e424cf5de20150788774a9bcaf063c791e2c0bd4d84"
+  },
+  {
+    "path": "packages/harness-adapters/package.json",
+    "sha256": "643486e2ed5b6042f6f4375eac747e7df6a5e549a71d4597ddf24df3219c53e8"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/README.md",
+    "sha256": "b58cf6f2c053bf1d7292268059aa1f75efba8fef969c91165897124654a1db2a"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/adapter.ts",
+    "sha256": "8f02bb3748fa68852d3b31d1fcac14e85b10415f9227fa1f58de1f621283a100"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/files.ts",
+    "sha256": "1cd3b39f855b027a03beb14363f848eed6ebc0f1a33bcaee091f429515b41d73"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/inspect.ts",
+    "sha256": "a61db0df3e325567c45dff1054751af5594145bb4617368903fee0ef65c1917a"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/runtime.ts",
+    "sha256": "d14e886780e41afa3a71a84825ae1d725377fd79e790159fd1cf141c0ceba920"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/skills.ts",
+    "sha256": "a48bcfc6379242065bced48b24787d45031189b0e9521da52f1c304a724094f4"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/README.md",
+    "sha256": "c7a136b76f6b62afef802a9b0febe1d435c5dd9cfa838ca0b566387443a7b477"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/adapter.ts",
+    "sha256": "44384691131936394e82afa3c3827e336e775a6cd21c54f1908242005dbf4e42"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/approval-evidence.md",
+    "sha256": "7be33ae322ca8d8281bd9175495fbc4f73ed1d7cb95e71e58e99986639a4c841"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/.gitattributes",
+    "sha256": "c72d1ee85dc4f9b0e9775890f66128e42d7df6264fcaed911be79e347c4aed74"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/AbsolutePathBuf.ts",
+    "sha256": "a79d31d5e8f24c58c8cce2633e5e4fc5b0bb88d1c44c69e7ce7d0dc7c1252272"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/ClientInfo.ts",
+    "sha256": "c3f38c70ffff810867af87a536d915dadea9e4b547343611c4e14731bcb7c648"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/FunctionCallOutputBody.ts",
+    "sha256": "29879d8884c7031f104c56b462fdd9d09395d8c2f90eb10f67bfe00ed36b3234"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/FunctionCallOutputContentItem.ts",
+    "sha256": "9eeae66678a736333a5a9ab116b186662512525cf1b3093a14e13e4d12fb78e5"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/ImageDetail.ts",
+    "sha256": "cf2036b2af8a0e42de8934caec9cebe36169d5e86aeb5504a2ebc859596e4414"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/InitializeCapabilities.ts",
+    "sha256": "4abc3c8bf9f039c61a0ee0f92c21854e350ce9ef4ef6b770178040e47744cd7b"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/InitializeParams.ts",
+    "sha256": "bfc13b4fc9e37f629ee67b42d6e7f342ba38668ff528e738a911de5ebcfd545f"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/InputModality.ts",
+    "sha256": "549288aebc01097fb6983b41dbdeb53d010e3cd8dfed6e4b1d767e8adb10426a"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/LICENSE",
+    "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/LegacyAppPathString.ts",
+    "sha256": "74517cf53c55fa2086b7a0c364efcc3a90804ca118d0c679f244bdd682bd6632"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/NOTICE",
+    "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/Personality.ts",
+    "sha256": "51eee5332b3af52cce2117922688523e90808390eec477434d9a089b36a21163"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/PlanType.ts",
+    "sha256": "cc466a3091b69a53c1fdbd1540611ac3629313a806ae975a8b776bfde47480e7"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/ReasoningEffort.ts",
+    "sha256": "a29212fd92094fc023f5d8727412325c60b05dfb429a1e6291b60ceba1eb1743"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/ReasoningSummary.ts",
+    "sha256": "1d56c8b72bf6806438e612e1a14a567ceab91be91a4bcb0ca192f898fe0bf9bc"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/RequestId.ts",
+    "sha256": "beeb38dfd0b050b171141bd66d51663786a50a81cbe904ba9b006289a101fd39"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/provenance.json",
+    "sha256": "c5d847ce61b460976d21435c3b5a83c0bcda5775022e927044335ed75439f21c"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/serde_json/JsonValue.ts",
+    "sha256": "8697aaaa4cbe8f91492fe36dc545cc53a26e53143371c22c08385969d4e3cc61"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/Account.ts",
+    "sha256": "122259e3439c0c0f63e53a2f2e0028a9e6f153b3bc16c1a705f640b98ff8bf37"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/AdditionalFileSystemPermissions.ts",
+    "sha256": "c26c68250553698af4f9affd0b991e64e5841384f07199940d6f211f0cef11be"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/AdditionalNetworkPermissions.ts",
+    "sha256": "7b1a37a73699dfea562f7b4cc1b71cffa8f42371b11248dc7ff7582c0f8e3f94"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ApprovalsReviewer.ts",
+    "sha256": "0ba0d2403a6987128af58e825fb0d0e05d61891ce5a35e7ba1f94afe51a57630"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/AskForApproval.ts",
+    "sha256": "81dd17defd9a7fd4785346d3ce54c14243353b43174c7417827210cbd3ef3c52"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ByteRange.ts",
+    "sha256": "dd61c4b71554053feaecec39f41015a5db3869b28b19b7c9a85ee73f3502a4e4"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/CommandAction.ts",
+    "sha256": "df8e6909e1e46e352ada64e766c3d6c93552199ce2448b35b83912efb2fe8917"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/CommandExecutionApprovalDecision.ts",
+    "sha256": "9283d7206bc8df353c4fcc9a14682b5f69f7f288d666f975356762ed49d5bc6b"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/CommandExecutionApprovalKind.ts",
+    "sha256": "16f398d31bf73bf7ca9e8694701fd9d2f5d745f6cde8032b81d4c1bfb43d12b6"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/CommandExecutionRequestApprovalParams.ts",
+    "sha256": "b3425c5bc97dd9a1d74d33ef1cb42d56049da7e4704435021d50fa4eb404abbe"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/CommandExecutionRequestApprovalResponse.ts",
+    "sha256": "454ceee4decc66a9c070273d4344fa8a0187732cd884b8b60edda3a17766aa95"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ConfigReadParams.ts",
+    "sha256": "3bf81d288ea2d597f8977114d726e5554de97e3a164b56a692b772132efdafad"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ExecPolicyAmendment.ts",
+    "sha256": "eae3c3f9c81a40ffffe5de29e274b322db8200591ba39306daa27794a2deffa0"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileChangeApprovalDecision.ts",
+    "sha256": "8a5aa00ea5e9c7b0856da23daa6e799dc1c5f15d16553ce59390ec73b65c8430"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileChangePatchUpdatedNotification.ts",
+    "sha256": "c7a287dd5f82dbe8ae6018240d3b284999c5c9e578dc5c6d0772cf6e75103de1"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileChangeRequestApprovalParams.ts",
+    "sha256": "32ec2fef83e1e17db98ea0b9b86baaa5c8bf2e8979988f5ad8fef3a93ab15074"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileChangeRequestApprovalResponse.ts",
+    "sha256": "527a9af90f753e2b7f1852415523443fc9745376bb2c4b0b735f900c8da8fc71"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileSystemAccessMode.ts",
+    "sha256": "36689572cd7c9e23ec2fa01912b8ca2abd331608dfd89b691b87351b5e520389"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileSystemPath.ts",
+    "sha256": "e0279cd26713e84898352d23f02798912ca2ff69c796f58ff9606a6cd5f4d45f"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileSystemSandboxEntry.ts",
+    "sha256": "f27cc590b6aa56f41c8c9168c6012c0e562e952bc2657421e9fa48c108084151"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileSystemSpecialPath.ts",
+    "sha256": "b38fce284661d5495836cf6c0833547912845146cb06de542041ec776a4d9bfd"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/FileUpdateChange.ts",
+    "sha256": "71acccec19639609d9a2a7f42de4bc53e540692afcbd29de0735826541dbe5a0"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/GetAccountParams.ts",
+    "sha256": "73feed16e294673d984618e2264a32be4b20bfe45973fdba064bddd2e6c6c18a"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/GetAccountResponse.ts",
+    "sha256": "f16f348c9c37a760bd7b4c75c0b7d86a57d6cbd16bd6a1c4b06dffa39157b6a9"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/GrantedPermissionProfile.ts",
+    "sha256": "8371f4208b11169274a7b46f2ecc464fc1ec7b153718a5420f64cbec262828cd"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationAction.ts",
+    "sha256": "2f0de09e3c4bf2e4afe28eb1175c73286270f5fdf527f4658bb0a7d43c03a7ab"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/McpServerElicitationRequestResponse.ts",
+    "sha256": "391007144a7dac5cdc57a065de5aaab130d4f7a45b5c9d7fae801c674498a3ee"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/Model.ts",
+    "sha256": "ff56f09e9b9f301f1c6ecc565e2bcf6355c6ea66880f3ac963b7754e74cbe0a3"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelAvailabilityNux.ts",
+    "sha256": "35f13293530e619e27a58f7b655e858083f80ad5dadd5bdc85430dba0f9a6da0"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListParams.ts",
+    "sha256": "9749040f93232fee23f044d307fd69eb08fea77eb6c56b1d04593d7533dd7bf4"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelListResponse.ts",
+    "sha256": "5969afbe718e9a6270fe1e4f58315d7dbffe2e2275973b9c93e5abb2e8daa675"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelServiceTier.ts",
+    "sha256": "c926a88f721864aa8fedf5c46b118d76baf58384aa880221d422d00759bb35a2"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ModelUpgradeInfo.ts",
+    "sha256": "0cd44f4b05d66c802b4f155afd7c3b976d6939913b57bd91635adf6e4511321a"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/MultiAgentVersion.ts",
+    "sha256": "ec8db72e668f2e8ff5b199aab03df8e31ac7fbb33edd63edd05aa1b38fe53771"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkAccess.ts",
+    "sha256": "3622aa2cccf2a1835cd561d97187db75eba8cc379c03e56b5d1c91ab901da9dc"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalContext.ts",
+    "sha256": "f5fb2588e2a7caf33d4d25f8f98e03f6abd58e1cfc65d6ae6d918536d417c825"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkApprovalProtocol.ts",
+    "sha256": "50489d7ee01bb75b2ad453e2f976e8b92a3334a973637c0c36ccd1c547a0d894"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkPolicyAmendment.ts",
+    "sha256": "2219666281d984a6edf51fcdbd93df7b88e4c51f4fe8a306989e68f430ffb2fe"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/NetworkPolicyRuleAction.ts",
+    "sha256": "8d6d5aa29ce47bdaec03eedc56543629344b9a424a293258116f44a212b507fc"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/PatchChangeKind.ts",
+    "sha256": "20e95907d698efbef2fa9d9ab00392b10caf127dfc5e0df1ba9878ad6f42531d"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionGrantScope.ts",
+    "sha256": "2ea29b4448c98516a2e1e4f5bbc22e95147ad46cbc0fd0c83377c2fa4db37f8d"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalParams.ts",
+    "sha256": "5194d16cf90887e54d65c66a0a380a97ee084685ccf5cc3cadad541f61e3c058"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/PermissionsRequestApprovalResponse.ts",
+    "sha256": "60259c885b04fe35e3596d74921b3ca8c8cba3cb5bd582305b9d90e14fff9930"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ReasoningEffortOption.ts",
+    "sha256": "5d1f91ca1bff16730604514f5d6a6102c74e5912af7f5c8fa474d6fcf8c90dde"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/RequestPermissionProfile.ts",
+    "sha256": "b79d118592a8d3281f00e3defa0eb4abc96da4b42387d6c4ccf0d8a5be60926e"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxMode.ts",
+    "sha256": "8a59381e04efa84f9001e5c24444ee26fccf8f9e10bcfb02d2f6a24e85898843"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/SandboxPolicy.ts",
+    "sha256": "f5a4b24c0de4945e77c1573306ae4cb98a29103a6c64ee23264dc9d35a977e85"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ServerRequestResolvedNotification.ts",
+    "sha256": "e428ba289071d7b2e04cedc8b3cd7e6adbe57409dbbc333c38178b316f122ec5"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/SortDirection.ts",
+    "sha256": "9ad2278213c1d99366e0ac2ecf6cbc069f9cf1090aafd4e71462a3945c14638a"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TextElement.ts",
+    "sha256": "a6f412c3f9875b39b021d6ad116ed9e887180f9d574720a76f031bfed66c5a93"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadReadParams.ts",
+    "sha256": "c24743cb5655b4c71a853a2a290412d78e1a27e0278f2a0cde9bd9d9b78118a8"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadResumeParams.ts",
+    "sha256": "02f6d2d99d1cfb42ca2ef4647d731fee0b3801c25a61451b41f041b97adff649"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadSource.ts",
+    "sha256": "d850342355769c7de914d16fb2e555056c30d46dd1a407ad1702b210244b58c4"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadStartParams.ts",
+    "sha256": "3a8e4943c6a9a86de42037096cedb86ac6abef491fb7ca424752663116c24fef"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadStartSource.ts",
+    "sha256": "7352677b98e02cd1bd82e764582a818f3f59574842444f13e61656261cfa2ea2"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadTokenUsage.ts",
+    "sha256": "27cae6c3e6c44696225e9a0903e0531c6eff126c6de3da2176bc5cdd904def4e"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadTokenUsageUpdatedNotification.ts",
+    "sha256": "53ce4421d686b8a7f9a86c5ad54de2a7dceecfb95df74fa5f441947e136f063d"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ThreadTurnsListParams.ts",
+    "sha256": "ff03522c5cd95e5dd0b03a6d918bf7c2453b491fb47b8109420d52fe9df619b3"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TokenUsageBreakdown.ts",
+    "sha256": "e983f21175fdfdf1a239e26cd8916e1cb765bc0cb7904e2bd9cc83ffe325c8a7"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ToolRequestUserInputAnswer.ts",
+    "sha256": "271fbffc377b53570fae244df734bb666cb902bdff633bf27842a5bdd7e3d628"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ToolRequestUserInputOption.ts",
+    "sha256": "ec2f4b008b872a96c8460f4a830b8d0c20b60ef0421541970e3db62f329ef485"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ToolRequestUserInputParams.ts",
+    "sha256": "0e3063b70a99b815e170b3c157416924315308a1c8af201dcc2f3fb459e4144a"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ToolRequestUserInputQuestion.ts",
+    "sha256": "d0eaa32baa3b41a8ee3a3b764e84ffd75f7474f385eebeb779fe61f18deb2b24"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/ToolRequestUserInputResponse.ts",
+    "sha256": "39e4959095a1b31de3f7bf28422a6536d51d651581ad1f50bc5e30c02140498b"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TurnInterruptParams.ts",
+    "sha256": "643034c3d25c23c7700236d4d1ff16286565786d48148e85b0c4761fe46d3804"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TurnItemsView.ts",
+    "sha256": "df5e5fd79e6c28ff89e5e201c761535d7988fbaa9caa5fc6bf71f655f353668c"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TurnStartParams.ts",
+    "sha256": "049f50eff62666ed07e171d8d0a8ec08e745f697d71972a4a169e4fb7b3682d2"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/TurnToolOutput.ts",
+    "sha256": "6cd2705dfb62b22df331f044ab73530cc37fe82c7c6f43ec5379208563b1343e"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/generated/0.153.4/v2/UserInput.ts",
+    "sha256": "20bb8914250b88e4831123fed101a7ea2336efab4c2b13fd6336651ff0c65808"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/history.ts",
+    "sha256": "cd939f374a12cbbe3546f4cbc51abdfb034ba3ac876d5c2291c88153acd08d14"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/human-input.ts",
+    "sha256": "2127e8bbb8bb698c4865b3358da997b86ae5d127aebae29c10d8a92014ec0a3b"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/isolation-evidence.md",
+    "sha256": "1f5bdd6b07b9fa074d7232d320054e088e3a9888e87e0102a7359acdc4a7dee7"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/isolation.ts",
+    "sha256": "f969a9d2e4157fbc4b16d659fc74ce6f2be1cbb990ab263fcfffef5829d540b0"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/models.ts",
+    "sha256": "6da7621d0a25f2b1f196e0e3406b2d76a539ec81858e179aa134cefca9a1adaf"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/permissions.ts",
+    "sha256": "8903c36a51c0aec2487a42a547e82a4dc3fadc0eb58ba4e7b45176fe95417a2c"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/stdio.ts",
+    "sha256": "6e7e77b3d7333b991fe0cf53e7b96d3cb480efb58c0c2ea14a94375b7d2080c4"
+  },
+  {
+    "path": "packages/harness-adapters/src/codex/telemetry.ts",
+    "sha256": "a8a81cfc03934f73ff2ad301d839bcdb4a24300bf063d6d6ef5e3386b6ba482b"
+  },
+  {
+    "path": "packages/harness-adapters/src/generic/README.md",
+    "sha256": "39768e66e77958f10525578f0f17e1561cbc9a8c6d31f5511befecae3ce08bee"
+  },
+  {
+    "path": "packages/harness-adapters/src/index.ts",
+    "sha256": "713f620d8c58e4272b49cc7abf3cb1650e9bb02d4ccdda3e160bfe8b98a1b136"
+  },
+  {
+    "path": "packages/harness-adapters/src/opencode/README.md",
+    "sha256": "9bae953c24c3b5375af1586dea34608b158f0c545895783049377d5ffdb1bdd6"
+  },
+  {
+    "path": "packages/harness-adapters/src/remote/README.md",
+    "sha256": "f9a4e79cec45f368f7e48db00b5b2b5ca45db96a160888205c37488ce8101503"
+  },
+  {
+    "path": "packages/harness-adapters/tsconfig.json",
+    "sha256": "094ccdd152fe871942a3fe090a9b9b9b4a8fbe4ea3884f8b0791c3d6884330dc"
+  },
+  {
+    "path": "packages/harness-control-plane/package.json",
+    "sha256": "8a1d490d5e71ed75cd0f40f1e06483be62db9dd3b2ebd6ca4b84edbe4f02653d"
+  },
+  {
+    "path": "packages/harness-control-plane/src/admission.ts",
+    "sha256": "609e3c3f3d1fdf31736f0b8612089994524fa9c37f0fcce360744239175046f7"
+  },
+  {
+    "path": "packages/harness-control-plane/src/artifacts.ts",
+    "sha256": "3602aeffdd8f2d6874b58a7744003b569f14743c24319613580e0aecfcf7a507"
+  },
+  {
+    "path": "packages/harness-control-plane/src/codex-probe.ts",
+    "sha256": "66a57a7ea321665d420e57d84b2bf49679835236e61f49096c4ece1b600653cc"
+  },
+  {
+    "path": "packages/harness-control-plane/src/environment.ts",
+    "sha256": "a796723dd60bb288d2f09804072ffb14e7749a7b5a1763ee51e59196dd307310"
+  },
+  {
+    "path": "packages/harness-control-plane/src/host.ts",
+    "sha256": "39397e3d4e5489085c8bf20ff7f001c418aba05570010551877d8ece439ae29c"
+  },
+  {
+    "path": "packages/harness-control-plane/src/index.ts",
+    "sha256": "1569d6d9d959d7f93029ac0a23a5c0786f017931e7bb4febb41bd7a3ee0a4efc"
+  },
+  {
+    "path": "packages/harness-control-plane/src/journal.ts",
+    "sha256": "85994a848c806afa719dd54dd57e69217b65d2de153fbabfad1c37d558cfecf7"
+  },
+  {
+    "path": "packages/harness-control-plane/src/review-content.ts",
+    "sha256": "6d985d0b60930a211f310309bb91944975f6fbb3f1609fafd34c8bfb45308df8"
+  },
+  {
+    "path": "packages/harness-control-plane/src/runtime-manager.ts",
+    "sha256": "1c8428b3b0fbcc326cfe308a7952b98ec73449a72f028c3f215b0a3f7645e489"
+  },
+  {
+    "path": "packages/harness-control-plane/src/skills.ts",
+    "sha256": "8305f34dd11e3a8547add6bb92bcf61b92aab2f7cf31c46e6ecfd802e5380024"
+  },
+  {
+    "path": "packages/harness-control-plane/src/workspaces.ts",
+    "sha256": "1af04799c2c2f83f8e4d8d3a3971ab2801583c9db8e09b2b7d84ceffcb3179be"
+  },
+  {
+    "path": "packages/harness-control-plane/tsconfig.json",
+    "sha256": "ba512c5fda7c59521e0caa56f18aba13b1e9786ca6f7e1f18ea4470dcf7ca1fd"
+  },
+  {
+    "path": "packages/harness-desktop/PACKAGING.md",
+    "sha256": "851c022b7df9f68a0ac8e3fee246d117a01ee081fde54c7b32bf6d3786cc13fc"
+  },
+  {
+    "path": "packages/harness-desktop/electron.vite.config.ts",
+    "sha256": "4bc1d057d1e4007acb430fec5025e2f4c36fab3891c51a973784a92eb3c26a2d"
+  },
+  {
+    "path": "packages/harness-desktop/licenses/BUN-LICENSE.md",
+    "sha256": "2c6160ec8fb853f7e8f97d9b249e756c9b0ac44860a68b6bf4f1b0bcbc5c3741"
+  },
+  {
+    "path": "packages/harness-desktop/licenses/MIME-DB-MIT.txt",
+    "sha256": "cc1dfd4dafa27271e8212cd3b274eeb3f262e40a6fdab36ddc3f9696f706f58b"
+  },
+  {
+    "path": "packages/harness-desktop/licenses/MIME-TYPES-MIT.txt",
+    "sha256": "71f83c4c0621102a56d9853812777b85751bce7e9726f686f5b056c1f8a4b0e6"
+  },
+  {
+    "path": "packages/harness-desktop/package.json",
+    "sha256": "59ee3153c584cf7a5475316c7245f86603eb3b1e8839640d78853f3963e506b0"
+  },
+  {
+    "path": "packages/harness-desktop/script/package-windows.ts",
+    "sha256": "65823817e634c2752a4b3c571fc4c608c4e942666a3a8e0027d87e87622ae951"
+  },
+  {
+    "path": "packages/harness-desktop/src/host/backend.ts",
+    "sha256": "0a85406a5734ca394f361345f0b27ac229a0f28d0372152e9ce38c3f377217af"
+  },
+  {
+    "path": "packages/harness-desktop/src/host/conversations.ts",
+    "sha256": "3b78f48f9f24ca119955b7260fdfc908337b5f8a5d4d564961c7dcfdc30d0319"
+  },
+  {
+    "path": "packages/harness-desktop/src/host/worker.ts",
+    "sha256": "3e62a8a6f1143b008a571f1a0f8f592f062d6fd1631883b9d621471aa41cd7f0"
+  },
+  {
+    "path": "packages/harness-desktop/src/host/workspace-files.ts",
+    "sha256": "205e329f074b62f226e9ef596482ca9227ff026ae4f49b6b26c38f784074ad7d"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/copy.ts",
+    "sha256": "60afebc42b7618b6aa997fc1d9fcc45b38e13dcdcccf39ce346fcf1120c37770"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/host-client.ts",
+    "sha256": "29de693ed68976ca424eef3f4f3a6df24aa681a343e533ae0986c49771b48d09"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/index.ts",
+    "sha256": "2a433fb6bea38f2ec925738e0f5e940abbbf1e01c131b25ad5a3cd2f93ab1de9"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/ipc.ts",
+    "sha256": "e1b4fca5a9a399d26e465db9380936dd5818c75e523585a59f43a173d845341e"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/security.ts",
+    "sha256": "4329f4146548dc56b89b885cdf68b223702c272d189094570ac0e520d17dcd1f"
+  },
+  {
+    "path": "packages/harness-desktop/src/main/vault.ts",
+    "sha256": "b42a7b8b67320e3bab79d0214aafcf60d4890dc5f98fff6b6c1b995f9e754db9"
+  },
+  {
+    "path": "packages/harness-desktop/src/preload/bridge.ts",
+    "sha256": "457391ff4e65252ab5efad4ccc6f83ec8935f1739f5068a01b863d0ccc29644b"
+  },
+  {
+    "path": "packages/harness-desktop/src/preload/index.ts",
+    "sha256": "f7e16afc3063c46f737c3e955a4b6e583f3d4a478539ed96e1bd1d7013cd50a4"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/app.tsx",
+    "sha256": "18afe8b077377fb8769304ae3c5b000802b69523209b8d264713bb6cf91f8294"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/copy.ts",
+    "sha256": "5d88679d90e3686f880ecc63e8dd1f1f3b23074ec52ba0a99c8dddaefd93fefe"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/icons.tsx",
+    "sha256": "9df83a0386580c0326692207e54ccffb7288dd1f7b810a06b0a35812bb007e7d"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/index.html",
+    "sha256": "820a562d02034bda207425fc54d1c8a913578d75057cb0c0d57380b244cc3f6b"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/index.tsx",
+    "sha256": "d9b04fd33dd2a9fa6c1970c30b2bfce226c167be85a3f53e3a459bf9cba11c6c"
+  },
+  {
+    "path": "packages/harness-desktop/src/renderer/styles.css",
+    "sha256": "e28e8207b8f81f19adc8565fd1bba8d3e66a23592ce7b8bae6df0c54828ee342"
+  },
+  {
+    "path": "packages/harness-desktop/src/shared/contracts.ts",
+    "sha256": "f811b83e31b84c39facbfcb3a87a04b23e9f9dde7973b77470fa07789c3f0ecb"
+  },
+  {
+    "path": "packages/harness-desktop/src/shared/requests.ts",
+    "sha256": "08ad1c9168a1215ab73d715ab359131936d62332ee00bbff4c214ce2b5844380"
+  },
+  {
+    "path": "packages/harness-desktop/tsconfig.json",
+    "sha256": "6be4ed5f60ba299063dc319523f941ec3393d82b6efadc2c1cf6c298ce298b45"
+  },
+  {
+    "path": "packages/harness-protocol/package.json",
+    "sha256": "a2090444602b074322ec4b1cc40b8e0f734fa12f3611ad57a88434dc616a3c8d"
+  },
+  {
+    "path": "packages/harness-protocol/src/capabilities.ts",
+    "sha256": "34c1313d6b7e206efe65e05587a72ba03260077c42fc3cc048c5d29b9422f5d9"
+  },
+  {
+    "path": "packages/harness-protocol/src/collaboration.ts",
+    "sha256": "f0cc32bf7dad6b7b4d2085860c326e6ce50dfdb696e3d4d74d9ce81a7831fb41"
+  },
+  {
+    "path": "packages/harness-protocol/src/common.ts",
+    "sha256": "f9b2a33c769b4f0a3977d62f080fb035b5e8ce7a343467ba328d462bd568720e"
+  },
+  {
+    "path": "packages/harness-protocol/src/events.ts",
+    "sha256": "6443bfca85ee3e9d740ed8779a70a4f91b5acd1c6fe388bd7a19c96193d15078"
+  },
+  {
+    "path": "packages/harness-protocol/src/index.ts",
+    "sha256": "73b91348f0b6a92c5d3fa52921fd6519c6926963f8bf52996ccaf0789ab745d2"
+  },
+  {
+    "path": "packages/harness-protocol/src/permissions.ts",
+    "sha256": "08361d714ac2dbe055d1c73d5b1c09444e24f17fa67ef6e3280172f040e2c510"
+  },
+  {
+    "path": "packages/harness-protocol/src/remote.ts",
+    "sha256": "a6c351844955692a0fdea4c0c533c48600965e5dbc3050b4a22ce642ca695014"
+  },
+  {
+    "path": "packages/harness-protocol/src/runtime.ts",
+    "sha256": "790547cb50333551d26f6b3524b95f7dfa59e7c4f946a627b81f62271a3fc287"
+  },
+  {
+    "path": "packages/harness-protocol/src/session.ts",
+    "sha256": "79b2f83334d2fcc4edada9e44834913a8643a508b972ce51c037995076aae9b3"
+  },
+  {
+    "path": "packages/harness-protocol/src/skills.ts",
+    "sha256": "61b74be6e8b6f4d2eb021e8d4e4fbf122888320e6ca02043ca4b4ac0cbf847aa"
+  },
+  {
+    "path": "packages/harness-protocol/src/usage.ts",
+    "sha256": "d789d3d3deba8cc365dbafdfbafb2ff5df7cb33bede195fa24aba0473705d44d"
+  },
+  {
+    "path": "packages/harness-protocol/tsconfig.json",
+    "sha256": "a9016bd9ccb292d8c9d9dc2735e8f262dc3ed1cc6de1c77440de74447da8dba9"
+  }
+]

@@ -1,0 +1,86 @@
+{
+  "recordedAt": "2026-09-07T09:49:08.583Z",
+  "baseCommit": "569e426",
+  "change": "Correct native Codex automatic patch approval by using read-only sessions with untrusted approvals and disabled shell tools; disclose execution limits in the desktop.",
+  "nativeCodexVersion": "0.153.4",
+  "codex": {
+    "log": "v1-codex-approval-regression.log",
+    "passed": 299,
+    "failed": 0,
+    "assertions": 987
+  },
+  "desktop": {
+    "log": "v1-rc2-desktop-tests.log",
+    "passed": 91,
+    "failed": 0,
+    "assertions": 591,
+    "skipped": 1,
+    "skipReason": "POSIX file modes do not apply on Windows"
+  },
+  "ui": {
+    "log": "v1-rc2-ui-tests.log",
+    "passed": 20
+  },
+  "typechecks": [
+    {
+      "log": "v1-rc2-adapters-typecheck.log",
+      "exitCode": 0
+    },
+    {
+      "log": "v1-rc2-desktop-typecheck.log",
+      "exitCode": 0
+    }
+  ],
+  "unchangedPackages": "Control-plane, protocol and Claude runtime production sources are unchanged from the separately recorded RC1 validation; their full suites were not repeated.",
+  "quality": {
+    "format": {
+      "exitCode": 0,
+      "files": 128
+    },
+    "lint": {
+      "exitCode": 0,
+      "files": 111,
+      "errors": 0,
+      "warnings": 493
+    },
+    "preservation": {
+      "modifiedUpstreamFiles": ["SECURITY.md", "bun.lock"],
+      "mitUnchanged": true,
+      "securitySuffixUnchanged": true,
+      "generatedHashes": 84,
+      "preservedPriorHashes": 81,
+      "priorLockResolutionsMissing": []
+    }
+  },
+  "windowsPackage": {
+    "evidence": "v1-rc2-package-results.json",
+    "archive": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc2-44d4bf45.zip",
+    "sha256": "24e4127f90c2634dcde02c3afe56f73fcc9ebc1eee7ab7882c8d1c4abd5630f1",
+    "bytes": 186544738,
+    "manifestSha256": "95b54c3cfd61c8b5681d58e7ac0195d262e8d3f7300b9f077bd237a3372c8ebe"
+  },
+  "live": {
+    "evidence": "v1-live-results.json",
+    "budgets": [
+      {
+        "runtime": "codex",
+        "limit": 4,
+        "reservedAttempts": 4
+      },
+      {
+        "runtime": "claude",
+        "limit": 4,
+        "reservedAttempts": 0
+      }
+    ],
+    "codexCorrectedPermissionChecksPassed": true,
+    "codexContinuationPassed": true,
+    "claude": "No prompts sent; native auth status reports signed out. User was asked to restore native sign-in."
+  },
+  "remainingLimits": [
+    "Codex requires supplied file context; native repository browsing and shell/test execution are disabled.",
+    "Claude execution and standalone Skill live acceptance require restored native subscription sign-in.",
+    "Provider extra usage, OS enforcement and cross-process fencing remain unverified.",
+    "Unsigned portable Windows candidate; no public push or publication performed."
+  ]
+}

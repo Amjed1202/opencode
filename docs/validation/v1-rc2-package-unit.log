@@ -1,0 +1,16 @@
+bun test v1.3.14 (0d9b296a)
+
+test\unit\package-windows.test.ts:
+Creating portable archive: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\harness\packages\harness-desktop\test-results\package-unit-h7k8cK\zip-build-a1f8adcf.zip
+Creating portable archive: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\harness\packages\harness-desktop\test-results\package-unit-h7k8cK\zip-build-b3df6ed7.zip
+(pass) portable package boundaries > creates a unique ZIP preserving the package folder and writes its SHA-256 [673.08ms]
+(pass) portable package boundaries > rejects equal, sibling, relative and escaping destinations [0.38ms]
+(pass) portable package boundaries > copies only the built application, then hashes all assembled files deterministically [18.75ms]
+(pass) portable package boundaries > copies a hard-linked dependency notice into an independent package file [3.17ms]
+(pass) portable package boundaries > refuses credential/cache files, incomplete builds and unresolved external dependencies [15.78ms]
+(pass) portable package boundaries > rejects directory links and escaping copy plans [2.35ms]
+
+ 6 pass
+ 0 fail
+ 29 expect() calls
+Ran 6 tests across 1 file. [757.00ms]

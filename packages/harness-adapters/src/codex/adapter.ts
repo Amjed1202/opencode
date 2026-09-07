@@ -105,6 +105,8 @@ const isolatedConfiguration = {
   "features.enable_mcp_apps": false,
   "features.shell_snapshot": false,
   "features.shell_snapshot_v2": false,
+  // Saved native exec-policy allow rules can bypass even a read-only sandbox.
+  "features.shell_tool": false,
   "features.multi_agent": false,
   "features.multi_agent_v2": false,
   "features.skill_mcp_dependency_install": false,
@@ -417,18 +419,9 @@ export class CodexAdapter implements AgentAdapter {
         ),
         model: context.session.intent.selection.model.modelId,
         cwd: this.options.cwd,
-        approvalPolicy: context.session.intent.policy.approval === "ask" ? "on-request" : "never",
+        approvalPolicy: context.session.intent.policy.approval === "ask" ? "untrusted" : "never",
         approvalsReviewer: "user",
-        sandboxPolicy:
-          context.session.intent.policy.filesystem === "read-only"
-            ? { type: "readOnly", networkAccess: false }
-            : {
-                type: "workspaceWrite",
-                writableRoots: [this.options.cwd],
-                networkAccess: false,
-                excludeTmpdirEnvVar: true,
-                excludeSlashTmp: true,
-              },
+        sandboxPolicy: { type: "readOnly", networkAccess: false },
         serviceTierForTurn: "default",
       } satisfies TurnStartParams
       owned.awaitingAck = true
@@ -892,9 +885,11 @@ export class CodexAdapter implements AgentAdapter {
       model: request.intent.selection.model.modelId,
       modelProvider: "openai",
       cwd: this.options.cwd,
-      approvalPolicy: request.intent.policy.approval === "ask" ? "on-request" : "never",
+      approvalPolicy: request.intent.policy.approval === "ask" ? "untrusted" : "never",
       approvalsReviewer: "user",
-      sandbox: request.intent.policy.filesystem,
+      // Host workspace-write permits reviewed patches; it must never become blanket native write authority.
+      // Native workspace-write also persists project trust. Read-only plus untrusted gates patches before writes.
+      sandbox: "read-only",
       serviceTier: "default",
       config: {
         sandbox_workspace_write: {
@@ -927,17 +922,10 @@ export class CodexAdapter implements AgentAdapter {
       response.approvalsReviewer !== "user" ||
       !isRecord(response.sandbox) ||
       response.sandbox.networkAccess !== false ||
-      response.sandbox.type !== (params.sandbox === "read-only" ? "readOnly" : "workspaceWrite")
+      response.sandbox.type !== "readOnly" ||
+      Object.keys(response.sandbox).some((key) => !["type", "networkAccess"].includes(key))
     )
       throw new Error("Native effective thread settings differ from admission")
-    if (
-      response.sandbox.type === "workspaceWrite" &&
-      (!Array.isArray(response.sandbox.writableRoots) ||
-        response.sandbox.writableRoots.some((root) => typeof root !== "string" || !samePath(root, this.options.cwd)) ||
-        response.sandbox.excludeTmpdirEnvVar !== true ||
-        response.sandbox.excludeSlashTmp !== true)
-    )
-      throw new Error("Native writable roots exceed requested workspace")
     const session: AgentSession = {
       id: request.sessionId,
       workspaceId: request.workspace.id,

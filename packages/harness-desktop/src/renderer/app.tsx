@@ -424,6 +424,9 @@ export function App() {
             <option disabled>{copy.openCodePending}</option>
           </select>
           <p class="sidebar-description">{executionAvailable() ? copy.nativeSubscription : copy.connectionChecks}</p>
+          <Show when={runtime() === "codex"}>
+            <p class="sidebar-description">{copy.codexExecutionScope}</p>
+          </Show>
         </section>
         <footer class="sidebar-footer">
           <Icon name="shield" size={14} />

@@ -1,5 +1,28 @@
 # Validation and known issues
 
+## RC2 and live V1 continuation
+
+On 2026-09-07, live acceptance exposed and corrected automatic Codex patch approval. The adapter now keeps native execution read-only, requests per-patch approval and disables native shell tools. The desktop explains that callers must supply file contents and run commands/tests separately. [Independent review](docs/validation/v1-codex-approval-review.md), [exact acceptance limits](V1_STATUS.md).
+
+| Check                                   | Result                                                                                              | Evidence                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Codex regression suite                  | 299 pass, 987 assertions                                                                            | [Log](docs/validation/v1-codex-approval-regression.log)                                                               |
+| Desktop unit/process suite              | 91 pass, 1 Windows skip, 591 assertions                                                             | [Log](docs/validation/v1-rc2-desktop-tests.log)                                                                       |
+| Desktop browser fixtures                | 20 pass                                                                                             | [Log](docs/validation/v1-rc2-ui-tests.log)                                                                            |
+| Changed-package typechecks              | Adapters and desktop pass                                                                           | [Results](docs/validation/v1-rc2-results.json)                                                                        |
+| Windows package                         | Build, 6 packaging tests, development and portable startup pass; all ZIP bytes match                | [Package evidence](docs/validation/v1-rc2-package-evidence.md)                                                        |
+| Source quality and preservation         | 128 files format clean, 0 lint errors / 493 warnings; 84 generated hashes match, prior 81 unchanged | [Quality](docs/validation/v1-rc2-quality.json)                                                                        |
+| Actual Codex subscription task          | Denial, exact protected approval, fixed tests, interruption, restart/history and exact resume pass  | [Live results](docs/validation/v1-live-results.json), [fixed tests](docs/validation/v1-codex-live-fixture-tests.json) |
+| Actual Claude subscription task / Skill | Blocked before prompt: native signed out; 0 of 4 approved prompts used                              | [Sanitized native status](docs/validation/v1-claude-signed-out.json)                                                  |
+
+The original failed Codex attempt remains recorded. Its native-created fixture trust entry was removed exactly. The corrected fixture acquired no trust entry. The corrected edit run's first host test subprocess failure has an unknown cause because it did not retain diagnostics; independent and final-continuation fixed tests pass. The continuation also corrected an overly strict runner assumption about unloaded native state, without weakening production recovery rules. Detached state remains unknown; complete terminal turn counts were 2 before the final prompt, 3 after interruption, and still 3 after exact resume. Earlier outcomes and encrypted review rows were preserved.
+
+Codex used exactly four approved host prompts across retries. No further Codex prompts are authorized by that budget. Claude remains at zero and needs native login restored before new status/model checks and execution. Provider overage, current quota, OS enforcement and cross-process fencing remain unverified. No credentials were imported, no API fallback was enabled, and no public push or publication occurred.
+
+RC2 is the replacement unsigned portable candidate. RC1's ZIP, manifest, package bytes and screenshots remain unchanged. Control-plane, protocol and Claude production sources did not change in RC2; their earlier full-suite evidence below is retained rather than represented as a fresh run. [RC2 result record](docs/validation/v1-rc2-results.json).
+
+## RC1 local validation
+
 The desktop V1 candidate was checked on **2026-09-07**, Windows x64, Bun **1.3.14**, Node **24.14.1**, Electron **42.3.3**. It adds restricted native Claude execution/Skills, saved conversations, explicit recovery/resume, file/diff previews, observed usage and a portable Windows artifact. [Acceptance and limits](V1_STATUS.md).
 
 | Final check                                               | Result                                                                                        | Evidence                                                                                                                     |
