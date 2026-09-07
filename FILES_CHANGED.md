@@ -4,7 +4,7 @@ The fork adds architecture and four Harness packages with independent Codex/Clau
 
 Compared with pinned OpenCode v1.18.29, only two preexisting tracked files change: SECURITY.md retains the original policy suffix beneath Harness policy, and bun.lock adds Harness workspaces/dependencies with Bun hoisting changes. Prior locked resolution tuples, upstream functional source, root manifests and MIT notices remain preserved. All 84 native generated types match provenance; the prior 81 hashes are unchanged.
 
-There are **457 cumulative changed/added files** below. All other differences are additions relative to the pinned release. Runtime binaries, caches, build output, portable folders/archives and scratch data stay outside the source commit. Validation artifacts contain bounded fixture or sanitized diagnostic evidence.
+There are **458 cumulative changed/added files** below. All other differences are additions relative to the pinned release. Runtime binaries, caches, build output, portable folders/archives and scratch data stay outside the source commit. Validation artifacts contain bounded fixture or sanitized diagnostic evidence.
 
 ## Exact cumulative inventory
 
@@ -26,6 +26,7 @@ There are **457 cumulative changed/added files** below. All other differences ar
 - [TELEMETRY.md](TELEMETRY.md)
 - [UPSTREAM_STRATEGY.md](UPSTREAM_STRATEGY.md)
 - [V1_CLAUDE.md](V1_CLAUDE.md)
+- [V1_HANDOFF.md](V1_HANDOFF.md)
 - [V1_STATUS.md](V1_STATUS.md)
 - [VALIDATION.md](VALIDATION.md)
 - [bun.lock](bun.lock)
