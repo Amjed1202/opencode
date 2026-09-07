@@ -12,7 +12,13 @@ import type { InteractionReview } from "@harness/protocol"
 import { StdioJsonRpc } from "../../../harness-adapters/src/codex/stdio"
 import { removeFixtureDirectory } from "../../../harness-control-plane/test/support"
 import { DesktopBackend } from "../../src/host/backend"
-import type { DesktopConfiguration, DesktopState, StartSessionInput } from "../../src/shared/contracts"
+import type {
+  DesktopConfiguration,
+  DesktopState,
+  StartSessionInput,
+  WorkspaceFileList,
+  WorkspaceFilePreview,
+} from "../../src/shared/contracts"
 
 const start: StartSessionInput = {
   modelId: "gpt-5.4",
@@ -22,6 +28,7 @@ const start: StartSessionInput = {
 }
 
 async function fixture(scenario = "normal") {
+  let nativeScenario = scenario
   const directory = await mkdtemp(join(tmpdir(), "harness-desktop-backend-"))
   const workspace = join(directory, "workspace")
   const storage = join(directory, "storage")
@@ -50,6 +57,7 @@ async function fixture(scenario = "normal") {
     claudeAdapterFactory: (options: ConstructorParameters<typeof ClaudeAdapter>[0]) =>
       new ClaudeAdapter({
         ...options,
+        policyCheck: async () => {},
         inspectorFactory: (options) =>
           new NativeClaudeInspector({
             ...options,
@@ -73,7 +81,7 @@ async function fixture(scenario = "normal") {
             command: [
               process.execPath,
               resolve(import.meta.dir, "../../../harness-adapters/test/codex/app-server-peer.ts"),
-              scenario,
+              nativeScenario,
               ...options.command.slice(1),
             ],
           })
@@ -98,6 +106,9 @@ async function fixture(scenario = "normal") {
     transports,
     inspections,
     disposals: () => disposals,
+    scenario(value: string) {
+      nativeScenario = value
+    },
     backend: () => backend,
     async configure() {
       return (await backend.dispatch("configure", configuration)) as DesktopState
@@ -143,8 +154,258 @@ async function rejection(promise: Promise<unknown>) {
   expect(result).toBeInstanceOf(Error)
 }
 
+test("closing and viewing history invalidate file baselines and stale file handles", async () => {
+  const state = await fixture()
+  try {
+    await writeFile(join(state.workspace, "review.txt"), "before")
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const started = (await state.backend().dispatch("start", start)) as DesktopState
+    await writeFile(join(state.workspace, "review.txt"), "after")
+    const attached = (await state.backend().dispatch("listFiles")) as WorkspaceFileList
+    expect(attached.baseline).toBe("session-start")
+    await state.backend().dispatch("detachConversation")
+    await rejection(state.backend().dispatch("previewFile", { fileId: attached.items[0]!.id }))
+    await state.backend().dispatch("viewConversation", { sessionId: started.session!.id })
+    const detached = (await state.backend().dispatch("listFiles")) as WorkspaceFileList
+    expect(detached.baseline).toBe("unavailable")
+    expect(detached.items[0]!.change).toBe("unknown")
+  } finally {
+    await state.close()
+  }
+})
+
+test("same-launch shutdown and exact reconciliation release the old writer for a new conversation", async () => {
+  const state = await fixture("hold")
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const first = (await state.backend().dispatch("start", start)) as DesktopState
+    const sessionId = first.session!.id
+    await state.backend().dispatch("send", { text: "Known active writer" })
+    await state.backend().dispatch("detachConversation")
+    await state.backend().dispatch("refresh")
+    await state.backend().dispatch("viewConversation", { sessionId })
+    await state.backend().dispatch("inspectConversation", { sessionId })
+    const settled = (await state.backend().dispatch("reconcileConversation", { sessionId })) as DesktopState
+    expect(settled.conversations!.items.find((item) => item.id === sessionId)?.status).toBe("idle")
+    const second = (await state.backend().dispatch("start", start)) as DesktopState
+    expect(second.session!.id).not.toBe(sessionId)
+    expect(second.conversations!.items).toHaveLength(2)
+    expect((await state.nativeState()).turns).toBe(0)
+  } finally {
+    await state.close()
+  }
+})
+
+test("a failed native close still disposes the adapter and detaches the uncertain conversation", async () => {
+  const state = await fixture("hold")
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const first = (await state.backend().dispatch("start", start)) as DesktopState
+    await state.backend().dispatch("send", { text: "Transport will close" })
+    await state.transports.at(-1)!.close()
+    await state
+      .backend()
+      .dispatch("detachConversation")
+      .catch(() => undefined)
+    expect(state.disposals()).toBe(1)
+    expect((await state.state()).session).toBeUndefined()
+    expect((await state.state()).conversations!.items.find((item) => item.id === first.session!.id)?.status).toBe(
+      "uncertain",
+    )
+  } finally {
+    await state.close()
+  }
+})
+
+test("an assistant message cannot overwrite a user message with the same native item identity", async () => {
+  const state = await fixture("hold")
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    await state.backend().dispatch("start", start)
+    const sent = (await state.backend().dispatch("send", { text: "Original user text" })) as DesktopState
+    const id = sent.messages.find((message) => message.role === "user")!.id
+    await state.transports.at(-1)!.request("fixture/notification", {
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: { type: "agentMessage", id, text: "Assistant text", phase: "final_answer" },
+      },
+    })
+    const shown = await until(state.state, (value) =>
+      value.activity.some((item) => item.kind === "assistant.text.completed"),
+    )
+    expect(shown.messages).toContainEqual({ id, role: "user", text: "Original user text" })
+    expect(shown.messages).toContainEqual({ id, role: "assistant", text: "Assistant text" })
+  } finally {
+    await state.close()
+  }
+})
+
+test("a failed resume remains uncertain after shutdown and native inspection without another model dispatch", async () => {
+  const state = await fixture()
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const first = (await state.backend().dispatch("start", start)) as DesktopState
+    const sessionId = first.session!.id
+    await state.backend().dispatch("detachConversation")
+    state.scenario("thread-provider")
+    await state.backend().dispatch("refresh")
+    await state.backend().dispatch("viewConversation", { sessionId })
+    await rejection(
+      state
+        .backend()
+        .dispatch("resumeConversation", { sessionId, acknowledgeOverage: true, acknowledgeUnverifiedBoundary: true }),
+    )
+    expect((await state.state()).conversations!.items.find((item) => item.id === sessionId)?.status).toBe("uncertain")
+    await state.backend().dispatch("detachConversation")
+    state.scenario("normal")
+    await state.backend().dispatch("refresh")
+    await state.backend().dispatch("inspectConversation", { sessionId })
+    const inspected = (await state.backend().dispatch("reconcileConversation", { sessionId })) as DesktopState
+    expect(inspected.conversations!.items.find((item) => item.id === sessionId)?.status).toBe("uncertain")
+    await rejection(state.backend().dispatch("start", start))
+    expect((await state.nativeState()).requests).not.toContain("thread/start")
+    expect((await state.nativeState()).requests).not.toContain("thread/resume")
+    expect((await state.nativeState()).turns).toBe(0)
+  } finally {
+    await state.close()
+  }
+})
+
+test("V1 history survives restart, opens without replay, and explicitly resumes the same native thread", async () => {
+  const state = await fixture()
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const started = (await state.backend().dispatch("start", start)) as DesktopState
+    const sessionId = started.session!.id
+    await state.backend().dispatch("send", { text: "Remember this local fixture input" })
+    await until(
+      state.state,
+      (value) => value.session?.status === "idle" && value.messages.some((message) => message.text === "Hello"),
+    )
+    const detached = (await state.backend().dispatch("detachConversation")) as DesktopState
+    expect(detached.session).toBeUndefined()
+    expect(detached.conversations!.items[0]).toMatchObject({ id: sessionId, status: "closed", compatible: true })
+    await state.reopen()
+    await state.configure()
+    const history = (await state.backend().dispatch("viewConversation", { sessionId })) as DesktopState
+    expect(history.session).toBeUndefined()
+    expect(history.messages.map((message) => message.text)).toEqual(["Remember this local fixture input", "Hello"])
+    expect(history.history).toEqual({ id: sessionId, partial: true, unconfirmedMessages: 0 })
+    await state.backend().dispatch("refresh")
+    expect((await state.nativeState()).turns).toBe(0)
+    await rejection(
+      state
+        .backend()
+        .dispatch("resumeConversation", { sessionId, acknowledgeOverage: false, acknowledgeUnverifiedBoundary: true }),
+    )
+    const resumed = (await state.backend().dispatch("resumeConversation", {
+      sessionId,
+      acknowledgeOverage: true,
+      acknowledgeUnverifiedBoundary: true,
+    })) as DesktopState
+    expect(resumed.session).toMatchObject({ id: sessionId, status: "idle" })
+    expect(resumed.messages.filter((message) => message.role === "assistant")).toHaveLength(1)
+    expect((await state.nativeState()).requests).toContain("thread/resume")
+    expect((await state.nativeState()).turns).toBe(0)
+    await rejection(state.backend().dispatch("viewConversation", { sessionId }))
+  } finally {
+    await state.close()
+  }
+})
+
+test("V1 native inspection and reconciliation are explicit and cannot resend uncertain input", async () => {
+  const state = await fixture("hold")
+  try {
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    const started = (await state.backend().dispatch("start", start)) as DesktopState
+    const sessionId = started.session!.id
+    await state.backend().dispatch("send", { text: "Held fixture turn" })
+    await state.reopen()
+    await state.configure()
+    await state.backend().dispatch("viewConversation", { sessionId })
+    await state.backend().dispatch("refresh")
+    await rejection(
+      state
+        .backend()
+        .dispatch("resumeConversation", { sessionId, acknowledgeOverage: true, acknowledgeUnverifiedBoundary: true }),
+    )
+    await rejection(state.backend().dispatch("reconcileConversation", { sessionId }))
+    const inspected = (await state.backend().dispatch("inspectConversation", { sessionId })) as DesktopState
+    expect(inspected.inspection).toMatchObject({ sessionId, nativeState: "idle", terminalTurns: 1 })
+    expect(inspected.conversations!.items[0]!.status).toBe("uncertain")
+    const reconciled = (await state.backend().dispatch("reconcileConversation", { sessionId })) as DesktopState
+    expect(reconciled.conversations!.items[0]!.status).toBe("idle")
+    expect((await state.nativeState()).turns).toBe(0)
+    expect(reconciled.session).toBeUndefined()
+  } finally {
+    await state.close()
+  }
+})
+
+test("V1 displays bounded workspace files and native cumulative telemetry without inventing charges or context occupancy", async () => {
+  const state = await fixture("hold")
+  try {
+    await writeFile(join(state.workspace, "example.txt"), "before\n")
+    await state.configure()
+    await state.backend().dispatch("refresh")
+    await state.backend().dispatch("start", start)
+    await writeFile(join(state.workspace, "example.txt"), "after\n")
+    const files = (await state.backend().dispatch("listFiles")) as WorkspaceFileList
+    expect(files.items[0]).toMatchObject({ path: "example.txt", change: "modified" })
+    const preview = (await state
+      .backend()
+      .dispatch("previewFile", { fileId: files.items[0]!.id })) as WorkspaceFilePreview
+    expect(preview.diff).toContain("-before\n+after")
+    expect(() => state.backend().dispatch("previewFile", { fileId: "C:/secret" })).toThrow()
+    await state.backend().dispatch("send", { text: "Telemetry fixture" })
+    const counts = {
+      totalTokens: 150,
+      inputTokens: 100,
+      cachedInputTokens: 20,
+      cacheWriteInputTokens: 10,
+      outputTokens: 50,
+      reasoningOutputTokens: 5,
+    }
+    const observation = {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      tokenUsage: { total: counts, last: counts, modelContextWindow: 200000 },
+      secret: "not-retained",
+    }
+    for (let index = 0; index < 2; index++)
+      await state.transports
+        .at(-1)!
+        .request("fixture/notification", { method: "thread/tokenUsage/updated", params: observation })
+    const shown = await until(state.state, (value) => value.usage?.tokens?.input === 100)
+    expect(shown.usage).toMatchObject({
+      basis: "cumulative",
+      accountingScope: "session",
+      tokens: { input: 100, output: 50 },
+    })
+    expect(shown.usage?.costs).toBeUndefined()
+    expect(shown.context).toMatchObject({ usedTokens: null, capacityTokens: 200000, compactions: null })
+    expect(JSON.stringify(shown)).not.toContain("not-retained")
+    await state.transports.at(-1)!.request("fixture/notification", {
+      method: "thread/tokenUsage/updated",
+      params: { ...observation, tokenUsage: { ...observation.tokenUsage, total: { ...counts, inputTokens: -10 } } },
+    })
+    expect((await state.state()).usage?.tokens?.input).toBe(100)
+  } finally {
+    await state.close()
+  }
+})
+
 describe("desktop backend through the pinned local stdio fixture", () => {
-  test("runtime switching clears native roots and Claude sign-in never enables execution or exposes native status fields", async () => {
+  test("runtime switching clears native roots and an unverified Claude account profile cannot enable execution or expose native status fields", async () => {
     const state = await fixture()
     try {
       await state.configure()
@@ -169,9 +430,8 @@ describe("desktop backend through the pinned local stdio fixture", () => {
       const checked = (await state.backend().dispatch("refresh")) as DesktopState
       expect(checked.connection).toMatchObject({
         runtimeName: "Claude Code",
-        runtimeVersion: "2.1.251",
         status: "blocked",
-        authentication: "authenticated",
+        authentication: "unknown",
         billing: "unknown",
         providerOverage: "unknown",
       })

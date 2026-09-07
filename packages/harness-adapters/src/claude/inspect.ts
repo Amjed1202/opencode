@@ -3,8 +3,14 @@ import type { ChildProcessByStdio } from "node:child_process"
 import type { Readable } from "node:stream"
 import { lstat, realpath } from "node:fs/promises"
 import { delimiter, isAbsolute, resolve } from "node:path"
+import { createHash } from "node:crypto"
 
 export const PINNED_CLAUDE_VERSION = "2.1.251"
+export interface ClaudeSubscriptionObservation {
+  readonly accountId: string
+  readonly emailHash: string
+  readonly personalSubscription: true
+}
 export interface ClaudeInspectionOptions {
   readonly executable: string
   /** Private host directory, not an untrusted repository. */
@@ -99,6 +105,48 @@ export class NativeClaudeInspector {
     // Auth method, provider, account identifiers, paths and all unknown fields stay private.
     // A signed-in native account is not evidence of subscription billing or safe effective settings.
     return { loggedIn: value.loggedIn }
+  }
+
+  /** Pinned native projection. Values and account identifiers never leave this inspector. */
+  async subscriptionStatus(): Promise<ClaudeSubscriptionObservation> {
+    const result = await this.run(["auth", "status"])
+    let value: unknown
+    try {
+      value = JSON.parse(result.stdout)
+    } catch {
+      throw new Error("Invalid Claude subscription observation")
+    }
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      !("loggedIn" in value) ||
+      value.loggedIn !== true ||
+      result.code !== 0 ||
+      !("authMethod" in value) ||
+      value.authMethod !== "claude.ai" ||
+      !("apiProvider" in value) ||
+      value.apiProvider !== "firstParty" ||
+      !("subscriptionType" in value) ||
+      !["pro", "max"].includes(String(value.subscriptionType)) ||
+      ("apiKeySource" in value && value.apiKeySource !== undefined && value.apiKeySource !== null) ||
+      !("email" in value) ||
+      typeof value.email !== "string" ||
+      !value.email ||
+      value.email.length > 320 ||
+      !("orgId" in value) ||
+      typeof value.orgId !== "string" ||
+      !value.orgId ||
+      value.orgId.length > 128
+    )
+      throw new Error("Claude personal subscription route is unavailable")
+    return {
+      accountId: createHash("sha256")
+        .update(JSON.stringify([value.email.toLowerCase(), value.orgId]))
+        .digest("hex"),
+      emailHash: createHash("sha256").update(value.email.toLowerCase()).digest("hex"),
+      personalSubscription: true,
+    }
   }
 
   private async run(args: readonly string[]) {
@@ -210,6 +258,7 @@ export class NativeClaudeInspector {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
     } catch {
       this.disposed = true
+      throw new Error("Claude diagnostic termination is unconfirmed")
     }
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
@@ -220,7 +269,10 @@ export class NativeClaudeInspector {
         }),
       ])
       // An unconfirmed shutdown cannot overlap another diagnostic.
-      if (!complete) this.disposed = true
+      if (!complete) {
+        this.disposed = true
+        throw new Error("Claude diagnostic termination is unconfirmed")
+      }
     } finally {
       clearTimeout(timer)
     }

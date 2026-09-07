@@ -146,6 +146,13 @@ export class LocalWorkspaceRegistry {
     if (lease.generation !== generation) throw new Error("Stale lease generation")
     this.leases.delete(id)
   }
+
+  /** Privileged host cleanup after its native owner has stopped and journal work has been reconciled. */
+  async releaseStoppedOwner(workspaceId: string, ownerId: string): Promise<void> {
+    for (const lease of this.leases.values()) {
+      if (lease.workspaceId === workspaceId && lease.ownerId === ownerId) await this.release(lease.id, lease.generation)
+    }
+  }
 }
 
 function contains(parent: string, child: string): boolean {

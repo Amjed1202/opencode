@@ -32,6 +32,9 @@ import type { FileApprovalEvidence } from "./permissions"
 import { inspectCodexHistory } from "./history"
 import { decodeHumanInput } from "./human-input"
 import { readCodexModels } from "./models"
+import { codexTelemetry } from "./telemetry"
+import { isolationArguments, readIsolation, requireIsolation } from "./isolation"
+import type { NativeIsolation } from "./isolation"
 import type { ToolRequestUserInputParams } from "./generated/0.153.4/v2/ToolRequestUserInputParams"
 import type { ToolRequestUserInputResponse } from "./generated/0.153.4/v2/ToolRequestUserInputResponse"
 import type { NativeNotification, NativeReply, NativeRequest, StdioJsonRpcOptions } from "./stdio"
@@ -120,6 +123,7 @@ const isolatedConfiguration = {
   "orchestrator.skills.enabled": false,
   "features.respect_system_proxy": false,
   "features.network_proxy": false,
+  chatgpt_base_url: "https://chatgpt.com/backend-api/",
 } as const
 
 /** Host-only, subscription-first adapter. This release exposes no login, token or API inference route. */
@@ -130,6 +134,9 @@ export class CodexAdapter implements AgentAdapter {
   private readonly runtimeId: string
   private transport: StdioJsonRpc | undefined
   private connecting: Promise<StdioJsonRpc> | undefined
+  private observing: Promise<RuntimePreflight> | undefined
+  private pendingObservations = 0
+  private isolation: NativeIsolation | null | undefined
   private disposed = false
   private accountEpoch = 0
   private accountMode: unknown = "chatgpt"
@@ -194,6 +201,14 @@ export class CodexAdapter implements AgentAdapter {
     return {
       chat: support,
       streaming: support,
+      "token-telemetry": {
+        ...support,
+        limitations: ["Native session cumulative token counts only; no pricing, quota or charge attribution."],
+      },
+      "context-telemetry": {
+        ...support,
+        limitations: ["Native model context capacity only. Current occupancy and compaction count are unavailable."],
+      },
       "session-resume": {
         ...support,
         limitations: [
@@ -664,45 +679,61 @@ export class CodexAdapter implements AgentAdapter {
   private async connect(): Promise<StdioJsonRpc> {
     if (this.disposed) throw new Error("Codex adapter is closed")
     if (this.connecting) return this.connecting
-    this.connecting = (async () => {
-      const options: StdioJsonRpcOptions = {
-        command: [
-          this.options.executable,
-          "app-server",
-          "--listen",
-          "stdio://",
-          ...Object.entries(isolatedConfiguration).flatMap(([key, value]) => ["-c", `${key}=${JSON.stringify(value)}`]),
-        ],
-        cwd: this.options.cwd,
-        environment: this.options.environment,
-        ...(this.options.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: this.options.requestTimeoutMs }),
-        ...(this.options.maxMessageBytes === undefined ? {} : { maxMessageBytes: this.options.maxMessageBytes }),
-        onNotification: (message) => this.notification(message),
-        onRequest: (message, signal, delivered) => this.serverRequest(message, signal, delivered),
-        onClose: () => {
-          this.disposed = true
-          void this.cancelApprovals()
-          for (const owned of this.sessions.values()) owned.stream.finish()
-        },
-      }
-      this.transport = this.options.transportFactory?.(options) ?? new StdioJsonRpc(options)
-      const result = await this.transport.request("initialize", {
-        clientInfo: { name: "harness", title: "Harness", version: this.version },
-        capabilities: { experimentalApi: false, requestAttestation: false },
-      } satisfies InitializeParams)
-      if (
-        !isRecord(result) ||
-        typeof result.userAgent !== "string" ||
-        !/^harness\/0\.153\.4(?:\s|$)/.test(result.userAgent)
-      ) {
-        await this.transport.close()
-        throw new Error("Unsupported Codex version")
-      }
-      this.versionVerifiedAt = new Date().toISOString()
-      this.transport.notify("initialized")
-      return this.transport
-    })()
+    this.connecting = this.startTransport()
     return this.connecting
+  }
+
+  private async startTransport(): Promise<StdioJsonRpc> {
+    if (this.disposed) throw new Error("Codex adapter is closed")
+    let transport: StdioJsonRpc | undefined
+    const options: StdioJsonRpcOptions = {
+      command: [
+        this.options.executable,
+        "app-server",
+        "--listen",
+        "stdio://",
+        ...Object.entries(isolatedConfiguration).flatMap(([key, value]) => ["-c", `${key}=${JSON.stringify(value)}`]),
+        "-c",
+        "notify=[]",
+        ...(this.isolation ? isolationArguments(this.isolation) : []),
+      ],
+      cwd: this.options.cwd,
+      environment: this.options.environment,
+      ...(this.options.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: this.options.requestTimeoutMs }),
+      ...(this.options.maxMessageBytes === undefined ? {} : { maxMessageBytes: this.options.maxMessageBytes }),
+      onNotification: (message) => {
+        if (transport && this.transport === transport) this.notification(message)
+      },
+      onRequest: (message, signal, delivered) =>
+        transport && this.transport === transport
+          ? this.serverRequest(message, signal, delivered)
+          : { error: { code: -32601, message: "Native request is unsupported and was not approved" } },
+      onClose: () => {
+        if (!transport || this.transport !== transport) return
+        this.disposed = true
+        void this.cancelApprovals()
+        for (const owned of this.sessions.values()) owned.stream.finish()
+      },
+    }
+    transport = this.options.transportFactory?.(options) ?? new StdioJsonRpc(options)
+    this.transport = transport
+    const result = await transport.request("initialize", {
+      clientInfo: { name: "harness", title: "Harness", version: this.version },
+      capabilities: { experimentalApi: false, requestAttestation: false },
+    } satisfies InitializeParams)
+    if (
+      this.disposed ||
+      this.transport !== transport ||
+      !isRecord(result) ||
+      typeof result.userAgent !== "string" ||
+      !/^harness\/0\.153\.4(?:\s|$)/.test(result.userAgent)
+    ) {
+      await transport.close()
+      throw new Error("Unsupported Codex version")
+    }
+    this.versionVerifiedAt = new Date().toISOString()
+    transport.notify("initialized")
+    return transport
   }
 
   private requireIntent(intent: SessionIntent): void {
@@ -729,11 +760,28 @@ export class CodexAdapter implements AgentAdapter {
       !["read-only", "workspace-write"].includes(policy.filesystem)
     )
       throw new Error("Unsupported native execution policy")
+    if (intent.skills?.length) throw new Error("Claude Skills cannot be activated through Codex")
     if (intent.requiredCapabilities.some((capability) => this.capabilities()[capability]?.status !== "supported"))
       throw new Error("Required capability is unverified")
   }
 
-  private async observe(): Promise<RuntimePreflight> {
+  private observe(): Promise<RuntimePreflight> {
+    // Serialize observations so no caller can use the process being replaced during initial isolation.
+    if (this.pendingObservations >= 64) return Promise.reject(new Error("Too many pending native observations"))
+    this.pendingObservations++
+    const previous = this.observing
+    this.observing = (async () => {
+      await previous?.catch(() => undefined)
+      try {
+        return await this.observeCurrent()
+      } finally {
+        this.pendingObservations--
+      }
+    })()
+    return this.observing
+  }
+
+  private async observeCurrent(): Promise<RuntimePreflight> {
     const transport = await this.connect()
     if (this.accountMode !== "chatgpt") throw new Error("Native account event conflicts with subscription")
     const epoch = this.accountEpoch
@@ -745,11 +793,28 @@ export class CodexAdapter implements AgentAdapter {
       cwd: this.options.cwd,
     } satisfies ConfigReadParams)
     if (!isRecord(result) || !isRecord(result.config)) throw new Error("Unknown native configuration")
-    requireConfiguration(result.config)
+    if (this.disposed || this.transport !== transport || epoch !== this.accountEpoch)
+      throw new Error("Native observation expired")
+    if (this.isolation === undefined) {
+      // Pin only bounded names. Source values never enter child args, environment, public status or a file.
+      this.isolation = null
+      const isolation = readIsolation(result.config)
+      if (this.sessions.size) throw new Error("Native isolation cannot change after session creation")
+      this.isolation = isolation
+      if (isolation.restart) {
+        // Native -c deep-merges tables; each observed entry must be explicitly cleared and then re-read.
+        this.transport = undefined
+        this.connecting = transport.close().then(() => this.startTransport())
+        await this.connecting
+        return this.observeCurrent()
+      }
+    }
+    if (this.isolation === null) throw new Error("Native isolation could not be verified")
+    requireConfiguration(result.config, this.isolation)
     const after = accountStatus(
       await transport.request("account/read", { refreshToken: false } satisfies GetAccountParams),
     )
-    if (hash(account) !== hash(after) || epoch !== this.accountEpoch)
+    if (this.disposed || this.transport !== transport || hash(account) !== hash(after) || epoch !== this.accountEpoch)
       throw new Error("Native account changed during observation")
     const checkedAt = new Date().toISOString()
     this.versionVerifiedAt = checkedAt
@@ -1022,6 +1087,11 @@ export class CodexAdapter implements AgentAdapter {
       return
     }
     const turnId = typeof params.turnId === "string" ? nativeId(params.turnId) : undefined
+    if (message.method === "thread/tokenUsage/updated") {
+      for (const payload of codexTelemetry(params, owned.session, owned.stream.id))
+        this.emit(owned, message, payload, turnId)
+      return
+    }
     const fileItem =
       (message.method === "item/started" || message.method === "item/completed") &&
       isRecord(params.item) &&
@@ -1068,6 +1138,39 @@ export class CodexAdapter implements AgentAdapter {
         { type: "assistant.text.completed", data: { messageId: id, partId: id, text: params.item.text } },
         turnId,
       )
+      return
+    }
+    if (
+      (message.method === "item/started" || message.method === "item/completed") &&
+      isRecord(params.item) &&
+      (params.item.type === "commandExecution" || params.item.type === "fileChange")
+    ) {
+      const callId = nativeId(params.item.id)
+      if (message.method === "item/started") {
+        this.emit(
+          owned,
+          message,
+          {
+            type: "tool.started",
+            data: {
+              callId,
+              name: params.item.type === "fileChange" ? "File change" : "Command execution",
+              input: null,
+            },
+          },
+          turnId,
+        )
+        return
+      }
+      const outcome =
+        params.item.status === "completed"
+          ? "succeeded"
+          : params.item.status === "failed"
+            ? "failed"
+            : params.item.status === "declined"
+              ? "denied"
+              : undefined
+      if (outcome) this.emit(owned, message, { type: "tool.completed", data: { callId, outcome } }, turnId)
       return
     }
     this.emit(
@@ -1435,7 +1538,7 @@ export class CodexAdapter implements AgentAdapter {
       origin: {
         streamId: owned.stream.id,
         epoch: owned.stream.id,
-        eventId: randomUUID(),
+        eventId: payload.type === "usage.updated" ? payload.data.sourceEventId : randomUUID(),
         identityStrategy: "adapter-assigned",
       },
       scope: {
@@ -1537,13 +1640,12 @@ function absolute(value: string): boolean {
   )
 }
 
-function requireConfiguration(config: Record<string, unknown>): void {
+function requireConfiguration(config: Record<string, unknown>, isolation: NativeIsolation): void {
   for (const [key, expected] of Object.entries(isolatedConfiguration)) {
     const actual = key.split(".").reduce<unknown>((value, part) => (isRecord(value) ? value[part] : undefined), config)
     if (actual !== expected) throw new Error("Native extension isolation settings could not be verified")
   }
-  if (isRecord(config.shell_environment_policy) && enabled(config.shell_environment_policy.set))
-    throw new Error("Native shell environment injects unverified values")
+  requireIsolation(config, isolation)
   if (config.model_provider !== null && config.model_provider !== "openai") throw new Error("Unknown native provider")
   if (
     config.forced_login_method !== undefined &&
@@ -1553,6 +1655,7 @@ function requireConfiguration(config: Record<string, unknown>): void {
     throw new Error("Native login override conflicts with subscription")
   for (const [key, value] of Object.entries(config)) {
     if (value === null || value === undefined || value === false || value === "") continue
+    if (key === "chatgpt_base_url" && value === isolatedConfiguration.chatgpt_base_url) continue
     if (
       (key === "cli_auth_credentials_store" || key === "mcp_oauth_credentials_store") &&
       typeof value === "string" &&
@@ -1578,7 +1681,12 @@ function requireConfiguration(config: Record<string, unknown>): void {
         Object.entries(value).some(([item, setting]) => item !== "enabled" && enabled(setting)))
     )
       throw new Error("Native configuration contains unverified skill or agent settings")
-    if (/^(mcp_servers|hooks|plugins|apps|notify)$/i.test(key) && enabled(value))
+    // Per-entry MCP/plugin enablement was checked above against the pinned native schema.
+    if (
+      /^(mcp_servers|hooks|plugins|apps|notify)$/i.test(key) &&
+      !["mcp_servers", "plugins", "notify"].includes(key) &&
+      enabled(value)
+    )
       throw new Error("Native configuration enables unverified extensions")
   }
 }

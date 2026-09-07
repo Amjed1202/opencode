@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-09-07T01:14:27.500Z",
+  "mode": "diagnostic",
+  "runtime": "claude",
+  "nativeExecutableSelected": true,
+  "nativeHomeSelected": true,
+  "rawStatusRetained": false,
+  "credentialsCopied": false,
+  "providerPromptsSubmitted": 0,
+  "hostSendAttempts": 0,
+  "outcome": "diagnostic-ready",
+  "checks": {
+    "noSessionDuringDiagnostic": true,
+    "generatedSkillCatalog": true
+  },
+  "promptLimit": 4,
+  "fixtureDirectory": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\work\\v1-native-repositories\\claude-087e842c-72bf-4239-8025-7a0066c440f8",
+  "originalFixturePreserved": true,
+  "generatedSkill": {
+    "prepared": true,
+    "invoked": false,
+    "liveValidation": "pending-explicit-live-authorization"
+  },
+  "connection": {
+    "status": "ready",
+    "runtimeVersion": "2.1.251",
+    "authentication": "subscription",
+    "billing": "subscription",
+    "providerOverage": "unknown",
+    "modelsStatus": "ready",
+    "modelIds": [
+      "sonnet",
+      "haiku"
+    ]
+  },
+  "completedAt": "2026-09-07T01:14:30.639Z"
+}

@@ -1,6 +1,6 @@
 # Harness — Universal Runtime Foundation
 
-**Delivered: a development desktop with Codex conversations and native model selection, Claude Code connection checks, protected patch/question review, OS-protected review keys and a Claude Skills catalog.** The host retains subscription admission, durable decisions and bounded history recovery. Harness is a provisional codename. See [desktop setup and limits](DESKTOP.md), [Codex host implementation](M1A_IMPLEMENTATION.md) and [Claude connection checks](M1B_CLAUDE.md). Claude **2.1.251** supports version and sign-in observations only; billing remains unknown, and Claude execution and native Skills activation remain blocked pending effective billing and managed policy evidence.
+**Implemented: a Windows desktop candidate with native Codex and Claude conversations, explicit models, protected file review, saved history/resume, files/diffs, observed usage and selected native Claude Skills.** Harness is a provisional codename. Local integration and native no-prompt diagnostics are implemented; live subscription repository acceptance remains pending. See [V1 acceptance](V1_STATUS.md), [desktop setup](DESKTOP.md), [Claude execution](V1_CLAUDE.md) and [Windows packaging](packages/harness-desktop/PACKAGING.md).
 
 Based on stable OpenCode **v1.18.29**, commit `16747470f976aca3d362ad730bcd3fe82ecc2c9a`. [Fork](https://github.com/Amjed1202/opencode), working branch `runtime-foundation`; `upstream` remains the original repository. Preserve OpenCode's [MIT license](LICENSE).
 
@@ -53,7 +53,7 @@ OpenCode fork/                       original monorepo retained
     │   └── src/
     │       ├── index.ts             adapter interface
     │       ├── codex/               pinned stdio adapter, mapping and generated wire types
-    │       ├── claude/              pinned version/sign-in inspector; execution unsupported
+    │       ├── claude/              official SDK + pinned native CLI, restricted execution and Skills
     │       └── opencode/, generic/, remote/  integration TODOs
     └── harness-control-plane/
         ├── src/index.ts            client and privileged service ports
@@ -63,7 +63,7 @@ OpenCode fork/                       original monorepo retained
         └── type-tests/public-contracts.ts
 ```
 
-Each added package has its own manifest and strict tsconfig. Existing `packages/*` discovery includes them, so root workspace configuration is unchanged. No native SDK dependency was added. Only `bun.lock` workspace records and an additive `SECURITY.md` section modify preexisting tracked files; all functional upstream source remains intact.
+Each added package has its own manifest and strict tsconfig. Existing `packages/*` discovery includes them, so root workspace configuration is unchanged. The Claude adapter adds the official SDK and pinned peers. Only `bun.lock` and an additive `SECURITY.md` section modify preexisting tracked files; functional upstream source, root workspace manifests and prior dependency resolutions remain intact.
 
 ## Check the packages
 
@@ -84,6 +84,6 @@ Set-Location ../..
 
 The filtered, script-disabled install prepares package dependencies. The new desktop also needs the pinned Electron binary; see [desktop setup](DESKTOP.md). This is separate from the upstream desktop dependency build. See the recorded Windows dependency issues before running upstream development scripts. Git must materialize tracked symlinks correctly on Windows; this checkout has `core.symlinks=true` and the tracked links restored without source changes.
 
-## Next implementation step
+## Remaining acceptance
 
-Complete native history/recovery presentation and OS boundary verification, then validate a separately authorized Codex repository task with explicit subscription/overage settings. Extend Claude beyond connection checks only after a supported native interface can establish effective billing and managed policy before startup side effects. Native Skills activation additionally requires verified source hashes, invocation rules and session policy. The current desktop is a development build with one attached session; installers, signing, update channels and the full M1 acceptance flow remain open.
+Complete the bounded live repository checks using each native subscription after explicit acknowledgment of unknown provider extra usage. Local tests, native connection/Skill initialization and Windows package startup do not replace live coding, permission, interrupt and resume acceptance. The current app supports one attached conversation at a time with explicit switching after close. OpenCode execution, OS sandbox attestation, cross-process fencing, collaboration, remote nodes, installers, signing and updates remain later work. [Current evidence](VALIDATION.md).

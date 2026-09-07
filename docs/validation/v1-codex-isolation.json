@@ -1,0 +1,30 @@
+{
+  "observedOn": "2026-09-07",
+  "runtime": "Codex 0.153.4",
+  "nativeReadOnly": {
+    "status": "authenticated",
+    "authMode": "subscription",
+    "billingRoute": "subscription",
+    "providerOverage": "unknown",
+    "modelIds": ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini", "gpt-5.3-codex-spark"],
+    "configuredShellEntriesCleared": 2,
+    "configuredMcpEntriesDisabled": 1,
+    "configuredPluginEntriesDisabled": 33,
+    "notificationCommandEmpty": true,
+    "officialChatgptEndpointPinnedAndVerified": true,
+    "nativeSessionsCreated": 0,
+    "providerPromptsSubmitted": 0,
+    "nativeConfigurationWriteRequests": 0,
+    "configurationNamesOrSourceValuesLogged": false
+  },
+  "validation": {
+    "codexTests": { "passed": 292, "failed": 0, "assertions": 951, "files": 7, "log": "work/v1-codex-isolation-regression.log" },
+    "adaptersPackageTypecheckExitCode": 0,
+    "generatedTypes": { "baseline": 81, "current": 84, "priorHashesChanged": 0, "fileHashMismatches": 0 }
+  },
+  "limitations": [
+    "No live model execution or native repository task was performed by this diagnostic.",
+    "Provider overage, model entitlement and OS sandbox enforcement remain unverified.",
+    "Native model listing can update native caches; managed authentication stays inside Codex."
+  ]
+}

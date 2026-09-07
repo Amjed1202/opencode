@@ -15,6 +15,42 @@ const answer = {
 }
 
 describe("desktop request decoder", () => {
+  test("V1 accepts only opaque file/history IDs and explicit bounded native skill activations", () => {
+    for (const operation of ["viewConversation", "inspectConversation", "reconcileConversation"] as const) {
+      expect(decodeDesktopRequest(operation, { sessionId: "session-a" })).toEqual({ sessionId: "session-a" })
+      expect(() => decodeDesktopRequest(operation, { sessionId: "../outside" })).toThrow()
+      expect(() => decodeDesktopRequest(operation, { sessionId: "session-a", replay: true })).toThrow()
+    }
+    expect(() => decodeDesktopRequest("previewFile", { path: "C:/secret" })).toThrow()
+    expect(() =>
+      decodeDesktopRequest("resumeConversation", {
+        sessionId: "session-a",
+        acknowledgeOverage: "yes",
+        acknowledgeUnverifiedBoundary: true,
+      }),
+    ).toThrow()
+    const skill = { skillId: "skill-a", sha256: "a".repeat(64), invocation: "model" }
+    expect(decodeDesktopRequest("start", { ...start, skills: [skill] })).toMatchObject({ skills: [skill] })
+    for (const skills of [
+      [skill, skill],
+      Array(17).fill(skill),
+      [{ ...skill, sha256: "new" }],
+      [{ ...skill, root: "C:/secret" }],
+      [{ ...skill, invocation: "automatic" }],
+    ])
+      expect(() => decodeDesktopRequest("start", { ...start, skills })).toThrow()
+    let calls = 0
+    const skills = [skill]
+    Object.defineProperty(skills, 0, {
+      get() {
+        calls++
+        return skill
+      },
+      enumerable: true,
+    })
+    expect(() => decodeDesktopRequest("start", { ...start, skills })).toThrow()
+    expect(calls).toBe(0)
+  })
   test("accepts only a named runtime selection without paths or account overrides", () => {
     expect(decodeDesktopRequest("selectRuntime", { runtime: "claude" })).toEqual({ runtime: "claude" })
     expect(decodeDesktopRequest("selectRuntime", { runtime: "codex" })).toEqual({ runtime: "codex" })

@@ -4,6 +4,40 @@ import type { AdapterPreflight, WorkspaceLease } from "@harness/protocol"
 import { admissionFixture, effective, intent, now } from "./support"
 
 describe("billing-safe admission", () => {
+  test("native skill selections must match workspace, runtime, target and exact session policy", async () => {
+    const fixture = await admissionFixture()
+    try {
+      const skill = {
+        skillId: "skill-a",
+        sha256: "a".repeat(64),
+        invocation: "model" as const,
+        workspaceId: intent.workspaceId,
+        runtimeId: intent.selection.runtimeId,
+        targetId: intent.selection.targetId,
+        policyId: intent.policy.id,
+        policyVersion: intent.policy.version,
+      }
+      for (const key of [
+        "workspaceId",
+        "runtimeId",
+        "targetId",
+        "policyId",
+        "policyVersion",
+        "sha256",
+        "invocation",
+        "skillId",
+      ] as const) {
+        const selected = { ...intent, skills: [{ ...skill, [key]: "../foreign" }] }
+        expect((await fixture.admission.preflight({ operation: "create", intent: selected })).status).toBe("blocked")
+      }
+      expect(
+        (await fixture.admission.preflight({ operation: "create", intent: { ...intent, skills: [skill, skill] } }))
+          .status,
+      ).toBe("blocked")
+    } finally {
+      await fixture.close()
+    }
+  })
   test("accepts current native subscription evidence with matching provider", async () => {
     const fixture = await admissionFixture()
     try {

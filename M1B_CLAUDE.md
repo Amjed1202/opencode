@@ -1,5 +1,7 @@
 # Claude native connection checks
 
+Historical milestone record. The later [V1 Claude adapter](V1_CLAUDE.md) adds restricted native execution and standalone Skills; the evidence and limitations below describe the earlier status-only delivery.
+
 Harness now has a native Claude Code adapter for **installation and sign-in checks only**, pinned to **2.1.251**. Select Claude Code in the desktop, choose its executable and the native account home containing `.claude`, then check the connection. This uses the unmodified binary and existing native sign-in; Harness does not offer a login/token-import flow or read credential files directly.
 
 Claude conversations, model discovery, tools, approvals, resume and native Skills activation remain unavailable. A signed-in result is displayed separately from billing. It cannot make the Start button available or issue a native prompt. The existing Codex path remains the only conversation executor.

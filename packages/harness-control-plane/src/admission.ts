@@ -352,6 +352,29 @@ export class AdmissionController implements AdmissionService {
     )
       fail("invalid-input", "Invalid execution policy")
     const access = selection.access
+    if (intent.skills !== undefined) {
+      if (!Array.isArray(intent.skills) || intent.skills.length > 16)
+        fail("invalid-input", "Invalid native skill selection")
+      const selected = new Set<string>()
+      for (const skill of intent.skills) {
+        if (
+          !skill ||
+          typeof skill.skillId !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(skill.skillId) ||
+          !/^[a-f0-9]{64}$/.test(skill.sha256) ||
+          skill.workspaceId !== intent.workspaceId ||
+          skill.runtimeId !== selection.runtimeId ||
+          skill.targetId !== selection.targetId ||
+          skill.policyId !== intent.policy.id ||
+          skill.policyVersion !== intent.policy.version ||
+          !["user", "model"].includes(skill.invocation)
+        )
+          fail("permission-denied", "Native skill binding does not match this session")
+        const key = `${skill.skillId}:${skill.invocation}`
+        if (selected.has(key)) fail("invalid-input", "Duplicate native skill activation")
+        selected.add(key)
+      }
+    }
     if (!["subscription", "api", "local", "provider-specific"].includes(access.mode) || !access.method?.trim())
       fail("invalid-input", "Invalid runtime access")
     const routes = {

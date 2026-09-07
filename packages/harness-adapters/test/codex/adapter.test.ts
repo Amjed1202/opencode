@@ -3,8 +3,60 @@ import { dirname } from "node:path"
 import type { AdmittedSessionRequest, AgentEventDraft, SessionIntent } from "@harness/protocol"
 import { CodexAdapter } from "../../src/codex/adapter"
 import { StdioJsonRpc } from "../../src/codex/stdio"
+import type { NativeReply } from "../../src/codex/stdio"
+import { codexTelemetry } from "../../src/codex/telemetry"
 
 const active: CodexAdapter[] = []
+
+test("token telemetry rejects malformed counters and foreign threads without estimating occupancy or cost", async () => {
+  const peer = fixture()
+  const session = await peer.adapter.createSession(await admission(peer.adapter))
+  const counts = {
+    totalTokens: 100,
+    inputTokens: 60,
+    cachedInputTokens: 15,
+    cacheWriteInputTokens: 0,
+    outputTokens: 40,
+    reasoningOutputTokens: 5,
+  }
+  const observation = {
+    threadId: session.binding.nativeSessionId,
+    turnId: "turn-1",
+    tokenUsage: { total: counts, last: counts, modelContextWindow: null },
+  }
+  const result = codexTelemetry(observation, session, "epoch")
+  expect(result).toHaveLength(2)
+  expect(result[0]).toMatchObject({
+    type: "usage.updated",
+    data: {
+      accountingScope: "session",
+      basis: "cumulative",
+      tokens: { input: 60, output: 40, cacheRelation: "unknown" },
+    },
+  })
+  expect(result[1]).toMatchObject({ type: "context.updated", data: { usedTokens: null, capacityTokens: null } })
+  expect(JSON.stringify(result)).not.toContain('"costs"')
+  for (const key of Object.keys(counts))
+    for (const value of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, null, "1", undefined]) {
+      expect(
+        codexTelemetry(
+          { ...observation, tokenUsage: { ...observation.tokenUsage, total: { ...counts, [key]: value } } },
+          session,
+          "epoch",
+        ),
+      ).toEqual([])
+    }
+  for (const value of [0, -1, 1.5, "200000", Number.POSITIVE_INFINITY])
+    expect(
+      codexTelemetry(
+        { ...observation, tokenUsage: { ...observation.tokenUsage, modelContextWindow: value } },
+        session,
+        "epoch",
+      ),
+    ).toEqual([])
+  expect(codexTelemetry({ ...observation, threadId: "foreign-thread" }, session, "epoch")).toEqual([])
+  expect(codexTelemetry({ ...observation, turnId: "invalid\n" }, session, "epoch")).toEqual([])
+})
 const intent: SessionIntent = {
   workspaceId: "workspace",
   mode: "chat",
@@ -39,6 +91,15 @@ function fixture(
   beforeNativeReply?: () => Promise<void>,
 ) {
   let transport: StdioJsonRpc | undefined
+  const commands: string[][] = []
+  const requests: string[] = []
+  const nativeReplies: { method: string; reply: NativeReply }[] = []
+  class FixtureTransport extends StdioJsonRpc {
+    override request(method: string, params: unknown): Promise<unknown> {
+      requests.push(method)
+      return super.request(method, params)
+    }
+  }
   const adapter = new CodexAdapter({
     executable: process.execPath,
     cwd: import.meta.dir,
@@ -47,24 +108,30 @@ function fixture(
     runtimeId: "codex-local",
     requestTimeoutMs: 1000,
     approvalTimeoutMs,
-    transportFactory: (options) =>
-      (transport = new StdioJsonRpc({
+    transportFactory: (options) => {
+      commands.push([...options.command])
+      return (transport = new FixtureTransport({
         ...options,
         command: [process.execPath, `${import.meta.dir}/app-server-peer.ts`, scenario, ...options.command.slice(1)],
-        ...(beforeNativeReply
+        ...(beforeNativeReply || scenario === "isolation-early-callbacks"
           ? {
               onRequest: async (message, signal, delivered) => {
                 const reply = await options.onRequest!(message, signal, delivered)
-                await beforeNativeReply()
+                nativeReplies.push({ method: message.method, reply })
+                if (beforeNativeReply) await beforeNativeReply()
                 return reply
               },
             }
           : {}),
-      })),
+      }))
+    },
   })
   active.push(adapter)
   return {
     adapter,
+    commands,
+    requests,
+    nativeReplies,
     state: async () =>
       (await transport!.request("fixture/state", {})) as {
         requests: string[]
@@ -884,23 +951,114 @@ test("read-only status rejects a foreign runtime binding before observing it", a
   expect((await peer.state()).requests).not.toContain("account/read")
 })
 
-test.each(["api", "provider", "helper", "profile", "mcp", "ignored-overrides", "shell-injection"])(
-  "read-only status blocks conflicting native %s configuration without running a task",
+test("initial native isolation restarts once with empty shell values and disabled entries before any native task", async () => {
+  const peer = fixture("isolation-honored")
+  const results = await Promise.all(
+    Array.from({ length: 4 }, () => peer.adapter.preflight({ operation: "create", intent })),
+  )
+  expect(results.every((result) => result.status === "ready")).toBe(true)
+  expect(peer.commands).toHaveLength(2)
+  expect(peer.commands[1]).toContain('shell_environment_policy.set.FIXTURE_ENV=""')
+  expect(peer.commands[1]).toContain('mcp_servers={"fixture.server"={enabled=false}}')
+  expect(peer.commands[1]).toContain('plugins={"fixture.plugin@market"={enabled=false}}')
+  expect(JSON.stringify(peer.commands)).not.toContain("fixture-do-not-forward")
+  expect(JSON.stringify(peer.commands)).not.toContain("fixture-must-not-start")
+  expect(peer.requests.filter((method) => !["initialize", "account/read", "config/read"].includes(method))).toEqual([])
+  const admitted = await admission(peer.adapter)
+  const session = await peer.adapter.createSession(admitted)
+  expect(
+    (await peer.adapter.send({ session, admissionId: admitted.admissionId, leaseGeneration: 1 }, input)).state,
+  ).toBe("dispatched")
+  expect(peer.commands).toHaveLength(2)
+  expect(JSON.stringify(admitted.effective)).not.toContain("fixture-do-not-forward")
+  expect(JSON.stringify(admitted.effective)).not.toContain("fixture.plugin@market")
+})
+
+test.each(["isolation-ignored", "isolation-new-key", "isolation-wrong-version"])(
+  "%s remains blocked after the single isolation attempt",
   async (scenario) => {
     const peer = fixture(scenario)
-    const runtime = (
-      await peer.adapter.discover({
-        target: { id: "local", kind: "local", name: "Local" },
-        allowedExecutablePaths: [process.execPath],
-      })
-    )[0]!
-    const error: unknown = await peer.adapter.status(runtime).catch((error: unknown) => error)
-    expect(error).toBeInstanceOf(Error)
-    const snapshot = await peer.state()
-    expect(snapshot.turns).toBe(0)
-    expect(snapshot.requests).not.toContain("thread/start")
+    for (let index = 0; index < 3; index++)
+      expect((await peer.adapter.preflight({ operation: "create", intent })).status).toBe("blocked")
+    expect(peer.commands).toHaveLength(2)
+    expect(peer.requests).not.toContain("thread/start")
+    expect(peer.requests).not.toContain("turn/start")
   },
 )
+
+test("callbacks received during initial isolation never receive credentials or an execution grant", async () => {
+  const peer = fixture("isolation-early-callbacks")
+  expect((await peer.adapter.preflight({ operation: "create", intent })).status).toBe("ready")
+  expect(peer.commands).toHaveLength(2)
+  expect(peer.nativeReplies.length).toBeGreaterThanOrEqual(2)
+  for (const entry of peer.nativeReplies) {
+    if (entry.method === "account/chatgptAuthTokens/refresh") expect(entry.reply).toHaveProperty("error")
+    if (entry.method === "item/commandExecution/requestApproval")
+      expect(entry.reply).toEqual({ result: { decision: "decline" } })
+  }
+  expect(peer.requests).not.toContain("thread/start")
+  expect(peer.requests).not.toContain("turn/start")
+})
+
+test("unrepresentable initial isolation remains blocked without a replacement process", async () => {
+  const peer = fixture("isolation-malformed")
+  for (let index = 0; index < 3; index++)
+    expect((await peer.adapter.preflight({ operation: "create", intent })).status).toBe("blocked")
+  expect(peer.commands).toHaveLength(1)
+  expect(peer.requests).not.toContain("thread/start")
+})
+
+test.each(["isolation-env-change", "isolation-plugin-change", "isolation-mcp-addition", "isolation-notify-change"])(
+  "%s blocks an existing session without restarting or dispatching",
+  async (scenario) => {
+    const peer = fixture(scenario)
+    const admitted = await admission(peer.adapter)
+    const session = await peer.adapter.createSession(admitted)
+    expect(
+      (await peer.adapter.send({ session, admissionId: admitted.admissionId, leaseGeneration: 1 }, input)).state,
+    ).toBe("rejected")
+    expect(peer.commands).toHaveLength(2)
+    expect(peer.requests).not.toContain("turn/start")
+  },
+)
+
+test("disposing during initial isolation observation prevents a replacement process and any native task", async () => {
+  const peer = fixture("isolation-delay-config")
+  const pending = peer.adapter.preflight({ operation: "create", intent })
+  for (let index = 0; index < 100 && !peer.requests.includes("config/read"); index++)
+    await new Promise((resolve) => setTimeout(resolve, 2))
+  expect(peer.requests).toContain("config/read")
+  await peer.adapter.dispose()
+  expect((await pending).status).toBe("blocked")
+  expect(peer.commands).toHaveLength(1)
+  expect(peer.requests).not.toContain("thread/start")
+})
+
+test.each([
+  "api",
+  "provider",
+  "helper",
+  "profile",
+  "mcp",
+  "ignored-overrides",
+  "shell-injection",
+  "custom-endpoint",
+  "endpoint-suffix",
+  "endpoint-path",
+])("read-only status blocks conflicting native %s configuration without running a task", async (scenario) => {
+  const peer = fixture(scenario)
+  const runtime = (
+    await peer.adapter.discover({
+      target: { id: "local", kind: "local", name: "Local" },
+      allowedExecutablePaths: [process.execPath],
+    })
+  )[0]!
+  const error: unknown = await peer.adapter.status(runtime).catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(Error)
+  const snapshot = await peer.state()
+  expect(snapshot.turns).toBe(0)
+  expect(snapshot.requests).not.toContain("thread/start")
+})
 
 test("preflight verifies managed ChatGPT status without claiming overage is disabled", async () => {
   const peer = fixture()

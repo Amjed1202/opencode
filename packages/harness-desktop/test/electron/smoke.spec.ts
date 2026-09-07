@@ -44,16 +44,23 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
         "chooseRuntime",
         "chooseSkillsRoot",
         "chooseWorkspace",
+        "detachConversation",
         "getState",
+        "inspectConversation",
         "interrupt",
+        "listFiles",
         "onState",
+        "previewFile",
+        "reconcileConversation",
         "refresh",
         "resolveInput",
         "resolvePermission",
+        "resumeConversation",
         "review",
         "selectRuntime",
         "send",
         "start",
+        "viewConversation",
       ])
       expect(renderer.state.configuration).toEqual({})
       expect(renderer.state.connection.status).toBe("not-configured")
@@ -138,7 +145,7 @@ test("built Electron app starts with isolated renderer and OS-wrapped artifact s
       expect((await page.evaluate(() => window.harness.getState())).session).toBeUndefined()
       await page.evaluate(() => window.harness.selectRuntime({ runtime: "codex" }))
       await expect(page.getByLabel("Codex model", { exact: true })).toBeDisabled()
-      const screenshot = resolve(packageRoot, "../../docs/validation/m1c-models-desktop.png")
+      const screenshot = resolve(packageRoot, "../../docs/validation/v1-desktop.png")
       await mkdir(resolve(screenshot, ".."), { recursive: true })
       await page.screenshot({ path: screenshot })
     } finally {

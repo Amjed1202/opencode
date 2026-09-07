@@ -2,6 +2,7 @@ import type { AgentCapabilities, Capability } from "./capabilities"
 import type { ArtifactReference, ProtocolError, Timestamp } from "./common"
 import type { EnforcementEvidence, ExecutionPolicy } from "./permissions"
 import type { BillingEvidence, RuntimeAuthState, RuntimeSelection } from "./runtime"
+import type { SkillActivationIntent } from "./skills"
 
 export interface WorkspaceDescriptor {
   readonly id: string
@@ -28,6 +29,8 @@ export interface SessionIntent {
   readonly policy: ExecutionPolicy
   readonly requiredCapabilities: readonly Capability[]
   readonly mode: "chat" | "code" | "plan" | "collaborate"
+  /** Explicit native skill activation, bound by the host to reviewed catalog content and session policy. */
+  readonly skills?: readonly SkillActivationIntent[]
 }
 
 export type PreflightRequest =

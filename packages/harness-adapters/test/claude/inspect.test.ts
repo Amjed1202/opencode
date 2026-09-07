@@ -77,6 +77,23 @@ test("fixed version and status commands use only explicit environment", async ()
   }
 })
 
+test("personal subscription observation projects only opaque hashes from fixed native status", async () => {
+  const pro = await peer("subscription-pro").inspector.subscriptionStatus()
+  const max = await peer("subscription-max").inspector.subscriptionStatus()
+  expect(pro).toEqual(max)
+  expect(pro).toMatchObject({ personalSubscription: true })
+  expect(pro.accountId).toMatch(/^[0-9a-f]{64}$/)
+  expect(pro.emailHash).toMatch(/^[0-9a-f]{64}$/)
+  expect(JSON.stringify(pro)).not.toMatch(/fixture|private|accessToken|email@/)
+})
+
+for (const scenario of ["team", "console", "cloud", "api", "no-email", "no-org", "bad-exit"])
+  test(`subscription observation rejects ${scenario}`, async () => {
+    await expect(peer(`subscription-${scenario}`).inspector.subscriptionStatus()).rejects.toThrow(
+      "Claude personal subscription route is unavailable",
+    )
+  })
+
 test("the diagnostic child receives immediate stdin EOF and no prompt", async () => {
   expect(await peer("stdin-eof").inspector.authStatus()).toEqual({ loggedIn: true })
 })

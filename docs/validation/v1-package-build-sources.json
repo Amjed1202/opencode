@@ -1,0 +1,22 @@
+[
+  {
+    "path": "packages/harness-adapters/src/claude/adapter.ts",
+    "sha256": "8f02bb3748fa68852d3b31d1fcac14e85b10415f9227fa1f58de1f621283a100"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/files.ts",
+    "sha256": "1cd3b39f855b027a03beb14363f848eed6ebc0f1a33bcaee091f429515b41d73"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/inspect.ts",
+    "sha256": "a61db0df3e325567c45dff1054751af5594145bb4617368903fee0ef65c1917a"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/runtime.ts",
+    "sha256": "d14e886780e41afa3a71a84825ae1d725377fd79e790159fd1cf141c0ceba920"
+  },
+  {
+    "path": "packages/harness-adapters/src/claude/skills.ts",
+    "sha256": "a48bcfc6379242065bced48b24787d45031189b0e9521da52f1c304a724094f4"
+  }
+]

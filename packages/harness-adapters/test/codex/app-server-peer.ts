@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline"
 import type { Model } from "../../src/codex/generated/0.153.4/v2/Model"
+import { isRecord } from "../../src/codex/stdio"
 const scenario = process.argv[2] ?? "normal"
 const output = (value: unknown) => process.stdout.write(JSON.stringify(value) + "\n")
 const notification = (method: string, params: unknown) => output({ method, params })
@@ -12,16 +13,35 @@ let historyRead = false
 let modelLists = 0
 const modelRequests: unknown[] = []
 const startedModels: string[] = []
-const overrides: Record<string, unknown> = {}
-for (const argument of process.argv.slice(3)) {
-  if (!argument.includes("=")) continue
-  const [path, value] = argument.split("=")
-  const keys = path!.split(".")
-  let table = overrides
-  for (const key of keys.slice(0, -1)) table = (table[key] ??= {}) as Record<string, unknown>
-  table[keys.at(-1)!] = JSON.parse(value!)
+function merge(left: Record<string, unknown>, right: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    [...new Set([...Object.keys(left), ...Object.keys(right)])].map((key) => {
+      const before = left[key]
+      const after = right[key]
+      return [
+        key,
+        after === undefined
+          ? before
+          : before &&
+              after &&
+              typeof before === "object" &&
+              typeof after === "object" &&
+              !Array.isArray(before) &&
+              !Array.isArray(after)
+            ? merge(before as Record<string, unknown>, after as Record<string, unknown>)
+            : after,
+      ]
+    }),
+  )
 }
-let cwd = ""
+const overrides = process.argv
+  .slice(3)
+  .filter((argument) => argument.includes("="))
+  .reduce<Record<string, unknown>>(
+    (config, argument) => merge(config, Bun.TOML.parse(argument) as Record<string, unknown>),
+    {},
+  )
+let cwd = process.cwd()
 const thread = (id: string) => ({
   id,
   sessionId: id,
@@ -96,7 +116,7 @@ for await (const line of createInterface({ input: process.stdin })) {
   if (message.method === "initialize") {
     if (message.params.capabilities?.experimentalApi !== false) process.exit(20)
     reply({
-      userAgent: `harness/${scenario === "wrong-version" ? "0.154.0" : "0.153.4"} (Windows 10.0.26200; x86_64) unknown (harness; 0.1.0)`,
+      userAgent: `harness/${scenario === "wrong-version" || (scenario === "isolation-wrong-version" && isRecord(overrides.plugins)) ? "0.154.0" : "0.153.4"} (Windows 10.0.26200; x86_64) unknown (harness; 0.1.0)`,
       codexHome: "private-home",
       platformFamily: "windows",
       platformOs: "windows",
@@ -129,9 +149,60 @@ for await (const line of createInterface({ input: process.stdin })) {
     })
   }
   if (message.method === "config/read") {
+    if (scenario === "isolation-early-callbacks") {
+      output({ id: `early-auth-${reads}`, method: "account/chatgptAuthTokens/refresh", params: {} })
+      output({
+        id: `early-command-${reads}`,
+        method: "item/commandExecution/requestApproval",
+        params: { threadId: "unowned", turnId: "unowned", itemId: "unowned" },
+      })
+    }
+    const source = scenario.startsWith("isolation-")
+      ? {
+          shell_environment_policy: {
+            set: { FIXTURE_ENV: "fixture-do-not-forward", FIXTURE_OTHER: "fixture-do-not-forward" },
+          },
+          mcp_servers: { "fixture.server": { command: "fixture-must-not-start", enabled: true } },
+          plugins: { "fixture.plugin@market": { enabled: true, mcp_servers: { hidden: { enabled: true } } } },
+          notify: ["fixture-must-not-start", "fixture-private-argument"],
+        }
+      : {}
+    const effective = scenario === "isolation-ignored" ? merge(overrides, source) : merge(source, overrides)
+    if (scenario === "isolation-malformed")
+      effective.shell_environment_policy = { set: { "BAD.KEY": "fixture-never-forward" } }
+    const changed = startedModels.length > 0
+    const isolated =
+      isRecord(effective.shell_environment_policy) &&
+      isRecord(effective.shell_environment_policy.set) &&
+      effective.shell_environment_policy.set.FIXTURE_ENV === ""
+    if (
+      scenario === "isolation-new-key" &&
+      isolated &&
+      isRecord(effective.shell_environment_policy) &&
+      isRecord(effective.shell_environment_policy.set)
+    )
+      effective.shell_environment_policy.set.NEW_ENTRY = ""
+    if (
+      scenario === "isolation-env-change" &&
+      changed &&
+      isRecord(effective.shell_environment_policy) &&
+      isRecord(effective.shell_environment_policy.set)
+    )
+      effective.shell_environment_policy.set.FIXTURE_ENV = "fixture-new-value"
+    if (
+      scenario === "isolation-plugin-change" &&
+      changed &&
+      isRecord(effective.plugins) &&
+      isRecord(effective.plugins["fixture.plugin@market"])
+    )
+      effective.plugins["fixture.plugin@market"].enabled = true
+    if (scenario === "isolation-mcp-addition" && changed && isRecord(effective.mcp_servers))
+      effective.mcp_servers.NEW_ENTRY = { command: "fixture-must-not-start", enabled: false }
+    if (scenario === "isolation-notify-change" && changed) effective.notify = ["fixture-must-not-start"]
+    if (scenario === "isolation-delay-config") await new Promise((resolve) => setTimeout(resolve, 100))
     reply({
       config: {
-        ...overrides,
+        ...effective,
         model: "gpt-5.4",
         model_provider: scenario === "provider" ? "third-party" : "openai",
         forced_login_method: null,
@@ -150,6 +221,11 @@ for await (const line of createInterface({ input: process.stdin })) {
           : {}),
         ...(scenario === "helper" ? { api_key_helper: "do-not-run" } : {}),
         ...(scenario === "profile" ? { profile: "other" } : {}),
+        ...(scenario === "custom-endpoint" ? { chatgpt_base_url: "https://fixture.invalid/backend-api/" } : {}),
+        ...(scenario === "endpoint-suffix"
+          ? { chatgpt_base_url: "https://chatgpt.com.fixture.invalid/backend-api/" }
+          : {}),
+        ...(scenario === "endpoint-path" ? { chatgpt_base_url: "https://chatgpt.com/backend-api/other" } : {}),
         ...(scenario === "config-switch" && reads > 2 ? { model: "gpt-other" } : {}),
         ...(scenario === "history-config-switch" && historyRead ? { model: "gpt-other" } : {}),
         ...(scenario === "models-config-switch" && modelLists > 0 ? { model: "gpt-other" } : {}),

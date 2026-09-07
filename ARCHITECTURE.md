@@ -1,6 +1,6 @@
 # Harness architecture
 
-Status: architectural baseline with a privileged host, Codex adapter, Claude version/sign-in inspector and initial Electron/Solid desktop, **2026-09-07**. **Harness is a working codename.** [DESKTOP.md](DESKTOP.md), [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) and [M1B_CLAUDE.md](M1B_CLAUDE.md) distinguish implemented behavior from the broader architecture below. Claude Code 2.1.251 is status-only; its execution and native Skills activation remain blocked. The new desktop is an additive `packages/harness-desktop` application; upstream desktop/app source stays intact.
+Status: architectural baseline with independent Codex and Claude native adapters, privileged admission/journals and an additive Electron/Solid desktop, **2026-09-07**. **Harness is a working codename.** [V1_STATUS.md](V1_STATUS.md), [DESKTOP.md](DESKTOP.md) and [V1_CLAUDE.md](V1_CLAUDE.md) distinguish the implemented local candidate from pending live acceptance and the wider architecture below. Upstream desktop/app source stays intact.
 
 ## Foundation and decision
 
@@ -74,4 +74,4 @@ Accounts/Runtimes settings will distinguish installed, authenticated, preflight-
 
 ## Deliberate limits
 
-The implementation includes local Codex discovery, billing admission, workspace leases, command/event persistence, private stdio, session orchestration and desktop patch/fixed-choice review. Claude has a pinned version/sign-in inspector and read-only Skills cataloging, with execution and activation unsupported. OS isolation attestation for native work, complete recovery/transcript presentation, additional runtime execution, collaboration scheduling and a listening node remain open. [M1A_IMPLEMENTATION.md](M1A_IMPLEMENTATION.md) and [M1B_CLAUDE.md](M1B_CLAUDE.md) record the exact limits; [MILESTONES.md](MILESTONES.md) retains the full acceptance gates.
+The implementation includes native Codex and restricted Claude subscription paths, workspace leases, protected permissions, durable commands/events, streaming, explicit models and a desktop with saved conversations, files/diffs, observed usage and standalone Claude Skills. Live provider acceptance, OS isolation attestation, cross-process fencing, complete native transcript/uncertain Claude recovery, OpenCode execution, collaboration scheduling and a listening node remain open. [V1_STATUS.md](V1_STATUS.md) records the candidate's limits; [MILESTONES.md](MILESTONES.md) retains the wider acceptance gates.

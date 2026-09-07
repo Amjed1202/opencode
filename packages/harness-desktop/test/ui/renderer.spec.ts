@@ -110,6 +110,84 @@ async function install(page: Page, state = initial) {
         calls.push({ method: "interrupt" })
         return current
       },
+      async viewConversation(input) {
+        calls.push({ method: "viewConversation", input })
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          history: { id: input.sessionId, partial: true, unconfirmedMessages: 1 },
+          messages: [{ id: "saved-user", role: "user", text: "Saved attempted message" }],
+        }
+        return current
+      },
+      async inspectConversation(input) {
+        calls.push({ method: "inspectConversation", input })
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          inspection: {
+            sessionId: input.sessionId,
+            observedAt: new Date().toISOString(),
+            nativeState: "idle",
+            completeness: "complete",
+            turnCount: 1,
+            terminalTurns: 1,
+            runningTurns: 0,
+            unknownTurns: 0,
+          },
+        }
+        return current
+      },
+      async reconcileConversation(input) {
+        calls.push({ method: "reconcileConversation", input })
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          conversations: {
+            items: current.conversations!.items.map((item) =>
+              item.id === input.sessionId ? { ...item, status: "idle" } : item,
+            ),
+            truncated: false,
+          },
+        }
+        return current
+      },
+      async resumeConversation(input) {
+        calls.push({ method: "resumeConversation", input })
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          session: { id: input.sessionId, status: "idle", modelId: "fixture-model" },
+        }
+        return current
+      },
+      async detachConversation() {
+        calls.push({ method: "detachConversation" })
+        const detached = { ...current, revision: current.revision + 1, messages: [], permissions: [], inputs: [] }
+        delete detached.session
+        delete detached.history
+        delete detached.inspection
+        current = detached
+        return current
+      },
+      async listFiles() {
+        calls.push({ method: "listFiles" })
+        return {
+          items: [{ id: "opaque-file-a", path: "src/index.ts", bytes: 32, change: "modified" }],
+          truncated: true,
+          baseline: "session-start",
+        }
+      },
+      async previewFile(input) {
+        calls.push({ method: "previewFile", input })
+        return {
+          path: "src/index.ts",
+          text: "<img src=x onerror=alert('unsafe')>",
+          before: "Original",
+          diff: "+<img src=x onerror=alert('unsafe')>",
+          baseline: "session-start",
+        }
+      },
       async review(input) {
         calls.push({ method: "review", input })
         return {
@@ -355,6 +433,8 @@ test("workspace, executable and account-home changes clear an otherwise availabl
     },
   ]
   for (const [index, configuration] of configurations.entries()) {
+    await page.getByLabel("I have checked my provider’s spending settings").check()
+    await page.getByLabel("I understand the operating-system execution boundary").check()
     await model.selectOption("fixture-model")
     await expect(start).toBeEnabled()
     await page.evaluate(
@@ -592,4 +672,315 @@ test("Claude sign-in status never enables execution or native Skills when billin
   ).toBeVisible()
   await expect(page.getByRole("button", { name: /activate|enable/i })).toHaveCount(0)
   expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
+const saved = {
+  id: "saved-a",
+  workspaceId: "workspace-a",
+  runtimeId: "codex-local",
+  modelId: "fixture-model",
+  status: "uncertain",
+  createdAt: "2026-09-06T12:00:00.000Z",
+  updatedAt: "2026-09-06T12:05:00.000Z",
+  compatible: true,
+}
+
+for (const status of ["closed", "uncertain"] as const)
+  test(`Claude ${status} history respects native resume and inspection support`, async ({ page }) => {
+    await install(page, {
+      ...initial,
+      configuration: { ...initial.configuration, runtime: "claude" },
+      connection: { ...initial.connection, runtimeName: "Claude Code", runtimeVersion: "2.1.251" },
+      runtimeFeatures: { resume: true, inspection: false },
+      conversations: { items: [{ ...saved, runtimeId: "claude-local", status }], truncated: false },
+    })
+    await page.goto("/")
+    await page.locator(".session-item").click()
+    const recovery = page.getByRole("region", { name: "Saved conversation" })
+    await expect(recovery.getByRole("button", { name: "Inspect native state", exact: true })).toBeDisabled()
+    await expect(recovery.getByRole("button", { name: "Reconcile uncertain work", exact: true })).toBeDisabled()
+    await expect(recovery.getByText(/cannot verify uncertain native history/)).toBeVisible()
+    await recovery.getByLabel("I have checked my provider’s spending settings").check()
+    await recovery.getByLabel("I understand the operating-system execution boundary").check()
+    if (status === "closed") {
+      await expect(recovery.getByRole("button", { name: "Resume conversation", exact: true })).toBeEnabled()
+      await recovery.getByRole("button", { name: "Resume conversation", exact: true }).click()
+    } else await expect(recovery.getByRole("button", { name: "Resume conversation", exact: true })).toBeDisabled()
+    const calls = await page.evaluate(
+      () => (window as unknown as { fixture: { calls: { method: string }[] } }).fixture.calls,
+    )
+    expect(calls.map((call) => call.method)).toEqual(
+      status === "closed" ? ["viewConversation", "resumeConversation"] : ["viewConversation"],
+    )
+  })
+
+test("saved history requires explicit inspection, reconciliation and fresh consent before resume", async ({ page }) => {
+  await install(page, { ...initial, conversations: { items: [saved], truncated: false } })
+  await page.goto("/")
+  await page.locator(".session-item").click()
+  const recovery = page.getByRole("region", { name: "Saved conversation" })
+  await expect(
+    recovery.getByText("Partial local history. Viewing this conversation does not resume native work."),
+  ).toBeVisible()
+  await expect(page.getByText("Saved attempted message")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled()
+  await expect(recovery.getByRole("button", { name: "Resume conversation", exact: true })).toBeDisabled()
+  await recovery.getByRole("button", { name: "Inspect native state", exact: true }).click()
+  await expect(recovery.getByRole("status")).toContainText("Native state: idle")
+  await expect(recovery.getByRole("button", { name: "Resume conversation", exact: true })).toBeDisabled()
+  await recovery.getByRole("button", { name: "Reconcile uncertain work", exact: true }).click()
+  await recovery.getByLabel("I have checked my provider’s spending settings").check()
+  await recovery.getByLabel("I understand the operating-system execution boundary").check()
+  await page.screenshot({ path: test.info().outputPath("desktop-conversation-recovery.png") })
+  await recovery.getByRole("button", { name: "Resume conversation", exact: true }).click()
+  await expect(recovery).toHaveCount(0)
+  await page.getByRole("textbox", { name: "Message to Codex", exact: true }).fill("Unsent after resume")
+  await page.getByRole("button", { name: "Close conversation", exact: true }).click()
+  await expect(page.getByRole("textbox", { name: "Message to Codex", exact: true })).toHaveValue("")
+  await expect(page.locator(".session-item")).toHaveCount(1)
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    { method: "viewConversation", input: { sessionId: "saved-a" } },
+    { method: "inspectConversation", input: { sessionId: "saved-a" } },
+    { method: "reconcileConversation", input: { sessionId: "saved-a" } },
+    {
+      method: "resumeConversation",
+      input: { sessionId: "saved-a", acknowledgeOverage: true, acknowledgeUnverifiedBoundary: true },
+    },
+    { method: "detachConversation" },
+  ])
+})
+
+test("incompatible conversations stay readable while native recovery controls remain disabled", async ({ page }) => {
+  await install(page, { ...initial, conversations: { items: [{ ...saved, compatible: false }], truncated: true } })
+  await page.goto("/")
+  await page.locator(".session-item").click()
+  await expect(page.getByText("Saved attempted message")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Inspect native state" })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "Reconcile uncertain work" })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "Resume conversation" })).toBeDisabled()
+  await expect(page.getByText(/select the original repository, runtime executable/)).toBeVisible()
+  await expect(page.getByText("Showing the 100 most recently updated conversations.")).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    { method: "viewConversation", input: { sessionId: "saved-a" } },
+  ])
+})
+
+test("file browsing is explicit, previews remain inert and workspace changes clear cached content", async ({
+  page,
+}) => {
+  await install(page)
+  await page.goto("/")
+  await page.getByRole("tab", { name: "Files", exact: true }).click()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+  await page.getByRole("button", { name: "Refresh files", exact: true }).click()
+  await expect(page.getByText("The file list reached its preview limit. Some files are omitted.")).toBeVisible()
+  await page.getByRole("button", { name: "src/index.ts Modified", exact: true }).click()
+  await expect(page.locator(".file-content")).toHaveText("+<img src=x onerror=alert('unsafe')>")
+  await expect(page.locator(".file-content img")).toHaveCount(0)
+  await page.getByRole("button", { name: "Current text", exact: true }).click()
+  await expect(page.locator(".file-content")).toHaveText("<img src=x onerror=alert('unsafe')>")
+  await page.screenshot({ path: test.info().outputPath("desktop-file-preview.png") })
+  await page.evaluate(
+    (serialized) => {
+      ;(window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+        JSON.parse(serialized) as DesktopState,
+      )
+    },
+    JSON.stringify({
+      ...initial,
+      revision: 2,
+      configuration: {
+        ...initial.configuration,
+        workspace: { id: "workspace-b", name: "Another", path: "C:/another" },
+      },
+    }),
+  )
+  await expect(page.locator(".file-content")).toHaveCount(0)
+  await expect(page.locator(".file-list")).toHaveCount(0)
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    { method: "listFiles" },
+    { method: "previewFile", input: { fileId: "opaque-file-a" } },
+  ])
+})
+
+test("usage shows reported cumulative tokens and native context without inventing unknown charges or counts", async ({
+  page,
+}) => {
+  await install(page, {
+    ...initial,
+    usage: {
+      id: "usage-a",
+      sourceEventId: "usage-event",
+      scope: { targetId: "local", sessionId: "session-a" },
+      providerId: "openai",
+      accountingScope: "session",
+      accountingId: "accounting-a",
+      epoch: "1",
+      basis: "cumulative",
+      includesSubagents: "unknown",
+      completeness: "partial",
+      evidence: { source: "native-status", observedAt: "2026-09-06T12:00:00Z" },
+      billing: {
+        route: "subscription",
+        providerId: "openai",
+        providerOverage: "unknown",
+        evidence: { source: "native-status", observedAt: "2026-09-06T12:00:00Z" },
+      },
+      tokens: {
+        input: 1234,
+        output: 56,
+        cacheRead: 100,
+        cacheWrite: null,
+        reasoning: null,
+        cacheRelation: "included-in-input",
+        reasoningRelation: "unknown",
+      },
+    },
+    context: {
+      sessionId: "session-a",
+      epoch: "1",
+      usedTokens: 1290,
+      capacityTokens: 128000,
+      basis: "native-context",
+      compactions: null,
+      evidence: { source: "native-status", observedAt: "2026-09-06T12:00:00Z" },
+    },
+  })
+  await page.goto("/")
+  await page.getByRole("tab", { name: "Usage", exact: true }).click()
+  const usage = page.getByRole("tabpanel", { name: "Usage", exact: true })
+  await expect(usage).toContainText("1,234")
+  await expect(usage).toContainText("128,000")
+  await expect(usage.locator("dt", { hasText: "Reasoning tokens" }).locator("+ dd")).toHaveText("Unknown")
+  await expect(usage).toContainText("Cumulative counts reported by the native runtime")
+  await expect(usage).toContainText("Unknown values are not zero")
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
+test("Claude skill permissions are explicit, bounded, and cleared when the selected repository changes", async ({
+  page,
+}) => {
+  const skill = {
+    id: "skill-0",
+    format: "claude-skill" as const,
+    scope: "workspace" as const,
+    workspaceId: "workspace-a",
+    commandName: "plain-0",
+    relativePath: ".claude/skills/plain-0/SKILL.md",
+    sha256: "a".repeat(64),
+    sizeBytes: 100,
+    metadataStatus: "parsed" as const,
+    invocation: { user: "allowed-by-metadata" as const, model: "allowed-by-metadata" as const },
+    declared: { unknownFields: [] },
+    observedFeatures: [],
+    activation: { status: "disabled" as const, reason: "native-adapter-required" as const },
+  }
+  const configured: DesktopState = {
+    ...initial,
+    configuration: { ...initial.configuration, runtime: "claude" },
+    connection: { ...initial.connection, runtimeName: "Claude Code", runtimeVersion: "2.1.251" },
+    skills: {
+      workspaceId: "workspace-a",
+      roots: [{ scope: "workspace", status: "scanned" }],
+      diagnostics: [],
+      skills: [
+        ...Array.from({ length: 9 }, (_value, index) => ({
+          ...skill,
+          id: `skill-${index}`,
+          commandName: `plain-${index}`,
+        })),
+        { ...skill, id: "unsupported", commandName: "unsupported", observedFeatures: ["dynamic-shell"] },
+      ],
+    },
+  }
+  await install(page, configured)
+  await page.goto("/")
+  await page.getByRole("tab", { name: "Skills", exact: true }).click()
+  await expect(page.getByLabel("Allow user invocation of /unsupported", { exact: true })).toBeDisabled()
+  for (let index = 0; index < 8; index++) {
+    await page.getByLabel(`Allow user invocation of /plain-${index}`, { exact: true }).check()
+    await page.getByLabel(`Allow model invocation of /plain-${index}`, { exact: true }).check()
+  }
+  await expect(page.getByText("16/16 skill permissions selected", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("Allow user invocation of /plain-8", { exact: true })).toBeDisabled()
+  await page.getByLabel("Allow user invocation of /plain-0", { exact: true }).uncheck()
+  await expect(page.getByLabel("Allow user invocation of /plain-8", { exact: true })).toBeEnabled()
+  await page.evaluate(
+    (serialized) => {
+      ;(window as unknown as { fixture: { publish(value: DesktopState): void } }).fixture.publish(
+        JSON.parse(serialized) as DesktopState,
+      )
+    },
+    JSON.stringify({
+      ...configured,
+      revision: 2,
+      configuration: { ...configured.configuration, workspace: { id: "workspace-b", name: "Other", path: "C:/other" } },
+    }),
+  )
+  await expect(page.getByText("0/16 skill permissions selected", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("Allow model invocation of /plain-0", { exact: true })).not.toBeChecked()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([])
+})
+
+test("verified Claude connection starts only with explicit model, billing and skill choices and sends separately", async ({
+  page,
+}) => {
+  await install(page, {
+    ...initial,
+    configuration: { ...initial.configuration, runtime: "claude", executable: "C:/fixture/claude.exe" },
+    connection: { ...initial.connection, runtimeName: "Claude Code", runtimeVersion: "2.1.251" },
+    skills: {
+      workspaceId: "workspace-a",
+      roots: [{ scope: "workspace", status: "scanned" }],
+      diagnostics: [],
+      skills: [
+        {
+          id: "plain-skill",
+          format: "claude-skill",
+          scope: "workspace",
+          workspaceId: "workspace-a",
+          commandName: "plain",
+          relativePath: ".claude/skills/plain/SKILL.md",
+          sha256: "a".repeat(64),
+          sizeBytes: 100,
+          metadataStatus: "parsed",
+          invocation: { user: "allowed-by-metadata", model: "allowed-by-metadata" },
+          declared: { unknownFields: [] },
+          observedFeatures: [],
+          activation: { status: "disabled", reason: "native-adapter-required" },
+        },
+      ],
+    },
+  })
+  await page.goto("/")
+  const start = page.getByRole("button", { name: "Start conversation", exact: true })
+  await expect(start).toBeDisabled()
+  await page.getByRole("combobox", { name: "Claude Code model", exact: true }).selectOption("fixture-model")
+  await page.getByLabel("I have checked my provider’s spending settings").check()
+  await page.getByLabel("I understand the operating-system execution boundary").check()
+  await page.getByRole("tab", { name: "Skills", exact: true }).click()
+  await page.getByLabel("Allow user invocation of /plain", { exact: true }).check()
+  await page.getByLabel("Allow model invocation of /plain", { exact: true }).check()
+  await start.click()
+  expect(await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls)).toEqual([
+    {
+      method: "start",
+      input: {
+        modelId: "fixture-model",
+        acknowledgeOverage: true,
+        acknowledgeUnverifiedBoundary: true,
+        allowFileChanges: false,
+        skills: [
+          { skillId: "plain-skill", sha256: "a".repeat(64), invocation: "user" },
+          { skillId: "plain-skill", sha256: "a".repeat(64), invocation: "model" },
+        ],
+      },
+    },
+  ])
+  await page.getByRole("textbox", { name: "Message to Claude Code", exact: true }).fill("Explicit Claude message")
+  await page.getByRole("button", { name: "Send message", exact: true }).click()
+  expect(
+    await page.evaluate(() => (window as unknown as { fixture: { calls: unknown[] } }).fixture.calls.at(-1)),
+  ).toEqual({ method: "send", input: { text: "Explicit Claude message" } })
+  await expect(page.getByText("Skill choices are fixed when the conversation starts.", { exact: true })).toBeVisible()
 })

@@ -1,6 +1,6 @@
 import type { InteractionReview } from "@harness/protocol"
 import { desktopChannels } from "../shared/contracts"
-import type { DesktopAPI, DesktopState } from "../shared/contracts"
+import type { DesktopAPI, DesktopState, WorkspaceFileList, WorkspaceFilePreview } from "../shared/contracts"
 
 export interface PreloadIpc {
   invoke(channel: string, input?: unknown): Promise<unknown>
@@ -22,6 +22,13 @@ export function createDesktopBridge(ipc: PreloadIpc): DesktopAPI {
     start: (input) => ipc.invoke(desktopChannels.start, input) as Promise<DesktopState>,
     send: (input) => ipc.invoke(desktopChannels.send, input) as Promise<DesktopState>,
     interrupt: () => ipc.invoke(desktopChannels.interrupt) as Promise<DesktopState>,
+    viewConversation: (input) => ipc.invoke(desktopChannels.viewConversation, input) as Promise<DesktopState>,
+    inspectConversation: (input) => ipc.invoke(desktopChannels.inspectConversation, input) as Promise<DesktopState>,
+    reconcileConversation: (input) => ipc.invoke(desktopChannels.reconcileConversation, input) as Promise<DesktopState>,
+    resumeConversation: (input) => ipc.invoke(desktopChannels.resumeConversation, input) as Promise<DesktopState>,
+    detachConversation: () => ipc.invoke(desktopChannels.detachConversation) as Promise<DesktopState>,
+    listFiles: () => ipc.invoke(desktopChannels.listFiles) as Promise<WorkspaceFileList>,
+    previewFile: (input) => ipc.invoke(desktopChannels.previewFile, input) as Promise<WorkspaceFilePreview>,
     review: (input) => ipc.invoke(desktopChannels.review, input) as Promise<InteractionReview>,
     resolvePermission: (input) => ipc.invoke(desktopChannels.resolvePermission, input) as Promise<DesktopState>,
     resolveInput: (input) => ipc.invoke(desktopChannels.resolveInput, input) as Promise<DesktopState>,

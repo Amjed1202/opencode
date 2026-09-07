@@ -661,7 +661,7 @@ select {
 }
 .context-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0 10px;
   border-bottom: 1px solid var(--line);
 }
@@ -674,6 +674,95 @@ select {
   font-size: 11px;
   gap: 5px;
   color: var(--muted);
+}
+.context-tab svg {
+  display: none;
+}
+.history-panel {
+  margin: 12px 24px 0;
+  padding: 16px 18px;
+  border-left: 3px solid var(--accent);
+  background: #edf3f6;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  max-height: 48dvh;
+}
+.history-panel .section-heading {
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.history-panel h2 {
+  font-size: 13px;
+}
+.history-actions,
+.file-view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0;
+}
+.inspection-summary {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.inspection-summary time {
+  color: var(--muted);
+  font-size: 11px;
+}
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+  max-height: 260px;
+  overflow: auto;
+}
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  gap: 10px;
+  font-size: 12px;
+}
+.file-path,
+.file-preview h3 {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.file-change {
+  color: var(--muted);
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.file-preview h3,
+#panel-usage h3 {
+  font-size: 13px;
+  margin: 20px 0 10px;
+}
+.file-content {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  line-height: 1.7;
+  background: #f0f4f6;
+  border: 1px solid var(--line);
+  padding: 12px;
+  overflow: auto;
+  max-height: 440px;
+  white-space: pre;
+}
+.file-view-controls button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.usage-metadata {
+  font-variant-numeric: tabular-nums;
 }
 .context-tab[aria-selected="true"] {
   color: var(--accent);

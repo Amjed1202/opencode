@@ -1,0 +1,8 @@
+$ bun script/package-windows.ts --output-root "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs" --bun "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\work\\tools\\bun-windows-x64\\bun.exe" --electron "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\harness\\node_modules\\.bun\\electron@42.3.3+759ce506b1ed1a42\\node_modules\\electron\\dist\\electron.exe" --name "Harness-windows-x64-v1-rc1"
+Assembling package in C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\Harness-windows-x64-v1-rc1.partial-8ea87865-6557-457a-a1ee-850baa88888c; failures retain this directory for inspection.
+Portable package: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\Harness-windows-x64-v1-rc1
+Files: 96
+Manifest SHA256: c0451ff093c18cebd19d4e84e2275f800252ccd2d9cf76358e77324596bd40f0
+Creating portable archive: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\Harness-windows-x64-v1-rc1-c3e223c4.zip
+Portable ZIP: C:\Users\Amjed\Documents\Codex\2026-09-06\files-pasted-by-the-user-we\outputs\Harness-windows-x64-v1-rc1-c3e223c4.zip
+ZIP SHA256: 4b96c0e88a153995ddcdef789f516e608f1646519cddf6658eafc7323a956940

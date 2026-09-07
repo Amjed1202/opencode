@@ -1,10 +1,10 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import type { HumanInputRequest, InteractionReview, PermissionRequest } from "@harness/protocol"
-import type { DesktopState } from "../shared/contracts"
+import type { HumanInputRequest, InteractionReview, PermissionRequest, SkillDescriptor } from "@harness/protocol"
+import type { DesktopState, StartSessionInput, WorkspaceFileList, WorkspaceFilePreview } from "../shared/contracts"
 import { copy } from "./copy"
 import { Icon } from "./icons"
 
-type ContextTab = "activity" | "review" | "skills"
+type ContextTab = "activity" | "files" | "usage" | "review" | "skills"
 
 export function App() {
   const [state, setState] = createSignal<DesktopState>()
@@ -21,11 +21,30 @@ export function App() {
   const [reviews, setReviews] = createSignal<Record<string, InteractionReview>>({})
   const [selections, setSelections] = createSignal<Record<string, Record<string, string>>>({})
   const [now, setNow] = createSignal(Date.now())
+  const [files, setFiles] = createSignal<WorkspaceFileList>()
+  const [filePreview, setFilePreview] = createSignal<WorkspaceFilePreview>()
+  const [fileMode, setFileMode] = createSignal<"text" | "diff">("diff")
+  const [resumeOverage, setResumeOverage] = createSignal(false)
+  const [resumeBoundary, setResumeBoundary] = createSignal(false)
+  const [activations, setActivations] = createSignal<NonNullable<StartSessionInput["skills"]>>([])
   const configuration = () => state()?.configuration
   const runtime = () => configuration()?.runtime ?? "codex"
   const runtimeName = () => (runtime() === "claude" ? copy.claude : copy.codex)
-  const executionAvailable = () => runtime() === "codex"
+  const executionAvailable = () => runtime() === "codex" || (runtime() === "claude" && ready())
+  const runtimeText = (text: string) => text.replaceAll("Codex", runtimeName())
   const session = () => state()?.session
+  const selectedConversation = () =>
+    state()?.conversations?.items.find((item) => item.id === (state()?.history?.id ?? session()?.id))
+  const viewingHistory = () => !!state()?.history && !session()
+  const canRecover = () =>
+    !busy() && !session() && executionAvailable() && ready() && !!selectedConversation()?.compatible
+  const canInspect = () => canRecover() && (state()?.runtimeFeatures?.inspection ?? runtime() === "codex")
+  const canResume = () =>
+    canRecover() &&
+    (state()?.runtimeFeatures?.resume ?? runtime() === "codex") &&
+    ["idle", "interrupted", "closed", "failed"].includes(selectedConversation()?.status ?? "") &&
+    resumeOverage() &&
+    resumeBoundary()
   const running = () => ["running", "awaiting-permission", "awaiting-input"].includes(session()?.status ?? "")
   const canSend = () =>
     executionAvailable() &&
@@ -40,14 +59,14 @@ export function App() {
   const selectedModelAvailable = () => offeredModels().some((model) => model.id === modelId())
   const modelStatus = () =>
     checkingModels()
-      ? copy.modelsLoading
+      ? runtimeText(copy.modelsLoading)
       : modelsReady()
-        ? copy.modelHint
+        ? runtimeText(copy.modelHint)
         : state()?.models.status === "unavailable" || state()?.models.status === "ready"
-          ? copy.modelsUnavailable
+          ? runtimeText(copy.modelsUnavailable)
           : state()?.models.status === "unsupported"
             ? copy.modelsUnsupported
-            : copy.modelsNotLoaded
+            : runtimeText(copy.modelsNotLoaded)
   const canStart = () =>
     !busy() &&
     executionAvailable() &&
@@ -84,15 +103,29 @@ export function App() {
     ) {
       setModelId("")
     }
-    if ((current?.configuration.runtime ?? "codex") !== (next.configuration.runtime ?? "codex")) {
-      setModelId("")
+    if (viewIdentity(current) !== viewIdentity(next)) {
       setAcknowledgeOverage(false)
       setAllowFileChanges(false)
       setAcknowledgeBoundary(false)
+      setResumeOverage(false)
+      setResumeBoundary(false)
       setDraft("")
       setReviews({})
       setSelections({})
+      setFiles(undefined)
+      setFilePreview(undefined)
+      setActivations([])
     }
+    setActivations((previous) =>
+      previous.filter((selected) =>
+        next.skills?.skills.some(
+          (skill) =>
+            skill.id === selected.skillId &&
+            skill.sha256 === selected.sha256 &&
+            selectableSkill(skill, selected.invocation),
+        ),
+      ),
+    )
     setState(next)
   }
 
@@ -193,10 +226,15 @@ export function App() {
     if (busy()) return
     setBusy(true)
     setError("")
+    const identity = viewIdentity(state())
     try {
       const review = await window.harness.review({ kind, requestId })
       const current = kind === "permission" ? permissionIds() : inputIds()
-      if (current.includes(requestId) && Date.parse(review.expiresAt) > Date.now()) {
+      if (
+        identity === viewIdentity(state()) &&
+        current.includes(requestId) &&
+        Date.parse(review.expiresAt) > Date.now()
+      ) {
         setReviews((previous) => ({ ...previous, [requestId]: review }))
       }
     } catch (cause) {
@@ -204,6 +242,30 @@ export function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function readFiles<T>(operation: () => Promise<T>, accept: (result: T) => void) {
+    if (busy()) return
+    const identity = viewIdentity(state())
+    setBusy(true)
+    setError("")
+    try {
+      const result = await operation()
+      if (identity === viewIdentity(state())) accept(result)
+    } catch (cause) {
+      if (identity === viewIdentity(state())) setError(cause instanceof Error ? cause.message : copy.failedRequest)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function toggleSkill(skill: SkillDescriptor, invocation: "user" | "model", checked: boolean) {
+    if (busy() || session() || runtime() !== "claude" || !ready() || !selectableSkill(skill, invocation)) return
+    const remaining = activations().filter(
+      (selected) => selected.skillId !== skill.id || selected.invocation !== invocation,
+    )
+    if (checked && remaining.length >= 16) return
+    setActivations(checked ? [...remaining, { skillId: skill.id, sha256: skill.sha256, invocation }] : remaining)
   }
 
   function clearReview(requestId: string) {
@@ -244,7 +306,7 @@ export function App() {
   }
 
   function tabKey(event: KeyboardEvent) {
-    const tabs: ContextTab[] = ["activity", "review", "skills"]
+    const tabs: ContextTab[] = ["activity", "files", "usage", "review", "skills"]
     const index = tabs.indexOf(tab())
     const next =
       event.key === "ArrowRight"
@@ -290,22 +352,55 @@ export function App() {
         </section>
         <section class="sidebar-section sidebar-sessions">
           <h2 class="sidebar-heading">{copy.sessions}</h2>
-          <Show when={session()} fallback={<p class="sidebar-description">{copy.noSessions}</p>}>
-            {(current) => (
-              <div class="session-list">
-                <button class="session-item" data-selected="true" aria-current="page" title={current().id}>
-                  <span class="status-dot" data-active={running()} />
-                  <span class="session-name">{configuration()?.workspace?.name ?? copy.conversation}</span>
-                  <span class="session-detail">{status()}</span>
-                </button>
-              </div>
-            )}
+          <Show
+            when={state()?.conversations?.items.length}
+            fallback={
+              <Show when={session()} fallback={<p class="sidebar-description">{copy.noSessions}</p>}>
+                {(current) => (
+                  <div class="session-list">
+                    <button class="session-item" data-selected="true" aria-current="page" title={current().id}>
+                      <span class="status-dot" data-active={running()} />
+                      <span class="session-name">{configuration()?.workspace?.name ?? copy.conversation}</span>
+                      <span class="session-detail">{status()}</span>
+                    </button>
+                  </div>
+                )}
+              </Show>
+            }
+          >
+            <div class="session-list">
+              <For each={state()?.conversations?.items}>
+                {(item) => (
+                  <button
+                    class="session-item"
+                    data-selected={item.id === (state()?.history?.id ?? session()?.id)}
+                    aria-current={item.id === (state()?.history?.id ?? session()?.id) ? "page" : undefined}
+                    disabled={busy() || !!session()}
+                    title={item.id}
+                    onClick={() => void perform(() => window.harness.viewConversation({ sessionId: item.id }))}
+                  >
+                    <span class="status-dot" data-active={item.id === session()?.id && running()} />
+                    <span class="session-name">{item.modelId}</span>
+                    <span class="session-detail">{copy.sessionStatus[item.status] ?? item.status}</span>
+                    <time class="session-detail" dateTime={item.updatedAt}>
+                      {new Date(item.updatedAt).toLocaleString()}
+                    </time>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={state()?.conversations?.truncated}>
+            <p class="sidebar-description">{copy.conversationsLimited}</p>
           </Show>
           <button
             class="new-session"
             disabled={!!session() || busy() || !state()}
             title={session() ? copy.singleSession : copy.newConversation}
-            onClick={() => openContext()}
+            onClick={() => {
+              if (state()?.history) void perform(() => window.harness.detachConversation()).then(() => openContext())
+              if (!state()?.history) openContext()
+            }}
           >
             <Icon name="plus" size={15} />
             {copy.newConversation}
@@ -346,6 +441,15 @@ export function App() {
             </p>
           </div>
           <div class="header-actions">
+            <Show when={session()}>
+              <button
+                class="secondary-button"
+                disabled={busy()}
+                onClick={() => void perform(() => window.harness.detachConversation())}
+              >
+                {copy.closeConversation}
+              </button>
+            </Show>
             <Show when={pending() > 0}>
               <button class="secondary-button" onClick={() => openContext("review")}>
                 {copy.review}
@@ -388,6 +492,99 @@ export function App() {
             </p>
           )}
         </For>
+        <Show when={viewingHistory()}>
+          <section class="history-panel" aria-label={copy.savedConversation}>
+            <div class="section-heading">
+              <h2>{copy.savedConversation}</h2>
+              <span>{selectedConversation()?.modelId}</span>
+            </div>
+            <p>{copy.historyPartial}</p>
+            <Show when={(state()?.history?.unconfirmedMessages ?? 0) > 0}>
+              <p class="attention">{copy.historyUnconfirmed}</p>
+            </Show>
+            <Show when={!selectedConversation()?.compatible}>
+              <p class="attention">{copy.historyIncompatible}</p>
+            </Show>
+            <Show when={selectedConversation()?.compatible && !ready()}>
+              <p class="attention">{copy.historyCheckConnection}</p>
+            </Show>
+            <div class="history-actions">
+              <button
+                class="secondary-button"
+                disabled={!canInspect()}
+                onClick={() =>
+                  void perform(() => window.harness.inspectConversation({ sessionId: state()!.history!.id }))
+                }
+              >
+                {copy.inspectConversation}
+              </button>
+              <button
+                class="secondary-button"
+                disabled={
+                  !canInspect() ||
+                  selectedConversation()?.status !== "uncertain" ||
+                  state()?.inspection?.sessionId !== state()?.history?.id
+                }
+                onClick={() =>
+                  void perform(() => window.harness.reconcileConversation({ sessionId: state()!.history!.id }))
+                }
+              >
+                {copy.reconcileConversation}
+              </button>
+            </div>
+            <Show when={state()?.inspection?.sessionId === state()?.history?.id && state()?.inspection}>
+              {(inspection) => (
+                <div class="inspection-summary" role="status">
+                  <p>
+                    {copy.inspectionState}: {inspection().nativeState}. {copy.inspectionCoverage}:{" "}
+                    {inspection().completeness}.
+                  </p>
+                  <p>
+                    {inspection().terminalTurns} {copy.terminalTurns}, {inspection().runningTurns} {copy.runningTurns},{" "}
+                    {inspection().unknownTurns} {copy.unknownTurns}.
+                  </p>
+                  <time dateTime={inspection().observedAt}>{new Date(inspection().observedAt).toLocaleString()}</time>
+                </div>
+              )}
+            </Show>
+            <p class="model-hint">{copy.resumeHint}</p>
+            <Show when={ready() && state()?.runtimeFeatures?.inspection === false}>
+              <p class="model-hint">{copy.inspectionUnavailable}</p>
+            </Show>
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                checked={resumeOverage()}
+                onChange={(event) => setResumeOverage(event.currentTarget.checked)}
+              />
+              <span>{copy.acknowledgeOverage}</span>
+            </label>
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                checked={resumeBoundary()}
+                onChange={(event) => setResumeBoundary(event.currentTarget.checked)}
+              />
+              <span>{copy.acknowledgeBoundary}</span>
+            </label>
+            <button
+              class="primary-button"
+              disabled={!canResume()}
+              onClick={() => {
+                if (!canResume()) return
+                void perform(() =>
+                  window.harness.resumeConversation({
+                    sessionId: state()!.history!.id,
+                    acknowledgeOverage: resumeOverage(),
+                    acknowledgeUnverifiedBoundary: resumeBoundary(),
+                  }),
+                )
+              }}
+            >
+              {copy.resumeConversation}
+            </button>
+          </section>
+        </Show>
         <div
           class="conversation"
           ref={conversation}
@@ -626,9 +823,9 @@ export function App() {
               <Show when={!executionAvailable()}>
                 <p class="attention">{copy.claudeUnavailable}</p>
               </Show>
-              <Show when={executionAvailable()}>
+              <Show when={executionAvailable() && !viewingHistory()}>
                 <label class="model-label" for="model-id">
-                  {copy.modelLabel}
+                  {runtimeText(copy.modelLabel)}
                 </label>
                 <select
                   id="model-id"
@@ -641,7 +838,7 @@ export function App() {
                     setModelId(offeredModels().some((model) => model.id === selected) ? selected : "")
                   }}
                 >
-                  <option value="">{checkingModels() ? copy.modelsLoading : copy.modelPlaceholder}</option>
+                  <option value="">{checkingModels() ? runtimeText(copy.modelsLoading) : copy.modelPlaceholder}</option>
                   <For each={offeredModels()}>
                     {(model) => (
                       <option value={model.id}>
@@ -653,7 +850,7 @@ export function App() {
                 <p class="model-hint" id="model-status" role="status" aria-live="polite">
                   {modelStatus()}
                 </p>
-                <p class="attention">{copy.overageNotice}</p>
+                <p class="attention">{runtimeText(copy.overageNotice)}</p>
                 <label class="checkbox-label">
                   <input
                     type="checkbox"
@@ -679,23 +876,26 @@ export function App() {
                   <span>{copy.acknowledgeBoundary}</span>
                 </label>
               </Show>
-              <button
-                class="primary-button full-width"
-                disabled={!canStart()}
-                onClick={() => {
-                  if (!canStart()) return
-                  void perform(() =>
-                    window.harness.start({
-                      modelId: modelId(),
-                      acknowledgeOverage: acknowledgeOverage(),
-                      allowFileChanges: allowFileChanges(),
-                      acknowledgeUnverifiedBoundary: acknowledgeBoundary(),
-                    }),
-                  )
-                }}
-              >
-                {copy.startConversation}
-              </button>
+              <Show when={!viewingHistory()}>
+                <button
+                  class="primary-button full-width"
+                  disabled={!canStart()}
+                  onClick={() => {
+                    if (!canStart()) return
+                    void perform(() =>
+                      window.harness.start({
+                        modelId: modelId(),
+                        acknowledgeOverage: acknowledgeOverage(),
+                        allowFileChanges: allowFileChanges(),
+                        acknowledgeUnverifiedBoundary: acknowledgeBoundary(),
+                        ...(runtime() === "claude" && activations().length ? { skills: activations() } : {}),
+                      }),
+                    )
+                  }}
+                >
+                  {copy.startConversation}
+                </button>
+              </Show>
             </Show>
             <Show when={session()}>
               <p class="model-hint">
@@ -704,7 +904,7 @@ export function App() {
             </Show>
           </section>
           <div class="context-tabs" role="tablist" aria-label={copy.contextTabs} onKeyDown={tabKey}>
-            <For each={["activity", "review", "skills"] as const}>
+            <For each={["activity", "files", "usage", "review", "skills"] as const}>
               {(item) => (
                 <button
                   class="context-tab"
@@ -715,7 +915,18 @@ export function App() {
                   tabIndex={tab() === item ? 0 : -1}
                   onClick={() => setTab(item)}
                 >
-                  <Icon name={item === "activity" ? "activity" : item === "skills" ? "book" : "shield"} size={13} />
+                  <Icon
+                    name={
+                      item === "activity" || item === "usage"
+                        ? "activity"
+                        : item === "files"
+                          ? "folder"
+                          : item === "skills"
+                            ? "book"
+                            : "shield"
+                    }
+                    size={13}
+                  />
                   {copy[item]}
                   <Show when={item === "review" && pending() > 0}>
                     <span class="tab-count">{pending()}</span>
@@ -746,6 +957,134 @@ export function App() {
                   </For>
                 </ol>
               </Show>
+            </section>
+          </Show>
+          <Show when={tab() === "files"}>
+            <section class="panel-body" id="panel-files" role="tabpanel" aria-labelledby="tab-files" tabIndex={0}>
+              <p class="model-hint">{copy.filesHint}</p>
+              <button
+                class="secondary-button full-width"
+                disabled={busy() || !configuration()?.workspace}
+                onClick={() => {
+                  setFilePreview(undefined)
+                  void readFiles(() => window.harness.listFiles(), setFiles)
+                }}
+              >
+                {copy.refreshFiles}
+              </button>
+              <Show when={files()} fallback={<p class="panel-empty">{copy.filesNotLoaded}</p>}>
+                {(catalog) => (
+                  <>
+                    <p class="model-hint">
+                      {catalog().baseline === "session-start" ? copy.fileBaseline : copy.fileBaselineUnavailable}
+                    </p>
+                    <Show when={catalog().truncated}>
+                      <p class="attention" role="status">
+                        {copy.filesLimited}
+                      </p>
+                    </Show>
+                    <Show when={!catalog().items.length}>
+                      <p class="panel-empty">{copy.filesEmpty}</p>
+                    </Show>
+                    <ul class="file-list">
+                      <For each={catalog().items}>
+                        {(file) => (
+                          <li>
+                            <button
+                              class="file-item"
+                              disabled={busy()}
+                              onClick={() =>
+                                void readFiles(() => window.harness.previewFile({ fileId: file.id }), setFilePreview)
+                              }
+                            >
+                              <span class="file-path">{file.path}</span>
+                              <span class="file-change">{copy.fileChange[file.change]}</span>
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </>
+                )}
+              </Show>
+              <Show when={filePreview()}>
+                {(preview) => (
+                  <article class="file-preview" aria-label={copy.filePreview}>
+                    <h3>{preview().path}</h3>
+                    <div class="file-view-controls">
+                      <button
+                        class="secondary-button"
+                        aria-pressed={fileMode() === "diff"}
+                        onClick={() => setFileMode("diff")}
+                      >
+                        {copy.fileDiff}
+                      </button>
+                      <button
+                        class="secondary-button"
+                        aria-pressed={fileMode() === "text"}
+                        onClick={() => setFileMode("text")}
+                      >
+                        {copy.fileText}
+                      </button>
+                    </div>
+                    <Show
+                      when={fileMode() === "diff"}
+                      fallback={
+                        <Show
+                          when={preview().text !== null}
+                          fallback={<p class="model-hint">{copy.fileTextUnavailable}</p>}
+                        >
+                          <pre class="file-content">{preview().text}</pre>
+                        </Show>
+                      }
+                    >
+                      <Show
+                        when={preview().diff !== null}
+                        fallback={<p class="model-hint">{copy.fileBaselineUnavailable}</p>}
+                      >
+                        <pre class="file-content">{preview().diff || copy.fileUnchanged}</pre>
+                      </Show>
+                    </Show>
+                  </article>
+                )}
+              </Show>
+            </section>
+          </Show>
+          <Show when={tab() === "usage"}>
+            <section class="panel-body" id="panel-usage" role="tabpanel" aria-labelledby="tab-usage" tabIndex={0}>
+              <h3>{copy.tokenUsage}</h3>
+              <p class="model-hint">
+                {state()?.usage?.basis === "cumulative"
+                  ? copy.usageCumulative
+                  : state()?.usage
+                    ? copy.usageLatest
+                    : copy.usageUnavailable}
+              </p>
+              <dl class="metadata usage-metadata">
+                <dt>{copy.inputTokens}</dt>
+                <dd>{count(state()?.usage?.tokens?.input)}</dd>
+                <dt>{copy.outputTokens}</dt>
+                <dd>{count(state()?.usage?.tokens?.output)}</dd>
+                <dt>{copy.cachedTokens}</dt>
+                <dd>{count(state()?.usage?.tokens?.cacheRead)}</dd>
+                <dt>{copy.reasoningTokens}</dt>
+                <dd>{count(state()?.usage?.tokens?.reasoning)}</dd>
+              </dl>
+              <p class="model-hint">{copy.usageRelations}</p>
+              <h3>{copy.contextUsage}</h3>
+              <dl class="metadata usage-metadata">
+                <dt>{copy.contextUsed}</dt>
+                <dd>
+                  {state()?.context?.basis === "native-context" ? count(state()?.context?.usedTokens) : copy.unknown}
+                </dd>
+                <dt>{copy.contextCapacity}</dt>
+                <dd>
+                  {state()?.context?.basis === "native-context"
+                    ? count(state()?.context?.capacityTokens)
+                    : copy.unknown}
+                </dd>
+              </dl>
+              <p class="model-hint">{copy.usageLimit}</p>
             </section>
           </Show>
           <Show when={tab() === "review"}>
@@ -927,7 +1266,12 @@ export function App() {
           <Show when={tab() === "skills"}>
             <section class="panel-body" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0}>
               <p class="skill-intro">{copy.skillsIntro}</p>
-              <p class="attention">{copy.skillsPending}</p>
+              <p class="attention">{runtime() === "claude" && ready() ? copy.skillsSelection : copy.skillsPending}</p>
+              <Show when={runtime() === "claude" && ready() && !session()}>
+                <p class="model-hint">
+                  {activations().length}/16 {copy.skillsSelected}
+                </p>
+              </Show>
               <button
                 class="secondary-button full-width"
                 disabled={busy() || !state() || !!session()}
@@ -963,7 +1307,38 @@ export function App() {
                         {copy.skillFeatures}: {skill.observedFeatures.join(", ")}
                       </p>
                     </Show>
-                    <p>{copy.skillDisabled}</p>
+                    <Show
+                      when={runtime() === "claude" && ready() && !session()}
+                      fallback={<p>{session() && runtime() === "claude" ? copy.skillsFixed : copy.skillDisabled}</p>}
+                    >
+                      <For each={["user", "model"] as const}>
+                        {(invocation) => {
+                          const selected = () =>
+                            activations().some((value) => value.skillId === skill.id && value.invocation === invocation)
+                          return (
+                            <label class="checkbox-label skill-choice">
+                              <input
+                                type="checkbox"
+                                checked={selected()}
+                                disabled={
+                                  busy() ||
+                                  !selectableSkill(skill, invocation) ||
+                                  (!selected() && activations().length >= 16)
+                                }
+                                onChange={(event) => toggleSkill(skill, invocation, event.currentTarget.checked)}
+                              />
+                              <span>
+                                {invocation === "user" ? copy.skillUserInvocation : copy.skillModelInvocation} /
+                                {skill.commandName}
+                              </span>
+                            </label>
+                          )
+                        }}
+                      </For>
+                      <Show when={!selectableSkill(skill, "user") && !selectableSkill(skill, "model")}>
+                        <p>{copy.skillUnsupported}</p>
+                      </Show>
+                    </Show>
                   </article>
                 )}
               </For>
@@ -972,5 +1347,30 @@ export function App() {
         </div>
       </aside>
     </div>
+  )
+}
+
+function viewIdentity(state: DesktopState | undefined) {
+  return JSON.stringify([
+    state?.configuration.workspace?.id,
+    state?.configuration.workspace?.path,
+    state?.configuration.runtime ?? "codex",
+    state?.configuration.executable,
+    state?.configuration.nativeHome,
+    state?.session?.id,
+    state?.history?.id,
+  ])
+}
+
+function count(value: number | null | undefined) {
+  return value === null || value === undefined ? copy.unknown : value.toLocaleString()
+}
+
+function selectableSkill(skill: SkillDescriptor, invocation: "user" | "model") {
+  return (
+    skill.metadataStatus !== "partial" &&
+    !skill.observedFeatures.length &&
+    !skill.declared.unknownFields.length &&
+    skill.invocation[invocation] === "allowed-by-metadata"
   )
 }

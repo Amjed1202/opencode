@@ -1,0 +1,109 @@
+{
+  "recordedAt": "2026-09-07T01:23:34.246Z",
+  "application": {
+    "name": "Harness",
+    "version": "0.1.0",
+    "platform": "win32",
+    "arch": "x64",
+    "signing": "unsigned-harness-development-package"
+  },
+  "runtimes": {
+    "electron": {
+      "electron": "42.3.3",
+      "node": "24.15.0",
+      "chrome": "148.0.7778.218",
+      "arch": "x64",
+      "platform": "win32"
+    },
+    "bun": {
+      "version": "1.3.14",
+      "revision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+      "arch": "x64",
+      "platform": "win32"
+    }
+  },
+  "packageDirectory": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1",
+  "executable": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1\\Harness.exe",
+  "archive": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1-c3e223c4.zip",
+  "archiveBytes": 186544769,
+  "archiveSha256": "4b96c0e88a153995ddcdef789f516e608f1646519cddf6658eafc7323a956940",
+  "manifestPath": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1\\artifacts.json",
+  "manifestSha256": "c0451ff093c18cebd19d4e84e2275f800252ccd2d9cf76358e77324596bd40f0",
+  "manifestListedFiles": 96,
+  "bundledExecutables": [
+    "Harness.exe",
+    "resources/runtime/bun.exe"
+  ],
+  "packagedHostSha256": "9d944b689113bfadbb7a8f6c72613996fe949092b046367eede56aefd44ee71b",
+  "currentBuiltHostSha256": "9d944b689113bfadbb7a8f6c72613996fe949092b046367eede56aefd44ee71b",
+  "logs": {
+    "build": "v1-package-build.log",
+    "packageAssembly": "v1-package-assembly.log",
+    "packageUnit": "v1-package-unit.log",
+    "developmentElectron": "v1-package-electron-development.log",
+    "portableElectron": "v1-package-electron-portable.log",
+    "archiveVerification": "v1-package-archive-verification.json",
+    "buildSources": "v1-package-build-sources.json"
+  },
+  "sourceSnapshot": [
+    {
+      "path": "packages/harness-adapters/src/claude/adapter.ts",
+      "sha256": "8f02bb3748fa68852d3b31d1fcac14e85b10415f9227fa1f58de1f621283a100"
+    },
+    {
+      "path": "packages/harness-adapters/src/claude/files.ts",
+      "sha256": "1cd3b39f855b027a03beb14363f848eed6ebc0f1a33bcaee091f429515b41d73"
+    },
+    {
+      "path": "packages/harness-adapters/src/claude/inspect.ts",
+      "sha256": "a61db0df3e325567c45dff1054751af5594145bb4617368903fee0ef65c1917a"
+    },
+    {
+      "path": "packages/harness-adapters/src/claude/runtime.ts",
+      "sha256": "d14e886780e41afa3a71a84825ae1d725377fd79e790159fd1cf141c0ceba920"
+    },
+    {
+      "path": "packages/harness-adapters/src/claude/skills.ts",
+      "sha256": "a48bcfc6379242065bced48b24787d45031189b0e9521da52f1c304a724094f4"
+    }
+  ],
+  "validation": {
+    "buildExitCode": 0,
+    "desktopTypecheckExitCode": 0,
+    "packageUnit": {
+      "passed": 6,
+      "failed": 0,
+      "assertions": 29
+    },
+    "developmentElectron": {
+      "passed": 1,
+      "failed": 0,
+      "launches": 2
+    },
+    "portableElectron": {
+      "passed": 1,
+      "failed": 0,
+      "launches": 2,
+      "minimalSystemPath": true,
+      "bundledBun": true
+    },
+    "archive": {
+      "archivePath": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\outputs\\Harness-windows-x64-v1-rc1-c3e223c4.zip",
+      "archiveBytes": 186544769,
+      "archiveSha256": "4b96c0e88a153995ddcdef789f516e608f1646519cddf6658eafc7323a956940",
+      "manifestSha256": "c0451ff093c18cebd19d4e84e2275f800252ccd2d9cf76358e77324596bd40f0",
+      "manifestFiles": 96,
+      "archiveEntries": 97,
+      "missingFiles": 0,
+      "unexpectedEntries": 0,
+      "hashMismatches": 0
+    },
+    "allPackageAndArchiveHashesVerified": true,
+    "providerPromptsSubmitted": 0,
+    "nativeProvidersConfigured": 0
+  },
+  "limitations": [
+    "Unsigned portable development build; no installer, updater, or public publication.",
+    "Validated on this Windows development machine; live provider work is a separate acceptance check."
+  ]
+}

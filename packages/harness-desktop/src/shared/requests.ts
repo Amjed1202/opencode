@@ -1,13 +1,17 @@
 import type { DesktopOperation } from "./contracts"
 
-const noInput = new Set(["getState", "refresh", "interrupt", "shutdown"])
+const noInput = new Set(["getState", "refresh", "interrupt", "shutdown", "detachConversation", "listFiles"])
 export function decodeDesktopRequest(operation: DesktopOperation, value: unknown): Record<string, unknown> {
   if (noInput.has(operation)) {
     if (value === undefined || value === null) return {}
     return object(value, [])
   }
   if (operation === "start") {
-    const input = object(value, ["modelId", "acknowledgeOverage", "allowFileChanges", "acknowledgeUnverifiedBoundary"])
+    const input = object(
+      value,
+      ["modelId", "acknowledgeOverage", "allowFileChanges", "acknowledgeUnverifiedBoundary", "skills"],
+      ["skills"],
+    )
     text(input.modelId, 128)
     if (
       ![input.acknowledgeOverage, input.allowFileChanges, input.acknowledgeUnverifiedBoundary].every(
@@ -15,6 +19,49 @@ export function decodeDesktopRequest(operation: DesktopOperation, value: unknown
       )
     )
       throw new Error("Invalid session options")
+    if (input.skills !== undefined) {
+      if (
+        !Array.isArray(input.skills) ||
+        input.skills.length > 16 ||
+        Object.getPrototypeOf(input.skills) !== Array.prototype ||
+        Reflect.ownKeys(input.skills).length !== input.skills.length + 1
+      )
+        throw new Error("Invalid skill selection")
+      const descriptors = Object.getOwnPropertyDescriptors(input.skills)
+      const selected = new Set<string>()
+      for (let index = 0; index < input.skills.length; index++) {
+        if (!descriptors[index] || !Object.hasOwn(descriptors[index]!, "value"))
+          throw new Error("Invalid skill selection")
+        const skill = object(descriptors[index]!.value, ["skillId", "sha256", "invocation"])
+        identifier(skill.skillId)
+        if (
+          typeof skill.sha256 !== "string" ||
+          !/^[a-f0-9]{64}$/.test(skill.sha256) ||
+          (skill.invocation !== "user" && skill.invocation !== "model")
+        )
+          throw new Error("Invalid skill binding")
+        const key = `${skill.skillId}:${skill.invocation}`
+        if (selected.has(key)) throw new Error("Duplicate skill invocation")
+        selected.add(key)
+      }
+    }
+    return structuredClone(input)
+  }
+  if (["viewConversation", "inspectConversation", "reconcileConversation"].includes(operation)) {
+    const input = object(value, ["sessionId"])
+    identifier(input.sessionId)
+    return structuredClone(input)
+  }
+  if (operation === "resumeConversation") {
+    const input = object(value, ["sessionId", "acknowledgeOverage", "acknowledgeUnverifiedBoundary"])
+    identifier(input.sessionId)
+    if (typeof input.acknowledgeOverage !== "boolean" || typeof input.acknowledgeUnverifiedBoundary !== "boolean")
+      throw new Error("Invalid resume options")
+    return structuredClone(input)
+  }
+  if (operation === "previewFile") {
+    const input = object(value, ["fileId"])
+    identifier(input.fileId)
     return structuredClone(input)
   }
   if (operation === "selectRuntime") {

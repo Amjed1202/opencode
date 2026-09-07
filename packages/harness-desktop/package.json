@@ -11,6 +11,7 @@
     "test:ui": "playwright test --config test/ui/playwright.config.ts",
     "test:electron": "playwright test --config test/electron/playwright.config.ts",
     "build": "electron-vite build && bun build src/host/worker.ts --target bun --outfile out/host/index.js",
+    "package:windows": "bun script/package-windows.ts",
     "dev": "bun run build && electron .",
     "preview:web": "vite --config vite.preview.config.ts"
   },

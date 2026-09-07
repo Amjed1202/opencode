@@ -16,9 +16,11 @@ const option = (name: string) => {
   const index = process.argv.indexOf(name)
   return index >= 0 ? process.argv[index + 1] : undefined
 }
-const selectedData = option("--harness-data") ?? join(app.getPath("appData"), "Harness-development")
+const selectedData =
+  option("--harness-data") ?? join(app.getPath("appData"), app.isPackaged ? "Harness" : "Harness-development")
 if (!isAbsolute(selectedData)) throw new Error("Harness storage path must be absolute")
 app.setName("Harness")
+if (process.platform === "win32") app.setAppUserModelId("com.harness.desktop")
 app.setPath("userData", selectedData)
 protocol.registerSchemesAsPrivileged([
   { scheme: "harness", privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -40,7 +42,9 @@ else {
     .then(async () => {
       await mkdir(selectedData, { recursive: true, mode: 0o700 })
       const directory = await realpath(selectedData)
-      const executable = option("--harness-bun") ?? process.env.HARNESS_BUN_EXECUTABLE
+      const executable = app.isPackaged
+        ? join(process.resourcesPath, "runtime", "bun.exe")
+        : (option("--harness-bun") ?? process.env.HARNESS_BUN_EXECUTABLE)
       if (!executable || !isAbsolute(executable)) throw new Error("Explicit Bun executable is required")
       const bun = await realpath(executable)
       const toolPath =
@@ -127,6 +131,7 @@ else {
               ...(lastState.session ? { session: { ...lastState.session, status: "uncertain" } } : {}),
               permissions: [],
               inputs: [],
+              runtimeFeatures: { resume: false, inspection: false },
               models: {
                 status: lastState.configuration.runtime === "claude" ? "unsupported" : "unavailable",
                 items: [],

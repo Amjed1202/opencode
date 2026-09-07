@@ -1,0 +1,41 @@
+{
+  "checkedAt": "2026-09-07T01:15:22.694Z",
+  "mode": "diagnostic",
+  "runtime": "codex",
+  "nativeExecutableSelected": true,
+  "nativeHomeSelected": true,
+  "rawStatusRetained": false,
+  "credentialsCopied": false,
+  "providerPromptsSubmitted": 0,
+  "hostSendAttempts": 0,
+  "outcome": "diagnostic-ready",
+  "checks": {
+    "noSessionDuringDiagnostic": true
+  },
+  "promptLimit": 4,
+  "fixtureDirectory": "C:\\Users\\Amjed\\Documents\\Codex\\2026-09-06\\files-pasted-by-the-user-we\\work\\v1-native-repositories\\codex-282099b4-67aa-4e56-aeb7-0e4e2d36d4fe",
+  "originalFixturePreserved": true,
+  "generatedSkill": {
+    "prepared": false,
+    "invoked": false,
+    "liveValidation": "deferred-not-selected"
+  },
+  "connection": {
+    "status": "ready",
+    "runtimeVersion": "0.153.4",
+    "authentication": "subscription",
+    "billing": "subscription",
+    "providerOverage": "unknown",
+    "modelsStatus": "ready",
+    "modelIds": [
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex-spark"
+    ]
+  },
+  "completedAt": "2026-09-07T01:15:23.050Z"
+}

@@ -3,7 +3,7 @@
   "version": "codex-cli 0.153.4",
   "command": "codex app-server generate-ts --out <directory>",
   "generatedAt": "2026-09-06",
-  "selection": "Unmodified transitive closure of adapter-used request, account, approval, human-input, history and model-list types; runtime responses remain validated as unknown.",
+  "selection": "Unmodified transitive closure of adapter-used request, account, approval, human-input, history, model-list and token-usage types; runtime responses remain validated as unknown.",
   "license": "Apache-2.0 (OpenAI codex)",
   "files": {
     "AbsolutePathBuf.ts": "a79d31d5e8f24c58c8cce2633e5e4fc5b0bb88d1c44c69e7ce7d0dc7c1252272",
@@ -86,7 +86,10 @@
     "v2/TurnItemsView.ts": "df5e5fd79e6c28ff89e5e201c761535d7988fbaa9caa5fc6bf71f655f353668c",
     "v2/TurnStartParams.ts": "049f50eff62666ed07e171d8d0a8ec08e745f697d71972a4a169e4fb7b3682d2",
     "v2/TurnToolOutput.ts": "6cd2705dfb62b22df331f044ab73530cc37fe82c7c6f43ec5379208563b1343e",
-    "v2/UserInput.ts": "20bb8914250b88e4831123fed101a7ea2336efab4c2b13fd6336651ff0c65808"
+    "v2/UserInput.ts": "20bb8914250b88e4831123fed101a7ea2336efab4c2b13fd6336651ff0c65808",
+    "v2/ThreadTokenUsageUpdatedNotification.ts": "53ce4421d686b8a7f9a86c5ad54de2a7dceecfb95df74fa5f441947e136f063d",
+    "v2/ThreadTokenUsage.ts": "27cae6c3e6c44696225e9a0903e0531c6eff126c6de3da2176bc5cdd904def4e",
+    "v2/TokenUsageBreakdown.ts": "e983f21175fdfdf1a239e26cd8916e1cb765bc0cb7904e2bd9cc83ffe325c8a7"
   },
   "upstreamTag": "rust-v0.153.4",
   "upstreamUrl": "https://github.com/openai/codex/tree/rust-v0.153.4",

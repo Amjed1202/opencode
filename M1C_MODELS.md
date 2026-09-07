@@ -1,5 +1,7 @@
 # Native Codex model selection
 
+Historical model-picker increment. The later [V1 desktop](V1_STATUS.md) also adds Claude execution, Skills, history/recovery, files, usage and Windows packaging. Native catalog limitations below remain applicable.
+
 The desktop now loads a bounded model catalog from the selected Codex **0.153.4** runtime. After **Check connection**, choose a model from the **Codex model** list, review the existing billing and execution acknowledgments, then start the conversation. There is no automatic selection, hardcoded fallback or free-text model route in the desktop.
 
 The list represents what native Codex reports. It does not prove subscription entitlement, remote availability, disabled overage or additional tool capabilities. Native Codex may return cached data, fetch catalog metadata over the network and maintain its own cache. The application does not call an inference API to discover models. [Pinned native evidence](docs/validation/m1c-models-native-evidence.md).

@@ -19,6 +19,28 @@ const status = JSON.stringify({
 })
 
 async function main() {
+  if (scenario?.startsWith("subscription-")) {
+    const value: Record<string, unknown> = {
+      loggedIn: true,
+      authMethod: "claude.ai",
+      apiProvider: "firstParty",
+      subscriptionType: "pro",
+      email: "fixture@example.invalid",
+      orgId: "fixture-org",
+      unknown: secret,
+      accessToken: secret,
+    }
+    if (scenario === "subscription-max") value.subscriptionType = "max"
+    if (scenario === "subscription-team") value.subscriptionType = "team"
+    if (scenario === "subscription-console") value.authMethod = "console"
+    if (scenario === "subscription-cloud") value.apiProvider = "bedrock"
+    if (scenario === "subscription-api") value.apiKeySource = "user"
+    if (scenario === "subscription-no-email") delete value.email
+    if (scenario === "subscription-no-org") delete value.orgId
+    if (scenario === "subscription-bad-exit") process.exitCode = 1
+    process.stdout.write(JSON.stringify(value))
+    return
+  }
   if (scenario === "stdin-eof") {
     if ((await Bun.stdin.text()).length !== 0) {
       process.exitCode = 99

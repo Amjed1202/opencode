@@ -27,7 +27,7 @@ export function registerDesktopIpc(window: BrowserWindow, host: HostClient, docu
         try {
           const current = (await host.request("getState")) as DesktopState
           guard(event)
-          if (current.session) throw new Error("Restart before changing an attached session")
+          if (current.session) throw new Error("Close the attached conversation before changing its configuration")
           const title =
             method === "chooseWorkspace"
               ? nativeCopy.repository

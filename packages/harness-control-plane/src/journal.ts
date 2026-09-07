@@ -42,6 +42,14 @@ export interface InputRecord {
   readonly resolution?: HumanInputResolution
 }
 
+/** Host-submitted text is an attempt, not evidence that native work started or completed. */
+export interface JournalUserMessage {
+  readonly commandId: string
+  readonly messageId: string
+  readonly text: string
+  readonly recordedAt: string
+}
+
 export class SQLiteJournal implements EventStore, SessionStore {
   private readonly database: Database
   private readonly statements = new Map<string, Statement<unknown, SQLQueryBindings[]>>()
@@ -109,6 +117,22 @@ export class SQLiteJournal implements EventStore, SessionStore {
         session TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS journal_sessions_workspace ON journal_sessions (workspace_id);
+      CREATE TABLE IF NOT EXISTS journal_session_updates (
+        session_id TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS journal_host_contexts (
+        session_id TEXT PRIMARY KEY,
+        context_sha256 TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS journal_user_messages (
+        command_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        recorded_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS journal_user_messages_session ON journal_user_messages (session_id, recorded_at);
       CREATE TABLE IF NOT EXISTS journal_streams (
         id TEXT PRIMARY KEY,
         epoch TEXT NOT NULL,
@@ -538,6 +562,163 @@ export class SQLiteJournal implements EventStore, SessionStore {
       .map((row) => JSON.parse(row.session) as AgentSession)
   }
 
+  /** Bounded local catalog only; no native history discovery is performed. */
+  async recentSessions(workspaceId: string, limit = 100) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error("Invalid session preview limit")
+    const rows = this.query<{ session: string; updated_at: string }, [string, number]>(
+      `SELECT session, MAX(json_extract(session, '$.createdAt'),
+        COALESCE((SELECT updated_at FROM journal_session_updates WHERE session_id = sessions.id), ''),
+        COALESCE((SELECT MAX(json_extract(event, '$.observedAt')) FROM journal_events WHERE stream_id = sessions.id), ''),
+        COALESCE((SELECT MAX(recorded_at) FROM journal_user_messages WHERE session_id = sessions.id), ''),
+        COALESCE((SELECT MAX(json_extract(record, '$.receipt.recordedAt')) FROM journal_commands
+          WHERE json_extract(record, '$.sessionId') = sessions.id), '')) AS updated_at
+       FROM journal_sessions AS sessions WHERE workspace_id = ?
+       ORDER BY updated_at DESC, id DESC LIMIT ?`,
+    ).all(workspaceId, limit + 1)
+    return {
+      items: rows
+        .slice(0, limit)
+        .map((row) => ({ session: JSON.parse(row.session) as AgentSession, updatedAt: row.updated_at })),
+      truncated: rows.length > limit,
+    }
+  }
+
+  /** Immutable host-selected context. A missing historical binding never authorizes native attachment. */
+  async bindHostContext(sessionId: string, contextSha256: string): Promise<void> {
+    if (!/^[a-f0-9]{64}$/.test(contextSha256) || !(await this.get(sessionId)))
+      throw new Error("Invalid host context binding")
+    this.database
+      .transaction(() => {
+        const current = this.query<{ context_sha256: string }, [string]>(
+          "SELECT context_sha256 FROM journal_host_contexts WHERE session_id = ?",
+        ).get(sessionId)
+        if (current && current.context_sha256 !== contextSha256) throw new Error("Host context binding conflict")
+        this.query("INSERT OR IGNORE INTO journal_host_contexts (session_id, context_sha256) VALUES (?, ?)").run(
+          sessionId,
+          contextSha256,
+        )
+      })
+      .immediate()
+  }
+
+  async hostContext(sessionId: string): Promise<string | undefined> {
+    return this.query<{ context_sha256: string }, [string]>(
+      "SELECT context_sha256 FROM journal_host_contexts WHERE session_id = ?",
+    ).get(sessionId)?.context_sha256
+  }
+
+  async recordUserMessage(sessionId: string, message: JournalUserMessage): Promise<void> {
+    if (
+      !message.commandId ||
+      message.commandId.length > 256 ||
+      !message.messageId ||
+      message.messageId.length > 256 ||
+      !message.text ||
+      Buffer.byteLength(message.text) > 256 * 1024 ||
+      !Number.isFinite(Date.parse(message.recordedAt)) ||
+      !(await this.get(sessionId))
+    )
+      throw new Error("Invalid local user message")
+    this.database
+      .transaction(() => {
+        const current = this.query<
+          {
+            session_id: string
+            message_id: string
+            text: string
+          },
+          [string]
+        >("SELECT session_id, message_id, text FROM journal_user_messages WHERE command_id = ?").get(message.commandId)
+        if (
+          current &&
+          (current.session_id !== sessionId ||
+            current.message_id !== message.messageId ||
+            current.text !== message.text)
+        )
+          throw new Error("Local user message conflict")
+        this.query(
+          "INSERT OR IGNORE INTO journal_user_messages (command_id, session_id, message_id, text, recorded_at) VALUES (?, ?, ?, ?, ?)",
+        ).run(message.commandId, sessionId, message.messageId, message.text, message.recordedAt)
+      })
+      .immediate()
+  }
+
+  /** Bounded journal tail. Restricted artifact contents and arbitrary native history are never opened. */
+  async preview(sessionId: string, maxEvents = 1000, maxBytes = 512 * 1024) {
+    if (
+      !Number.isSafeInteger(maxEvents) ||
+      maxEvents < 1 ||
+      maxEvents > 2000 ||
+      !Number.isSafeInteger(maxBytes) ||
+      maxBytes < 1024 ||
+      maxBytes > 1024 * 1024
+    )
+      throw new Error("Invalid history preview limits")
+    return this.database.transaction(() => {
+      const stream = this.lookupStream(sessionId)
+      const rows = this.query<{ event: string | null; sequence: number }, [number, string, number]>(
+        `SELECT CASE WHEN length(CAST(event AS BLOB)) <= ? THEN event ELSE NULL END AS event, sequence
+         FROM journal_events WHERE stream_id = ? ORDER BY sequence DESC LIMIT ?`,
+      ).all(maxBytes, sessionId, maxEvents + 1)
+      const users = this.query<
+        {
+          command_id: string
+          message_id: string
+          text: string | null
+          recorded_at: string
+          state: string | null
+        },
+        [number, string]
+      >(
+        `SELECT command_id, message_id, CASE WHEN length(CAST(text AS BLOB)) <= ? THEN text ELSE NULL END AS text,
+          recorded_at, json_extract(commands.record, '$.receipt.state') AS state
+         FROM journal_user_messages AS messages LEFT JOIN journal_commands AS commands ON commands.id = messages.command_id
+         WHERE messages.session_id = ? ORDER BY recorded_at DESC, command_id DESC LIMIT 201`,
+      ).all(maxBytes, sessionId)
+      let bytes = 0
+      let truncated = rows.length > maxEvents || users.length > 200
+      const events = rows
+        .slice(0, maxEvents)
+        .flatMap((row) => {
+          if (!row.event || bytes + Buffer.byteLength(row.event) > maxBytes) {
+            truncated = true
+            return []
+          }
+          bytes += Buffer.byteLength(row.event)
+          return [JSON.parse(row.event) as AgentEvent]
+        })
+        .reverse()
+      const messages = users
+        .slice(0, 200)
+        .flatMap((row) => {
+          if (!row.text || bytes + Buffer.byteLength(row.text) > maxBytes) {
+            truncated = true
+            return []
+          }
+          bytes += Buffer.byteLength(row.text)
+          return [
+            {
+              commandId: row.command_id,
+              messageId: row.message_id,
+              text: row.text,
+              recordedAt: row.recorded_at,
+              state: row.state ?? "not-recorded",
+            },
+          ]
+        })
+        .reverse()
+      const retained = this.query<{ through_sequence: number }, [string]>(
+        "SELECT through_sequence FROM journal_retention WHERE stream_id = ?",
+      ).get(sessionId)
+      return {
+        events,
+        messages,
+        truncated: truncated || Boolean(retained),
+        ...(stream ? { cursor: { streamId: sessionId, epoch: stream.epoch, sequence: stream.last_sequence } } : {}),
+      }
+    })()
+  }
+
   async save(session: AgentSession, expectedRevision: number | null): Promise<void> {
     if (!session.id || !session.workspaceId || session.intent.workspaceId !== session.workspaceId)
       throw new Error("Invalid session identity")
@@ -558,6 +739,10 @@ export class SQLiteJournal implements EventStore, SessionStore {
           `INSERT INTO journal_sessions (id, workspace_id, revision, session) VALUES (?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET workspace_id = excluded.workspace_id, revision = excluded.revision, session = excluded.session`,
         ).run(session.id, session.workspaceId, session.revision, JSON.stringify(session))
+        this.query(
+          `INSERT INTO journal_session_updates (session_id, updated_at) VALUES (?, ?)
+          ON CONFLICT (session_id) DO UPDATE SET updated_at = excluded.updated_at`,
+        ).run(session.id, new Date().toISOString())
       })
       .immediate()
   }
